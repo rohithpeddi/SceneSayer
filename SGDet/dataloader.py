@@ -12,7 +12,7 @@ from torch.utils.data import Dataset
 from torchvision.transforms import transforms
 from dataset import *
 
-DATA_PATH = "../all_frames_full"
+DATA_PATH = "../all_frames_final"
 
 def AG_dataloader(
     data:str = DATA_PATH, 
@@ -27,7 +27,7 @@ def AG_dataloader(
             batch_size = batch_size, 
             shuffle = True, 
             num_workers = num_workers, 
-            pin_memory = True
+           # pin_memory = True
         )
     else: 
          return DataLoader(
@@ -35,7 +35,7 @@ def AG_dataloader(
             batch_size = batch_size, 
             shuffle = False, 
             num_workers = num_workers, 
-            pin_memory = True
+            #pin_memory = True
         ) 
 
 

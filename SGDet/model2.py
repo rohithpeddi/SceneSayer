@@ -85,7 +85,7 @@ class SGG(nn.Module):
         return encoding.unsqueeze(0)
 
     def forward(self,x):
-        entry  = x[3]
+        entry  = x
         # vid_no = entry['gt_annotation'][0][0]['frame'][0].split('.')[0]
         # gt_rel = pickle.load(open(path+vid_no+'.pkl','rb'))
         # a_gt = gt_rel["attention_gt"]
@@ -93,7 +93,6 @@ class SGG(nn.Module):
         # c_gt = gt_rel["contacting_gt"]
 
         in_x = entry["global_output"]
-        print("model global",in_x.shape)
         im_idx = entry["im_idx"]
         uniq_im = torch.unique(im_idx)
 
@@ -128,5 +127,6 @@ class SGG(nn.Module):
 
         entry["spatial_distribution"] = torch.sigmoid(entry["spatial_distribution"])
         entry["contacting_distribution"] = torch.sigmoid(entry["contacting_distribution"])
+
 
         return entry

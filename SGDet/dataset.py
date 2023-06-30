@@ -44,33 +44,32 @@ class AG_Dataset(Dataset):
         ):
         entry={}
         graph_path = self.files[index]
-        print("files ", graph_path)
         annot_path = self.gt_annotations[index]
-        print("annot ", annot_path)
         temp = pickle.load(open(graph_path,'rb'))
         gt = pickle.load(open(annot_path,'rb'))
         entry['global_output'] = temp['global_output']
-        entry['gt_annotation'] = gt
+        temp['gt_annotation'] = gt
         entry["boxes"] = temp['boxes']
         entry["labels"] = temp['labels']
         entry["scores"] = temp['scores']
-        entry['frames'] = temp['frames']
+        #entry['frames'] = temp['frames']
         entry["pred_labels"] = temp['pred_labels']
-        entry["pred_scores"] = temp['pred_scores']
+        #entry["pred_scores"] = temp['pred_scores']
         entry["pair_idx"] = temp['pair_idx']
         entry["im_idx"] = temp['im_idx']
-        entry["human_idx"] = temp['human_idx']
-        dense_graph = temp['dense_graph']
-        pred_graph = temp["pred_graph"]
-        gt_graph = temp["graph"]
+        #entry["human_idx"] = temp['human_idx']
+        # dense_graph = temp['dense_graph']
+        # pred_graph = temp["pred_graph"]
+        # gt_graph = temp["graph"]
         mask = np.ones(101)
-        for i in range(len(dense_graph),101,1):
-            mask[i] *= 0
+        # for i in range(len(dense_graph),101,1):
+        #     mask[i] *= 0
         pad_dense= np.zeros(1)
         pad= np.zeros(1)
         
 
-        return torch.from_numpy(dense_graph), torch.from_numpy(pred_graph),torch.from_numpy(gt_graph),entry
+        #return torch.from_numpy(dense_graph), torch.from_numpy(pred_graph),torch.from_numpy(gt_graph),entry
+        return temp
 
     def __len__(self):
         return len(self.files)

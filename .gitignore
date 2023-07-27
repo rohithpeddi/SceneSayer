@@ -6,6 +6,15 @@ __pycache__/
 # C extensions
 *.so
 
+data
+models
+*ipynb
+fasterRCNN/models/faster_rcnn_ag.pth
+dataloader/*pkl
+lib/fpn
+
+
+
 # Distribution / packaging
 .Python
 build/

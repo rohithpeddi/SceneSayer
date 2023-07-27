@@ -1,0 +1,13 @@
+# ninja log v5
+1	10701	1630354394095080233	/home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.8/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/ROIAlign_cuda.o	a6fca99ca421493d
+1	10961	1630354394355082133	/home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.8/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/nms.o	837874da34aa5ffa
+1	10991	1630354394387082366	/home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.8/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/ROIPool_cuda.o	5e9a86f49845271c
+0	14564	1630354397959108467	/home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.8/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cpu/nms_cpu.o	f930b47ffc25c5bb
+0	14700	1630354398095109461	/home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.8/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cpu/ROIAlign_cpu.o	7c8fe6dc317b2567
+0	16365	1630354399759121619	/home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.8/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/vision.o	fd555d98cede75f1
+38	8980	1630354409419192202	/home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.8/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/nms.o	b469c363d21643e6
+38	9042	1630354409479192640	/home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.8/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/ROIPool_cuda.o	972131557b792953
+38	9515	1630354409951196088	/home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.8/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/ROIAlign_cuda.o	fcbdd4d8737ce410
+38	14745	1630354415183234316	/home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.8/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cpu/ROIAlign_cpu.o	259a495020e5fe08
+38	15412	1630354415851239197	/home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.8/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cpu/nms_cpu.o	7e4785ca1f1337bf
+37	16260	1630354416695245363	/home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.8/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/vision.o	ca843a789c9a7f14

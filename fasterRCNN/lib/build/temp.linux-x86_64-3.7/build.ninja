@@ -1,0 +1,33 @@
+ninja_required_version = 1.3
+cxx = c++
+nvcc = /software/cuda-11.1/bin/nvcc
+
+cflags = -pthread -B /home/shengyu8/anaconda3/envs/STTran/compiler_compat -Wl,--sysroot=/ -Wsign-compare -DNDEBUG -g -fwrapv -O3 -Wall -Wstrict-prototypes -fPIC -DWITH_CUDA -I/home/shengyu8/STTran/fasterRCNN/lib/model/csrc -I/home/shengyu8/anaconda3/envs/STTran/lib/python3.7/site-packages/torch/include -I/home/shengyu8/anaconda3/envs/STTran/lib/python3.7/site-packages/torch/include/torch/csrc/api/include -I/home/shengyu8/anaconda3/envs/STTran/lib/python3.7/site-packages/torch/include/TH -I/home/shengyu8/anaconda3/envs/STTran/lib/python3.7/site-packages/torch/include/THC -I/software/cuda-11.1/include -I/home/shengyu8/anaconda3/envs/STTran/include/python3.7m -c
+post_cflags = -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0 -std=c++14 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0
+cuda_cflags = -DWITH_CUDA -I/home/shengyu8/STTran/fasterRCNN/lib/model/csrc -I/home/shengyu8/anaconda3/envs/STTran/lib/python3.7/site-packages/torch/include -I/home/shengyu8/anaconda3/envs/STTran/lib/python3.7/site-packages/torch/include/torch/csrc/api/include -I/home/shengyu8/anaconda3/envs/STTran/lib/python3.7/site-packages/torch/include/TH -I/home/shengyu8/anaconda3/envs/STTran/lib/python3.7/site-packages/torch/include/THC -I/software/cuda-11.1/include -I/home/shengyu8/anaconda3/envs/STTran/include/python3.7m -c
+cuda_post_cflags = -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -DCUDA_HAS_FP16=1 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0 -gencode=arch=compute_70,code=compute_70 -gencode=arch=compute_70,code=sm_70 -std=c++14
+ldflags = 
+
+rule compile
+  command = $cxx -MMD -MF $out.d $cflags -c $in -o $out $post_cflags
+  depfile = $out.d
+  deps = gcc
+
+rule cuda_compile
+  depfile = $out.d
+  deps = gcc
+  command = $nvcc  $cuda_cflags -c $in -o $out $cuda_post_cflags
+
+
+
+build /home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.7/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/vision.o: compile /home/shengyu8/STTran/fasterRCNN/lib/model/csrc/vision.cpp
+build /home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.7/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cpu/ROIAlign_cpu.o: compile /home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cpu/ROIAlign_cpu.cpp
+build /home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.7/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cpu/nms_cpu.o: compile /home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cpu/nms_cpu.cpp
+build /home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.7/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/ROIAlign_cuda.o: cuda_compile /home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/ROIAlign_cuda.cu
+build /home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.7/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/ROIPool_cuda.o: cuda_compile /home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/ROIPool_cuda.cu
+build /home/shengyu8/STTran/fasterRCNN/lib/build/temp.linux-x86_64-3.7/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/nms.o: cuda_compile /home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/nms.cu
+
+
+
+
+

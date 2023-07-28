@@ -48,11 +48,11 @@ def dump_frames(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Dump frames")
-    parser.add_argument("--video_dir", default="dataset/ag/videos",
+    parser.add_argument("--video_dir", default="/data/rohith/ag/videos",
                         help="Folder containing Charades videos.")
-    parser.add_argument("--frame_dir", default="dataset/ag/frames",
+    parser.add_argument("--frame_dir", default="/data/rohith/ag/frames",
                         help="Root folder containing frames to be dumped.")
-    parser.add_argument("--annotation_dir", default="dataset/ag/annotations",
+    parser.add_argument("--annotation_dir", default="/data/rohith/ag/annotations",
                         help=("Folder containing annotation files, including object_bbox_and_relationship.pkl, "
                               "person_bbox.pkl and frame_list.txt."))
     parser.add_argument("--all_frames", action="store_true",

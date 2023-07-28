@@ -147,7 +147,7 @@ for epoch in range(conf.nepoch):
 
     # """ ############## saving their output for train data ################### """
         vid_no = gt_annotation[0][0]["frame"].split('.')[0]
-        pickle.dump(pred,open('/home/cse/msr/csy227518/scratch/Project/frames_predcls/train_'+str(epoch)+'/'+vid_no+'.pkl','wb'))
+        pickle.dump(pred,open('/data/rohith/ag/frames_sgdet/train_'+str(epoch)+'/'+vid_no+'.pkl','wb'))
     # """ ##################################################################### """
     
         losses = {}
@@ -201,7 +201,7 @@ for epoch in range(conf.nepoch):
 
 # """ ############## saving their output for test data ################### """
             vid_no = gt_annotation[0][0]["frame"].split('.')[0]
-            pickle.dump(pred,open('/home/cse/msr/csy227518/scratch/Project/frames_predcls/test_'+str(epoch)+'/'+vid_no+'.pkl','wb'))
+            pickle.dump(pred,open('/data/rohith/ag/frames_sgdet/test_'+str(epoch)+'/'+vid_no+'.pkl','wb'))
 # """#####################################################################"""
 
             evaluator.evaluate_scene_graph(gt_annotation, pred)
@@ -212,7 +212,7 @@ for epoch in range(conf.nepoch):
     scheduler.step(score)
 
 
-# python train_predcls.py -mode predcls -save_path predcls -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/
+# python train_predcls.py -mode sgdet -save_path ./checkpoints -datasize large -data_path /data/rohith/ag/
 
 
 

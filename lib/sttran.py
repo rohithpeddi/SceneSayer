@@ -539,7 +539,8 @@ class STTran(nn.Module):
 		assert len(indices_flat) == len(entry["pair_idx"])
 		global_output = torch.zeros_like(rel_features).to(rel_features.device)
 		global_output.scatter_(0, indices_flat, rel_flat)
-		
+
+		entry["global_output"] = global_output
 		entry["attention_distribution"] = self.a_rel_compress(global_output)
 		entry["spatial_distribution"] = self.s_rel_compress(global_output)
 		entry["contacting_distribution"] = self.c_rel_compress(global_output)

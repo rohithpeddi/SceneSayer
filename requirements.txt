@@ -1,4 +1,15 @@
+tqdm
 numpy
 pandas
 tqdm
 cython
+scipy==1.1.0
+opencv-python
+easydict
+cython
+cffi
+msgpack
+easydict
+matplotlib
+pyyaml
+tensorboardX

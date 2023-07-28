@@ -200,4 +200,6 @@ for epoch in range(MAX_EPOCHS):
 	print("save the checkpoint after {} epochs".format(epoch))
 	print("*" * 40)
 
-"""(['boxes', 'labels', 'scores', 'distribution', 'pred_labels', 'features', 'fmaps', 'im_info', 'indices', 'pred_scores', 'pair_idx', 'im_idx', 'human_idx', 'union_feat', 'union_box', 'spatial_masks', 'attention_distribution', 'spatial_distribution', 'contacting_distribution', 'global_output', 'gt_annotation'])"""
+# """(['boxes', 'labels', 'scores', 'distribution', 'pred_labels', 'features', 'fmaps', 'im_info', 'indices',
+# 'pred_scores', 'pair_idx', 'im_idx', 'human_idx', 'union_feat', 'union_box', 'spatial_masks',
+# 'attention_distribution', 'spatial_distribution', 'contacting_distribution', 'global_output', 'gt_annotation'])"""

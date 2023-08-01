@@ -3,9 +3,12 @@ Neuro Symbolic Video Prediction/ Action Anticipation
 
 ```
 conda create -n sgg python=3.7 pip
+conda activate sgg
+
 pip install torch==1.10.1+cu111 torchvision==0.11.2+cu111 torchaudio==0.10.1 -f https://download.pytorch.org/whl/cu111/torch_stable.html
 pip install -r requirements.txt
 ```
+
 
 # Dataset Preparation 
 
@@ -84,3 +87,7 @@ Change the folder paths in 'fasterRCNN/lib/faster_rcnn.egg.info/SOURCES.txt' to 
 ```
 python setup.py build develop
 ```
+
+If any errors check gcc version ```Works for 9.x.x```
+
+Follow [this](https://www.youtube.com/watch?v=aai42Qp6L28) for changing gcc version

@@ -1,6 +1,11 @@
 # NeSysVideoPrediction
 Neuro Symbolic Video Prediction/ Action Anticipation
 
+conda create -n sgg python=3.7 pip
+conda install -c anaconda _libgcc_mutex
+pip install -r requirements.txt
+
+
 
 # Setup
 

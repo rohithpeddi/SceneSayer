@@ -1,10 +1,10 @@
 setup.py
-/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/vision.cpp
-/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cpu/ROIAlign_cpu.cpp
-/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cpu/nms_cpu.cpp
-/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/ROIAlign_cuda.cu
-/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/ROIPool_cuda.cu
-/home/shengyu8/STTran/fasterRCNN/lib/model/csrc/cuda/nms.cu
+C:/Users/rohit/PycharmProjects/NeSysVideoPrediction/fasterRCNN/lib/model/csrc/vision.cpp
+C:/Users/rohit/PycharmProjects/NeSysVideoPrediction/fasterRCNN/lib/model/csrc/cpu/ROIAlign_cpu.cpp
+C:/Users/rohit/PycharmProjects/NeSysVideoPrediction/fasterRCNN/lib/model/csrc/cpu/nms_cpu.cpp
+C:/Users/rohit/PycharmProjects/NeSysVideoPrediction/fasterRCNN/lib/model/csrc/cuda/ROIAlign_cuda.cu
+C:/Users/rohit/PycharmProjects/NeSysVideoPrediction/fasterRCNN/lib/model/csrc/cuda/ROIPool_cuda.cu
+C:/Users/rohit/PycharmProjects/NeSysVideoPrediction/fasterRCNN/lib/model/csrc/cuda/nms.cu
 datasets/__init__.py
 datasets/coco.py
 datasets/ds_utils.py

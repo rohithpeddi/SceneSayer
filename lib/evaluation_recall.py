@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 from functools import reduce
 from lib.ults.pytorch_misc import intersect_2d, argsort_desc
-from lib.fpn.box_intersections_cpu.bbox import bbox_overlaps
+import lib.fpn.box_intersections_cpu.bbox.bbox_overlaps as bbox_overlaps
 
 
 class BasicSceneGraphEvaluator:
@@ -271,7 +271,7 @@ def evaluate_recall(gt_rels, gt_boxes, gt_classes,
 	
 	if not np.all(scores_overall[1:] <= scores_overall[:-1] + 1e-5):
 		print("Somehow the relations weren't sorted properly: \n{}".format(scores_overall))
-		# raise ValueError("Somehow the relations werent sorted properly")
+	# raise ValueError("Somehow the relations werent sorted properly")
 	
 	# Compute recall. It's most efficient to match once and then do recall after
 	pred_to_gt = _compute_pred_matches(

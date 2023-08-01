@@ -130,3 +130,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+/lib/fpn/box_intersections_cpu/build/
+/lib/fpn/box_intersections_cpu/bbox.c
+/lib/draw_rectangles/build/
+/lib/draw_rectangles/draw_rectangles.c

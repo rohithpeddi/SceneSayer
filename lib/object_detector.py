@@ -7,7 +7,7 @@ import cv2
 import os
 
 from lib.funcs import assign_relations
-from lib.draw_rectangles.draw_rectangles import draw_union_boxes
+import lib.draw_rectangles.draw_rectangles.draw_union_boxes as draw_union_boxes
 from fasterRCNN.lib.model.faster_rcnn.resnet import resnet
 from fasterRCNN.lib.model.rpn.bbox_transform import bbox_transform_inv, clip_boxes
 from fasterRCNN.lib.model.roi_layers import nms

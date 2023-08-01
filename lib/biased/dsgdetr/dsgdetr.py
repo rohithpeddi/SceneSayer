@@ -12,7 +12,7 @@ from torch.nn.utils.rnn import pad_sequence
 from lib.word_vectors import obj_edge_vectors
 from lib.fpn.box_utils import center_size
 from fasterRCNN.lib.model.roi_layers import ROIAlign, nms
-from lib.draw_rectangles.draw_rectangles import draw_union_boxes
+import lib.draw_rectangles.draw_rectangles.draw_union_boxes as draw_union_boxes
 from torchvision.ops.boxes import box_area
 from itertools import combinations
 from constants import Constants as const

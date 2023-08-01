@@ -7,6 +7,21 @@ pip install torch==1.10.1+cu111 torchvision==0.11.2+cu111 torchaudio==0.10.1 -f 
 pip install -r requirements.txt
 ```
 
+# Dataset Preparation 
+
+### Estimated time: 10 hours
+
+Follow the instructions from [here](https://github.com/JingweiJ/ActionGenome)
+
+Download Charades videos ```data/ag/videos```
+
+Download all action genome annotations ```data/ag/annotations```
+
+Dump all frames ```data/ag/frames```
+
+#### Change the corresponding data file paths in ```datasets/action_genome/tools/dump_frames.py```
+
+
 # Setup
 
 ### Build draw_rectangles modules

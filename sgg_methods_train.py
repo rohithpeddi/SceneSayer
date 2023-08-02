@@ -112,10 +112,11 @@ def train_dsg_detr():
                     contact_label[i, pred[const.CONTACTING_GT][i]] = 1
 
             vid_no = gt_annotation[0][0][const.FRAME].split('.')[0]
-            train_intermediate_dump_file = os.path.join(conf.data_path, f"frames_{conf.mode}", f"train_{str(epoch)}",
-                                                        f"{vid_no}.pkl")
-            os.makedirs(train_intermediate_dump_file, exist_ok=True)
-            pickle.dump(pred, open(train_intermediate_dump_file, 'wb'))
+            train_intermediate_dump_directory = os.path.join(conf.data_path, f"frames_{conf.mode}", f"train_{str(epoch)}")
+            os.makedirs(train_intermediate_dump_directory, exist_ok=True)
+            train_intermediate_dump_file = os.path.join(train_intermediate_dump_directory, f"{vid_no}.pkl")
+            with open(train_intermediate_dump_file, 'wb') as f:
+                pickle.dump(pred, f)
 
             losses = {}
             if conf.mode == const.SGCLS or conf.mode == const.SGDET:
@@ -166,11 +167,14 @@ def train_dsg_detr():
                 entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
                 get_sequence(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
                 pred = model(entry)
+                
                 vid_no = gt_annotation[0][0][const.FRAME].split('.')[0]
-                test_intermediate_dump_file = os.path.join(conf.data_path, f"frames_{conf.mode}", f"test_{str(epoch)}",
-                                                           f"{vid_no}.pkl")
-                os.makedirs(test_intermediate_dump_file, exist_ok=True)
-                pickle.dump(pred, open(test_intermediate_dump_file, 'wb'))
+                test_intermediate_dump_directory = os.path.join(conf.data_path, f"frames_{conf.mode}", f"test_{str(epoch)}")
+                os.makedirs(test_intermediate_dump_directory, exist_ok=True)
+                test_intermediate_dump_file = os.path.join(test_intermediate_dump_directory, f"{vid_no}.pkl")
+                with open(test_intermediate_dump_file, 'wb') as f:
+                    pickle.dump(pred, f)
+                    
                 evaluator.evaluate_scene_graph(gt_annotation, pred)
             print('-----------------------------------------------------------------------------------', flush=True)
         score = np.mean(evaluator.result_dict[conf.mode + "_recall"][20])

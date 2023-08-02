@@ -553,6 +553,7 @@ class DsgDETR(nn.Module):
 		global_output = torch.zeros_like(rel_features).to(rel_features.device)
 		global_output.scatter_(0, indices_flat, rel_flat)
 		
+		entry[const.GLOBAL_OUTPUT] = global_output
 		entry[const.ATTENTION_DISTRIBUTION] = self.a_rel_compress(global_output)
 		entry[const.SPATIAL_DISTRIBUTION] = self.s_rel_compress(global_output)
 		entry[const.CONTACTING_DISTRIBUTION] = self.c_rel_compress(global_output)

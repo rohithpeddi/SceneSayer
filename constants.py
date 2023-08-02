@@ -34,6 +34,9 @@ class Constants:
 	ADAMW = "adamw"
 	SGD = "sgd"
 	OBJECT_LOSS = "object_loss"
+	FRAMES_PREDCLS = "frames_predcls"
+	FRAMES_SGCLS = "frames_sgcls"
+	FRAMES_SGDET = "frames_sgdet"
 	
 	GLOVE_6B = "glove.6B"
 	
@@ -59,6 +62,7 @@ class Constants:
 	ATTENTION_GT = "attention_gt"
 	SPATIAL_GT = "spatial_gt"
 	CONTACTING_GT = "contacting_gt"
+	GLOBAL_OUTPUT = "global_output"
 	
 	ATTENTION_RELATION_LOSS = "attention_relation_loss"
 	SPATIAL_RELATION_LOSS = "spatial_relation_loss"

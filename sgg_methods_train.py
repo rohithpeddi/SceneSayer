@@ -1,3 +1,5 @@
+import pickle
+
 import torch
 import torch.nn as nn
 import numpy as np
@@ -109,6 +111,11 @@ def train_dsg_detr():
 					spatial_label[i, pred[const.SPATIAL_GT][i]] = 1
 					contact_label[i, pred[const.CONTACTING_GT][i]] = 1
 			
+			vid_no = gt_annotation[0][0][const.FRAME].split('.')[0]
+			train_intermediate_dump_file = os.path.join(conf.data_path, f"frames_{conf.mode}", f"train_{str(epoch)}",
+			                                            f"{vid_no}.pkl")
+			pickle.dump(pred, open(train_intermediate_dump_file, 'wb'))
+			
 			losses = {}
 			if conf.mode == const.SGCLS or conf.mode == const.SGDET:
 				losses[const.OBJECT_LOSS] = ce_loss(pred[const.DISTRIBUTION], pred[const.LABELS])
@@ -158,6 +165,10 @@ def train_dsg_detr():
 				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
 				get_sequence(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
 				pred = model(entry)
+				vid_no = gt_annotation[0][0][const.FRAME].split('.')[0]
+				test_intermediate_dump_file = os.path.join(conf.data_path, f"frames_{conf.mode}", f"test_{str(epoch)}",
+				                                            f"{vid_no}.pkl")
+				pickle.dump(pred, open(test_intermediate_dump_file, 'wb'))
 				evaluator.evaluate_scene_graph(gt_annotation, pred)
 			print('-----------------------------------------------------------------------------------', flush=True)
 		score = np.mean(evaluator.result_dict[conf.mode + "_recall"][20])

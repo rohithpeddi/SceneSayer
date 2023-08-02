@@ -25,6 +25,9 @@ Dump all frames ```data/ag/frames```
 #### Change the corresponding data file paths in ```datasets/action_genome/tools/dump_frames.py```
 
 
+Download object_bbox_and_relationship_filtersmall.pkl from [here](https://drive.google.com/file/d/19BkAwjCw5ByyGyZjFo174Oc3Ud56fkaT/view)
+and place in the dataloader folder
+
 # Setup
 
 ### Build draw_rectangles modules
@@ -91,3 +94,6 @@ python setup.py build develop
 If any errors check gcc version ```Works for 9.x.x```
 
 Follow [this](https://www.youtube.com/watch?v=aai42Qp6L28) for changing gcc version
+
+
+Download pretrained fasterRCNN model [here]() and place in fasterRCNN/models/

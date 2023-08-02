@@ -134,3 +134,5 @@ dmypy.json
 /lib/fpn/box_intersections_cpu/bbox.c
 /lib/draw_rectangles/build/
 /lib/draw_rectangles/draw_rectangles.c
+/fasterRCNN/models/faster_rcnn_ag.pth
+/fasterRCNN/lib/build/

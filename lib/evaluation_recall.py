@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 from functools import reduce
 from lib.ults.pytorch_misc import intersect_2d, argsort_desc
-import lib.fpn.box_intersections_cpu.bbox.bbox_overlaps as bbox_overlaps
+from lib.fpn.box_intersections_cpu.bbox import bbox_overlaps
 
 
 class BasicSceneGraphEvaluator:

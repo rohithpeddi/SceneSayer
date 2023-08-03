@@ -52,7 +52,7 @@ class Constants:
 	OBJECT_CLASSES_FILE = "object_classes.txt"
 	RELATIONSHIP_CLASSES_FILE = "relationship_classes.txt"
 	PERSON_BOUNDING_BOX_PKL = "person_bbox.pkl"
-	OBJECT_BOUNDING_BOX_RELATIONSHIP_PKL = "object_bounding_box_relationship.pkl"
+	OBJECT_BOUNDING_BOX_RELATIONSHIP_PKL = "object_bbox_and_relationship.pkl"
 	PROGRESS_TEXT_FILE = "progress.txt"
 	
 	ATTENTION_RELATIONSHIP = "attention_relationship"

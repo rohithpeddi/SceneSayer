@@ -5,7 +5,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn.utils.rnn import pad_sequence
 import numpy as np
 
-from dataloader.generation.action_genome.action_genome import AG, cuda_collate_fn
+from dataloader.generation.action_genome.ag_dataset import AG, cuda_collate_fn
 
 np.set_printoptions(precision=3)
 import time

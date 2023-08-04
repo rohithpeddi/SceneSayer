@@ -7,9 +7,19 @@ from lib.fpn.box_intersections_cpu.bbox import bbox_overlaps
 
 
 class BasicSceneGraphEvaluator:
-	def __init__(self, mode, AG_object_classes, AG_all_predicates, AG_attention_predicates, AG_spatial_predicates,
-	             AG_contacting_predicates,
-	             iou_threshold=0.5, save_file="tmp", constraint=False, semithreshold=None):
+	def __init__(
+			self,
+			mode,
+			AG_object_classes,
+			AG_all_predicates,
+			AG_attention_predicates,
+			AG_spatial_predicates,
+			AG_contacting_predicates,
+			iou_threshold=0.5,
+			save_file="tmp",
+			constraint=False,
+			semithreshold=None
+	):
 		self.result_dict = {}
 		self.mode = mode
 		self.num_rel = len(AG_all_predicates)
@@ -45,22 +55,20 @@ class BasicSceneGraphEvaluator:
 				print('R@%i: %f' % (k, np.mean(v)))
 				f.write('R@%i: %f\n' % (k, np.mean(v)))
 			
-			""" uncomment the following lines if mean recall is needed
-            for k, v in self.result_dict[self.mode + '_mean_recall_collect'].items():
-                sum_recall = 0
-                for idx in range(self.num_rel):
-                    if len(v[idx]) == 0:
-                        tmp_recall = 0.0
-                    else:
-                        tmp_recall = np.mean(v[idx])
-                    sum_recall += tmp_recall
-
-                print('R@%i: %f' % (k, sum_recall / float(self.num_rel)))
-                f.write('R@%i: %f\n' % (k, sum_recall / float(self.num_rel)))
-            """
+			for k, v in self.result_dict[self.mode + '_mean_recall_collect'].items():
+				sum_recall = 0
+				for idx in range(self.num_rel):
+					if len(v[idx]) == 0:
+						tmp_recall = 0.0
+					else:
+						tmp_recall = np.mean(v[idx])
+					sum_recall += tmp_recall
+				
+				print('R@%i: %f' % (k, sum_recall / float(self.num_rel)))
+				f.write('R@%i: %f\n' % (k, sum_recall / float(self.num_rel)))
 	
 	def evaluate_scene_graph(self, gt, pred):
-		'''collect the groundtruth and prediction'''
+		"""collect the ground truth and prediction"""
 		pred['attention_distribution'] = nn.functional.softmax(pred['attention_distribution'], dim=1)
 		for idx, frame_gt in enumerate(gt):
 			# generate the ground truth
@@ -93,7 +101,7 @@ class BasicSceneGraphEvaluator:
 			# first part for attention and contact, second for spatial
 			rels_i = np.concatenate((pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy(),  # attention
 			                         pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy()[:, ::-1],  # spatial
-                                     pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy()),
+			                         pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy()),
 			                        axis=0)  # contacting
 			
 			pred_scores_1 = np.concatenate((pred['attention_distribution'][pred['im_idx'] == idx].cpu().numpy(),
@@ -113,7 +121,6 @@ class BasicSceneGraphEvaluator:
 				 pred['contacting_distribution'][pred['im_idx'] == idx].cpu().numpy()), axis=1)
 			
 			if self.mode == 'predcls':
-				
 				pred_entry = {
 					'pred_boxes': pred['boxes'][:, 1:].cpu().clone().numpy(),
 					'pred_classes': pred['labels'].cpu().clone().numpy(),
@@ -264,7 +271,7 @@ def evaluate_recall(gt_rels, gt_boxes, gt_classes,
 	
 	if not np.all(scores_overall[1:] <= scores_overall[:-1] + 1e-5):
 		print("Somehow the relations weren't sorted properly: \n{}".format(scores_overall))
-		# raise ValueError("Somehow the relations werent sorted properly")
+	# raise ValueError("Somehow the relations werent sorted properly")
 	
 	# Compute recall. It's most efficient to match once and then do recall after
 	pred_to_gt = _compute_pred_matches(

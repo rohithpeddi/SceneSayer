@@ -32,10 +32,11 @@ class Config(object):
         :return:
         """
 		parser = ArgumentParser(description='training code')
+		parser.add_argument('-method', dest='method', help='Method dsg_detr/sttran/tempura', default='dsg_detr', type=str)
 		parser.add_argument('-mode', dest='mode', help='predcls/sgcls/sgdet', default='predcls', type=str)
 		parser.add_argument('-save_path', default='data', type=str)
 		parser.add_argument('-model_path', default=None, type=str)
-		parser.add_argument('-data_path', default='/data/scene_understanding/action_genome/', type=str)
+		parser.add_argument('-data_path', default='/data/rohith/ag', type=str)
 		parser.add_argument('-datasize', dest='datasize', help='mini dataset or whole', default='large', type=str)
 		parser.add_argument('-ckpt', dest='ckpt', help='checkpoint', default=None, type=str)
 		parser.add_argument('-optimizer', help='adamw/adam/sgd', default='adamw', type=str)

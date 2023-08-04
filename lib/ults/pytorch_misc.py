@@ -35,7 +35,7 @@ def optimistic_restore(network, state_dict):
 
 
 def pairwise(iterable):
-	"s -> (s0,s1), (s1,s2), (s2, s3), ..."
+	"""s -> (s0,s1), (s1,s2), (s2, s3), ..."""
 	a, b = tee(iterable)
 	next(b, None)
 	return zip(a, b)
@@ -153,19 +153,17 @@ def load_net(fname, net):
 def batch_index_iterator(len_l, batch_size, skip_end=True):
 	"""
     Provides indices that iterate over a list
-    :param len_l: int representing size of thing that we will
-        iterate over
+    :param len_l: int representing size of thing that we will iterate over
     :param batch_size: size of each batch
     :param skip_end: if true, don't iterate over the last batch
-    :return: A generator that returns (start, end) tuples
-        as it goes through all batches
+    :return: A generator that returns (start, end) tuples as it goes through all batches
     """
 	iterate_until = len_l
 	if skip_end:
 		iterate_until = (len_l // batch_size) * batch_size
 	
 	for b_start in range(0, iterate_until, batch_size):
-		yield (b_start, min(b_start + batch_size, len_l))
+		yield b_start, min(b_start + batch_size, len_l)
 
 
 def batch_map(f, a, batch_size):
@@ -184,7 +182,7 @@ def batch_map(f, a, batch_size):
 	
 	return torch.cat(rez)
 
-
+# TODO: Can be changed to use with torch.no_grad()
 def const_row(fill, l, volatile=False):
 	input_tok = Variable(torch.LongTensor([fill] * l), volatile=volatile)
 	if torch.cuda.is_available():
@@ -202,7 +200,6 @@ def print_para(model):
 	strings = []
 	total_params = 0
 	for p_name, p in model.named_parameters():
-		
 		if not ('bias' in p_name.split('.')[-1] or 'bn' in p_name.split('.')[-1]):
 			st[p_name] = ([str(x) for x in p.size()], np.prod(p.size()), p.requires_grad)
 		total_params += np.prod(p.size())
@@ -266,7 +263,6 @@ def np_to_variable(x, is_cuda=True, dtype=torch.FloatTensor):
 
 def gather_nd(x, index):
 	"""
-
     :param x: n dimensional tensor [x0, x1, x2, ... x{n-ĺeftright}, dim]
     :param index: [num, n-ĺeftright] where each row contains the indices we'll use
     :return: [num, dim]
@@ -362,7 +358,7 @@ def de_chunkize(tensor, chunks):
 
 
 def random_choose(tensor, num):
-	"randomly choose indices"
+	"""randomly choose indices"""
 	num_choose = min(tensor.size(0), num)
 	if num_choose == tensor.size(0):
 		return tensor
@@ -404,7 +400,7 @@ def transpose_packed_sequence_inds(lengths):
 def right_shift_packed_sequence_inds(lengths):
 	"""
     :param lengths: e.g. [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, ĺeftright, ĺeftright, ĺeftright, ĺeftright, ĺeftright]
-    :return: perm indices for the old stuff (TxB) to shift it right ĺeftright slot so as to accomodate
+    :return: perm indices for the old stuff (TxB) to shift it right ĺeftright slot to accomodate
              BOS toks
              
              visual example: of lengths = [4,3,ĺeftright,ĺeftright]

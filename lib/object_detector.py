@@ -74,8 +74,7 @@ class detector(nn.Module):
 				# bbox regression (class specific)
 				box_deltas = bbox_pred.data
 				box_deltas = box_deltas.view(-1, 4) * torch.FloatTensor([0.1, 0.1, 0.2, 0.2]).cuda(0) \
-				             + torch.FloatTensor([0.0, 0.0, 0.0, 0.0]).cuda(
-					0)  # the first is normalize std, the second is mean
+				             + torch.FloatTensor([0.0, 0.0, 0.0, 0.0]).cuda(0)  # the first is normalize std, the second is mean
 				box_deltas = box_deltas.view(-1, rois.shape[1], 4 * len(self.object_classes))  # post_NMS_NTOP: 30
 				pred_boxes = bbox_transform_inv(boxes, box_deltas, 1)
 				PRED_BOXES = clip_boxes(pred_boxes, im_info.data, 1)
@@ -230,8 +229,7 @@ class detector(nn.Module):
 				union_boxes[:, 1:] = union_boxes[:, 1:] * im_info[0, 2]
 				union_feat = self.fasterRCNN.RCNN_roi_align(FINAL_BASE_FEATURES, union_boxes)
 				
-				pair_rois = torch.cat((FINAL_BBOXES_X[pair[:, 0], 1:], FINAL_BBOXES_X[pair[:, 1], 1:]),
-				                      1).data.cpu().numpy()
+				pair_rois = torch.cat((FINAL_BBOXES_X[pair[:, 0], 1:], FINAL_BBOXES_X[pair[:, 1], 1:]), 1).data.cpu().numpy()
 				spatial_masks = torch.tensor(draw_union_boxes(pair_rois, 27) - 0.5).to(FINAL_FEATURES.device)
 				
 				entry = {'boxes': FINAL_BBOXES_X,

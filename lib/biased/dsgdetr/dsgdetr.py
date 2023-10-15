@@ -530,6 +530,7 @@ class DsgDETR(nn.Module):
 		masks = (1 - pad_sequence([torch.ones(len(index)) for index in frames], batch_first=True)).bool()
 		rel_ = self.local_transformer(frame_features, src_key_padding_mask=masks.cuda())
 		rel_features = torch.cat([rel_[i, :len(index)] for i, index in enumerate(frames)])
+		
 		# temporal message passing
 		sequences = []
 		for l in obj_class.unique():

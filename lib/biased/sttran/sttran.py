@@ -83,12 +83,10 @@ class ObjectClassifier(nn.Module):
 		return entry
 	
 	def forward(self, entry):
-		
 		if self.mode == const.PREDCLS:
 			entry[const.PRED_LABELS] = entry[const.LABELS]
 			return entry
 		elif self.mode == const.SGCLS:
-			
 			obj_embed = entry[const.DISTRIBUTION] @ self.obj_embed.weight
 			pos_embed = self.pos_embed(center_size(entry[const.BOXES][:, 1:]))
 			obj_features = torch.cat((entry[const.FEATURES], obj_embed, pos_embed), 1)
@@ -105,7 +103,7 @@ class ObjectClassifier(nn.Module):
 				entry[const.PRED_SCORES], entry[const.PRED_LABELS] = torch.max(entry[const.DISTRIBUTION][:, 1:], dim=1)
 				entry[const.PRED_LABELS] = entry[const.PRED_LABELS] + 2
 				
-				# use the infered object labels for new pair idx
+				# use the inferred object labels for new pair idx
 				HUMAN_IDX = torch.zeros([b, 1], dtype=torch.int64).to(obj_features.device)
 				global_idx = torch.arange(0, entry[const.BOXES].shape[0])
 				
@@ -227,7 +225,7 @@ class ObjectClassifier(nn.Module):
 				entry[const.PRED_SCORES], entry[const.PRED_LABELS] = torch.max(entry[const.DISTRIBUTION][:, 1:], dim=1)
 				entry[const.PRED_LABELS] = entry[const.PRED_LABELS] + 2
 				
-				# use the infered object labels for new pair idx
+				# use the inferred object labels for new pair idx
 				HUMAN_IDX = torch.zeros([b, 1], dtype=torch.int64).to(box_idx.device)
 				global_idx = torch.arange(0, entry[const.BOXES].shape[0])
 				
@@ -306,8 +304,7 @@ class STTran(nn.Module):
 		self.obj_fc = nn.Linear(2048, 512)
 		self.vr_fc = nn.Linear(256 * 7 * 7, 512)
 		
-		embed_vecs = obj_edge_vectors(obj_classes, wv_type=const.GLOVE_6B,
-		                              wv_dir='checkpoints', wv_dim=200)
+		embed_vecs = obj_edge_vectors(obj_classes, wv_type=const.GLOVE_6B, wv_dir='checkpoints', wv_dim=200)
 		self.obj_embed = nn.Embedding(len(obj_classes), 200)
 		self.obj_embed.weight.data = embed_vecs.clone()
 		
@@ -315,9 +312,7 @@ class STTran(nn.Module):
 		self.obj_embed2.weight.data = embed_vecs.clone()
 		
 		self.glocal_transformer = STTransformer(enc_layer_num=enc_layer_num, dec_layer_num=dec_layer_num,
-		                                        embed_dim=1936,
-		                                        nhead=8,
-		                                        dim_feedforward=2048, dropout=0.1, mode='latter')
+		                                        embed_dim=1936, nhead=8, dim_feedforward=2048, dropout=0.1, mode='latter')
 		
 		self.a_rel_compress = nn.Linear(1936, self.attention_class_num)
 		self.s_rel_compress = nn.Linear(1936, self.spatial_class_num)

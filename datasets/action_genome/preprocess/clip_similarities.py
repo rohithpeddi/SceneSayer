@@ -61,12 +61,13 @@ if __name__ == "__main__":
 	device = 'cuda'
 	# Number of frames to process at once
 	max_length = 2000
-	features_output_path = 'path_to_save_visual_features'
-	data_path = 'path_to_input_videos'
+	features_output_path = "/data/rohith/ag/clip/visual_features/"
+	data_path = "/data/rohith/ag/videos/"
 	center_transform = transform_center()
 	model = load_clip_model()
 	
 	for video_name in tqdm(os.listdir(data_path), desc="Processing videos"):
+		logger.info("---------------------------------------------------------------------")
 		logger.info(f'Processing video {video_name}')
 		frames = get_videos(video_name, data_path)
 		logger.info(f'Video {video_name} has {len(frames)} frames')

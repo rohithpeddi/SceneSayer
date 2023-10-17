@@ -66,7 +66,6 @@ class ObjectClassifier(nn.Module):
 				new_labels = torch.argmax(new_scores, dim=1) + 1
 			else:
 				new_labels = torch.tensor([], dtype=torch.long).cuda(0)
-			
 			final_dists.append(scores)
 			final_dists.append(new_scores)
 			final_boxes.append(pred_boxes)
@@ -75,7 +74,6 @@ class ObjectClassifier(nn.Module):
 			final_feats.append(new_feats)
 			final_labels.append(pred_labels)
 			final_labels.append(new_labels)
-		
 		entry[const.BOXES] = torch.cat(final_boxes, dim=0)
 		entry[const.DISTRIBUTION] = torch.cat(final_dists, dim=0)
 		entry[const.FEATURES] = torch.cat(final_feats, dim=0)

@@ -11,10 +11,11 @@ from lib.draw_rectangles.draw_rectangles import draw_union_boxes
 from fasterRCNN.lib.model.faster_rcnn.resnet import resnet
 from fasterRCNN.lib.model.rpn.bbox_transform import bbox_transform_inv, clip_boxes
 from fasterRCNN.lib.model.roi_layers import nms
+from constants import Constants as const
 
 
 class detector(nn.Module):
-	'''first part: object detection (image/video)'''
+	"""first part: object detection (image/video)"""
 	
 	def __init__(self, train, object_classes, use_SUPPLY, mode='predcls'):
 		super(detector, self).__init__()
@@ -31,13 +32,6 @@ class detector(nn.Module):
 		
 		self.ROI_Align = copy.deepcopy(self.fasterRCNN.RCNN_roi_align)
 		self.RCNN_Head = copy.deepcopy(self.fasterRCNN._head_to_tail)
-	
-	def extract_features(self, im_data, boxes):
-		base_feat = self.fasterRCNN.RCNN_base(im_data)
-		FINAL_FEATURES = self.fasterRCNN.RCNN_roi_align(base_feat, boxes)
-		FINAL_FEATURES = self.fasterRCNN._head_to_tail(FINAL_FEATURES)
-		FINAL_DISTRIBUTIONS = torch.softmax(self.fasterRCNN.RCNN_cls_score(FINAL_FEATURES)[:, 1:], dim=1)
-		return FINAL_FEATURES, FINAL_DISTRIBUTION
 	
 	def forward(self, im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all):
 		
@@ -74,7 +68,8 @@ class detector(nn.Module):
 				# bbox regression (class specific)
 				box_deltas = bbox_pred.data
 				box_deltas = box_deltas.view(-1, 4) * torch.FloatTensor([0.1, 0.1, 0.2, 0.2]).cuda(0) \
-				             + torch.FloatTensor([0.0, 0.0, 0.0, 0.0]).cuda(0)  # the first is normalize std, the second is mean
+				             + torch.FloatTensor([0.0, 0.0, 0.0, 0.0]).cuda(
+					0)  # the first is normalize std, the second is mean
 				box_deltas = box_deltas.view(-1, rois.shape[1], 4 * len(self.object_classes))  # post_NMS_NTOP: 30
 				pred_boxes = bbox_transform_inv(boxes, box_deltas, 1)
 				PRED_BOXES = clip_boxes(pred_boxes, im_info.data, 1)
@@ -229,7 +224,8 @@ class detector(nn.Module):
 				union_boxes[:, 1:] = union_boxes[:, 1:] * im_info[0, 2]
 				union_feat = self.fasterRCNN.RCNN_roi_align(FINAL_BASE_FEATURES, union_boxes)
 				
-				pair_rois = torch.cat((FINAL_BBOXES_X[pair[:, 0], 1:], FINAL_BBOXES_X[pair[:, 1], 1:]), 1).data.cpu().numpy()
+				pair_rois = torch.cat((FINAL_BBOXES_X[pair[:, 0], 1:], FINAL_BBOXES_X[pair[:, 1], 1:]),
+				                      1).data.cpu().numpy()
 				spatial_masks = torch.tensor(draw_union_boxes(pair_rois, 27) - 0.5).to(FINAL_FEATURES.device)
 				
 				entry = {'boxes': FINAL_BBOXES_X,

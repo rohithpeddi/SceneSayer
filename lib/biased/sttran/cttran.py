@@ -17,6 +17,15 @@ from dataloader import *
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
+def get_positional_encoding(seq_len, d_model):
+	pos = torch.arange(0, seq_len).unsqueeze(1)
+	div_term = torch.exp(torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model))
+	encoding = torch.zeros(seq_len, d_model)
+	encoding[:, 0::2] = torch.sin(pos * div_term)
+	encoding[:, 1::2] = torch.cos(pos * div_term)
+	return encoding.unsqueeze(0)
+
+
 class SGA(nn.Module):
 	def __init__(
 			self,
@@ -79,14 +88,6 @@ class SGA(nn.Module):
 		self.transformer_encoder = nn.TransformerEncoder(encoder_layer=enc_layer, num_layers=self.num_layers)
 		self.transformer_encoder = self.transformer_encoder.double()
 	
-	def get_positional_encoding(self, seq_len, d_model):
-		pos = torch.arange(0, seq_len).unsqueeze(1)
-		div_term = torch.exp(torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model))
-		encoding = torch.zeros(seq_len, d_model)
-		encoding[:, 0::2] = torch.sin(pos * div_term)
-		encoding[:, 1::2] = torch.cos(pos * div_term)
-		return encoding.unsqueeze(0)
-	
 	def forward(self, x, future, future_mask):
 		entry = x
 		context = torch.flatten(entry, start_dim=2, end_dim=3)
@@ -95,7 +96,7 @@ class SGA(nn.Module):
 		encoding_dim = self.d_model
 		seq_len = self.context_len
 		context = context.to(device)
-		pos_enc = self.get_positional_encoding(seq_len, encoding_dim)
+		pos_enc = get_positional_encoding(seq_len, encoding_dim)
 		
 		# pe = torch.zeros((in_x.shape[0],in_x.shape[1],in_x.shape[2]))
 		# start = 0
@@ -125,10 +126,7 @@ class SGA(nn.Module):
 			37,
 			1936
 		))
-		
-		# print("fg : ",future_graphs.shape)
-		# print("fm : ",future_mask.unsqueeze(-1).shape)
-		
+
 		future_graphs = future_graphs[future_mask]
 		future = future[future_mask]
 		
@@ -136,11 +134,7 @@ class SGA(nn.Module):
 		s_pred = self.s_rel_compress(future_graphs)
 		c_pred = self.c_rel_compress(future_graphs)
 		
-		out_dict = {}
-		
-		out_dict["attention_distribution"] = a_pred
-		out_dict["spatial_distribution"] = s_pred
-		out_dict["contacting_distribution"] = c_pred
+		out_dict = {"attention_distribution": a_pred, "spatial_distribution": s_pred, "contacting_distribution": c_pred}
 		
 		out_dict["spatial_distribution"] = torch.sigmoid(out_dict["spatial_distribution"])
 		out_dict["contacting_distribution"] = torch.sigmoid(out_dict["contacting_distribution"])

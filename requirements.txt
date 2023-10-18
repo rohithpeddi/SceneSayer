@@ -55,4 +55,3 @@ six==1.16.0
 tqdm==4.65.0
 msgpack-python==0.5.6
 open-clip-torch==2.22.0
-salesforce-lavis==1.0.2

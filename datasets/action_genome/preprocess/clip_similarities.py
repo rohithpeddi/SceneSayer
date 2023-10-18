@@ -2,13 +2,21 @@ import os
 import cv2
 import torch
 import numpy as np
+import logging
 from PIL import Image
 import open_clip
 from tqdm import tqdm
 from torchvision.transforms import Resize, Compose, ToTensor, Normalize, CenterCrop
-from logger_config import get_logger
 
-logger = get_logger(__name__)
+log_directory = os.path.join(os.getcwd(), 'logs')
+if not os.path.exists(log_directory):
+	os.makedirs(log_directory)
+
+log_file_path = os.path.join(log_directory, f"std.log")
+logging.basicConfig(filename=log_file_path, filemode='a', level=logging.INFO,
+					format='%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
+
+logger = logging.getLogger(__name__)
 
 
 def transform_center():
@@ -60,7 +68,7 @@ def process_video_frames(video_frames, clip_model):
 if __name__ == "__main__":
 	device = 'cuda'
 	# Number of frames to process at once
-	max_length = 2000
+	max_length = 3000
 	features_output_path = "/data/rohith/ag/clip/visual_features/"
 	data_path = "/data/rohith/ag/videos/"
 	center_transform = transform_center()
@@ -75,7 +83,7 @@ if __name__ == "__main__":
 		assert len(features) == len(frames)
 		
 		if not os.path.exists(features_output_path):
-			os.mkdirs(features_output_path)
+			os.makedirs(features_output_path, exist_ok=True)
 			
 		np.save(os.path.join(features_output_path, f'{video_name[:-4]}.npy'), features)
 		logger.info(f'Visual features of {video_name} have been saved!')

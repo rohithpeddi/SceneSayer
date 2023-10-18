@@ -68,4 +68,7 @@ class Constants:
 	SPATIAL_RELATION_LOSS = "spatial_relation_loss"
 	CONTACTING_RELATION_LOSS = "contacting_relation_loss"
 	
-	
+	CUDA_DEVICE = 0
+	NMS_THRESHOLD = 0.4
+	SCORE_THRESHOLD = 0.1
+	FASTER_RCNN_BATCH_SIZE = 10

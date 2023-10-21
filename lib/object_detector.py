@@ -164,7 +164,6 @@ class detector(nn.Module):
 				inputs_info = im_info[counter:counter + 10]
 				inputs_gtboxes = gt_boxes[counter:counter + 10]
 				inputs_numboxes = num_boxes[counter:counter + 10]
-			
 			else:
 				inputs_data = im_data[counter:]
 				inputs_info = im_info[counter:]
@@ -351,7 +350,6 @@ class detector(nn.Module):
 			         'attention_gt': a_rel,
 			         'spatial_gt': s_rel,
 			         'contacting_gt': c_rel}
-			
 			return entry
 		
 		else:

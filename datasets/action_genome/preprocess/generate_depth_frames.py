@@ -1,15 +1,18 @@
 import cv2
-import torch
-from torchvision.transforms import Compose, ToTensor, Resize
-from torchvision.datasets import ImageFolder
-from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import torch
 import os
-import numpy as np
-from logger_config import get_logger
+import logging
 
-logger = get_logger(__name__)
+log_directory = os.path.join(os.getcwd(), 'logs')
+if not os.path.exists(log_directory):
+	os.makedirs(log_directory)
+
+log_file_path = os.path.join(log_directory, f"std.log")
+logging.basicConfig(filename=log_file_path, filemode='a', level=logging.INFO,
+					format='%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
+
+logger = logging.getLogger(__name__)
 
 
 class DepthEstimator:
@@ -38,9 +41,10 @@ class DepthEstimator:
 			image_path = os.path.join(self.input_path, image_name)
 			img = cv2.imread(image_path)
 			img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-			
+
+			input_batch = self.transform(img).to(self.device)
 			with torch.no_grad():
-				prediction = self.midas(img)
+				prediction = self.midas(input_batch)
 				prediction = torch.nn.functional.interpolate(
 					prediction.unsqueeze(1), size=img.shape[:2], mode="bicubic",
 					align_corners=False).squeeze()

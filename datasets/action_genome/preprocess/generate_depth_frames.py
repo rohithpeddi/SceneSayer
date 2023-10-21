@@ -1,8 +1,12 @@
+import concurrent
+
 import cv2
 import matplotlib.pyplot as plt
 import torch
 import os
 import logging
+
+from tqdm import tqdm
 
 log_directory = os.path.join(os.getcwd(), 'logs')
 if not os.path.exists(log_directory):
@@ -10,7 +14,7 @@ if not os.path.exists(log_directory):
 
 log_file_path = os.path.join(log_directory, f"std.log")
 logging.basicConfig(filename=log_file_path, filemode='a', level=logging.INFO,
-					format='%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
+                    format='%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +45,7 @@ class DepthEstimator:
 			image_path = os.path.join(self.input_path, image_name)
 			img = cv2.imread(image_path)
 			img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
+			
 			input_batch = self.transform(img).to(self.device)
 			with torch.no_grad():
 				prediction = self.midas(input_batch)
@@ -54,7 +58,26 @@ class DepthEstimator:
 		logger.info("Finished processing images files in input path: {}".format(self.input_path))
 
 
-if __name__ == "__main__":
-	depth_estimator = DepthEstimator(input_path="/data/rohith/ag/frames_annotated/0BX9N.mp4",
-	                                 output_path="/data/rohith/ag/depth/frames_annotated/0BX9N.mp4")
+def process_frame_directory(input_path, output_path):
+	depth_estimator = DepthEstimator(input_path=input_path, output_path=output_path)
 	depth_estimator.run()
+
+
+def estimate_monocular_depth(input_path, output_path, num_workers=4):
+	frame_directories = os.listdir(input_path)
+	with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+		futures = []
+		for frame_directory_name in tqdm(frame_directories, desc="Processing"):
+			input_dir = os.path.join(input_path, frame_directory_name)
+			output_dir = os.path.join(output_path, frame_directory_name)
+			future = executor.submit(process_frame_directory, input_dir, output_dir)
+			futures.append(future)
+		for future in concurrent.futures.as_completed(futures):
+			try:
+				future.result()
+			except Exception as e:
+				logger.error(f"Error: {e}")
+
+
+if __name__ == "__main__":
+	estimate_monocular_depth("/data/rohith/ag/frames", "/data/rohith/ag/depth/frames", num_workers=4)

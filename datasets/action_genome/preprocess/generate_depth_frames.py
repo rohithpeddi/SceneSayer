@@ -1,10 +1,10 @@
-import concurrent
-
 import cv2
 import matplotlib.pyplot as plt
 import torch
-import os
 import logging
+import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 from tqdm import tqdm
 
@@ -39,45 +39,50 @@ class DepthEstimator:
 			self.transform = midas_transforms.small_transform
 	
 	def run(self):
-		logger.info("----------------------------------------------------")
 		logger.info("Processing images files in input path: {}".format(self.input_path))
-		for image_name in os.listdir(self.input_path):
-			image_path = os.path.join(self.input_path, image_name)
-			img = cv2.imread(image_path)
-			img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-			
-			input_batch = self.transform(img).to(self.device)
-			with torch.no_grad():
-				prediction = self.midas(input_batch)
-				prediction = torch.nn.functional.interpolate(
-					prediction.unsqueeze(1), size=img.shape[:2], mode="bicubic",
-					align_corners=False).squeeze()
-			
-			output = prediction.cpu().numpy()
-			plt.imsave(os.path.join(self.output_path, image_name), output)
-		logger.info("Finished processing images files in input path: {}".format(self.input_path))
+		try:
+			for image_name in os.listdir(self.input_path):
+				image_path = os.path.join(self.input_path, image_name)
+				img = cv2.imread(image_path)
+				img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+				
+				input_batch = self.transform(img).to(self.device)
+				with torch.no_grad():
+					prediction = self.midas(input_batch)
+					prediction = torch.nn.functional.interpolate(
+						prediction.unsqueeze(1), size=img.shape[:2], mode="bicubic",
+						align_corners=False).squeeze()
+				
+				output = prediction.cpu().numpy()
+				plt.imsave(os.path.join(self.output_path, image_name), output)
+			logger.info("Finished processing images files in input path: {}".format(self.input_path))
+		except Exception as e:
+			logger.error("Error processing images files in input path: {}".format(self.input_path))
+			logger.error(e)
+			return
+		return
 
 
-def process_frame_directory(input_path, output_path):
-	depth_estimator = DepthEstimator(input_path=input_path, output_path=output_path)
-	depth_estimator.run()
-
-
-def estimate_monocular_depth(input_path, output_path, num_workers=4):
-	frame_directories = os.listdir(input_path)
-	with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
-		futures = []
-		for frame_directory_name in tqdm(frame_directories, desc="Processing"):
-			input_dir = os.path.join(input_path, frame_directory_name)
-			output_dir = os.path.join(output_path, frame_directory_name)
-			future = executor.submit(process_frame_directory, input_dir, output_dir)
-			futures.append(future)
-		for future in concurrent.futures.as_completed(futures):
-			try:
-				future.result()
-			except Exception as e:
-				logger.error(f"Error: {e}")
+def estimate_monocular_depth(input_path, output_path):
+	global counter
+	counter = 0
+	counter_lock = threading.Lock()
+	total_directories = len(os.listdir(input_path))
+	
+	def process_directory(frame_directory_name):
+		nonlocal counter
+		in_path = os.path.join(input_path, frame_directory_name)
+		out_path = os.path.join(output_path, frame_directory_name)
+		depth_estimator = DepthEstimator(input_path=in_path, output_path=out_path)
+		depth_estimator.run()
+		
+		with counter_lock:
+			counter += 1
+			print(f"Processed {counter/total_directories} directories")
+	
+	with ThreadPoolExecutor(max_workers=5) as executor:
+		executor.map(process_directory, os.listdir(input_path))
 
 
 if __name__ == "__main__":
-	estimate_monocular_depth("/data/rohith/ag/frames", "/data/rohith/ag/depth/frames", num_workers=4)
+	estimate_monocular_depth("/data/rohith/ag/frames", "/data/rohith/ag/depth/frames")

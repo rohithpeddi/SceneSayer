@@ -44,9 +44,8 @@ def draw_landmarks_on_image(rgb_image, detection_result):
 class PoseLandMarkDetection:
 	
 	def __init__(self):
-		self.model_path = '/absolute/path/to/pose_landmarker.task'
+		self.model_path = '/home/rxp190007/CODE/NeSysVideoPrediction/checkpoints/pose_landmarker_heavy.task'
 		BaseOptions = mp.tasks.BaseOptions
-		PoseLandmarker = mp.tasks.vision.PoseLandmarker
 		PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions
 		VisionRunningMode = mp.tasks.vision.RunningMode
 		

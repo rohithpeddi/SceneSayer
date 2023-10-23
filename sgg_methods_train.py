@@ -9,11 +9,11 @@ import warnings
 import pandas as pd
 import copy
 
-from dataloader.generation.action_genome.ag_dataset import AG, cuda_collate_fn
+from dataloader.supervised.generation.action_genome.ag_dataset import AG, cuda_collate_fn
 from constants import Constants as const
 from lib.object_detector import detector
-from lib.config import Config
-from lib.evaluation_recall import BasicSceneGraphEvaluator
+from lib.supervised.config import Config
+from lib.supervised.evaluation_recall import BasicSceneGraphEvaluator
 from lib.AdamW import AdamW
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader
@@ -42,9 +42,9 @@ def prepare_optimizer(model):
 
 
 def train_dsg_detr():
-	from lib.biased.dsgdetr.dsgdetr import DsgDETR
-	from lib.biased.dsgdetr.track import get_sequence
-	from lib.biased.dsgdetr.matcher import HungarianMatcher
+	from lib.supervised.biased.dsgdetr.dsgdetr import DsgDETR
+	from lib.supervised.biased.dsgdetr.track import get_sequence
+	from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 	
 	model = DsgDETR(mode=conf.mode,
 	                attention_class_num=len(AG_dataset_train.attention_relationships),
@@ -186,7 +186,7 @@ def train_dsg_detr():
 
 
 def train_sttran():
-	from lib.biased.sttran.sttran import STTran
+	from lib.supervised.biased.sttran.sttran import STTran
 	
 	model = STTran(mode=conf.mode,
 	               attention_class_num=len(AG_dataset_train.attention_relationships),
@@ -317,7 +317,6 @@ if __name__ == '__main__':
 		print(i, ':', conf.args[i])
 	
 	# 	TODO: Add code for saving method specific model
-	
 	AG_dataset_train = AG(
 		mode=const.TRAIN,
 		datasize=conf.datasize,

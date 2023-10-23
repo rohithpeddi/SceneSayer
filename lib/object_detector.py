@@ -7,7 +7,7 @@ import cv2
 import os
 from constants import Constants as const
 
-from lib.funcs import assign_relations
+from lib.supervised.funcs import assign_relations
 from lib.draw_rectangles.draw_rectangles import draw_union_boxes
 from fasterRCNN.lib.model.faster_rcnn.resnet import resnet
 from fasterRCNN.lib.model.rpn.bbox_transform import bbox_transform_inv, clip_boxes

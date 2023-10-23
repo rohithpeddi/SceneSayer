@@ -14,7 +14,6 @@ imageio
 importlib-metadata
 markdown
 mdurl
-mmcv-full
 model-index
 ninja
 openmim

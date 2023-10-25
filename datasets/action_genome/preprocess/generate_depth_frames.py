@@ -45,7 +45,13 @@ class DepthEstimator:
     def process_video_directory(self, input_path, output_path):
         if os.path.exists(output_path):
             logger.info("Output path already exists: {}".format(output_path))
-            return
+            if len(os.listdir(output_path)) == len(os.listdir(input_path)):
+                logger.info("Output path already has all the files. Skipping.")
+                return
+            else:
+                logger.info(f"Output: {len(os.listdir(output_path))}, Input: {len(os.listdir(input_path))} Output "
+                            f"path does not have all the files. Deleting and recreating.")
+                os.system("rm -rf {}".format(output_path))
 
         os.makedirs(output_path, exist_ok=True)
         logger.info("Processing images files in input path: {}".format(input_path))

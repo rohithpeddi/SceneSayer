@@ -58,8 +58,11 @@ class detector(nn.Module):
 		cls_scores = region_scores[:, j][indices]
 		_, order = torch.sort(cls_scores, 0, True)
 		cls_boxes = region_pred_boxes[indices][:, j * 4:(j + 1) * 4]
+		cls_dets = torch.cat((cls_boxes, cls_scores.unsqueeze(1)), 1)
+		cls_dets = cls_dets[order]
 		
 		keep = nms(cls_boxes[order, :], cls_scores[order], self.NMS_THRESHOLD)
+		cls_dets = cls_dets[keep.view(-1).long()]
 		
 		return [
 			cls_boxes[order][keep],
@@ -67,10 +70,36 @@ class detector(nn.Module):
 			roi_features[indices[order[keep]]]
 		]
 	
-	def _process_results_for_class(self, roi_idx, class_idx, rois, scores, pred_boxes, roi_features):
-		boxes, scores, features = self._nms_for_class(scores[roi_idx], pred_boxes[roi_idx], class_idx, roi_features[roi_idx])
-		labels = torch.full((len(scores),), class_idx, dtype=torch.int64).cuda()
-		return boxes, scores, labels, features
+	def _process_results_for_class(self, roi_idx, class_idx, rois, scores, pred_boxes, roi_features, counter_image):
+		indices = torch.nonzero(scores[roi_idx][:, class_idx] > self.SCORE_THRESHOLD).view(-1)
+		if indices.numel() == 0:
+			return []
+		
+		cls_scores = scores[roi_idx][:, class_idx][indices]
+		_, order = torch.sort(cls_scores, 0, True)
+		cls_boxes = pred_boxes[roi_idx][indices][:, class_idx * 4:(class_idx + 1) * 4]
+		cls_dets = torch.cat((cls_boxes, cls_scores.unsqueeze(1)), 1)
+		cls_dets = cls_dets[order]
+		
+		keep = nms(cls_boxes[order, :], cls_scores[order], self.NMS_THRESHOLD)
+		cls_dets = cls_dets[keep.view(-1).long()]
+		
+		if class_idx == 1:
+			# for person we only keep the highest score for person!
+			final_bbox = cls_dets[0, 0:4].unsqueeze(0)
+			final_score = cls_dets[0, 4].unsqueeze(0)
+			final_labels = torch.tensor([class_idx]).cuda(0)
+			final_features = roi_features[roi_idx, indices[order[keep][0]]].unsqueeze(0)
+		else:
+			final_bbox = cls_dets[:, 0:4]
+			final_score = cls_dets[:, 4]
+			final_labels = torch.tensor([class_idx]).repeat(keep.shape[0]).cuda(0)
+			final_features = roi_features[roi_idx, indices[order[keep]]]
+		
+		final_bbox = torch.cat((torch.tensor([[counter_image]], dtype=torch.float).repeat(
+			final_bbox.shape[0], 1).cuda(0), final_bbox), 1)
+		
+		return [final_bbox, final_score, final_labels, final_features]
 	
 	def _nms_and_collect_results(self, rois, scores, pred_boxes, base_features, roi_features, counter_image):
 		batch_results = {
@@ -83,18 +112,18 @@ class detector(nn.Module):
 		
 		for roi_idx in range(rois.shape[0]):
 			for class_idx in range(1, len(self.object_classes)):
-				boxes, scores, labels, features = self._process_results_for_class(roi_idx, class_idx, rois, scores,
-				                                                                  pred_boxes, roi_features)
-				if len(scores) == 0:
+				process_class_data = self._process_results_for_class(roi_idx, class_idx, rois, scores,
+				                                                     pred_boxes, roi_features, counter_image)
+				if len(process_class_data) == 0:
 					continue
 				
-				if class_idx == 1:  # If class is person
-					boxes, scores, labels, features = boxes[:1], scores[:1], labels[:1], features[:1]
+				final_bbox, final_score, final_labels, final_features = process_class_data[0], process_class_data[1], \
+					process_class_data[2], process_class_data[3]
 				
-				batch_results["FINAL_BBOXES"].append(boxes)
-				batch_results["FINAL_LABELS"].append(labels)
-				batch_results["FINAL_SCORES"].append(scores)
-				batch_results["FINAL_FEATURES"].append(features)
+				batch_results["FINAL_BBOXES"].append(final_bbox)
+				batch_results["FINAL_LABELS"].append(final_labels)
+				batch_results["FINAL_SCORES"].append(final_score)
+				batch_results["FINAL_FEATURES"].append(final_features)
 			
 			batch_results["FINAL_BASE_FEATURES"].append(base_features[roi_idx].unsqueeze(0))
 			counter_image += 1

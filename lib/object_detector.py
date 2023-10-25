@@ -591,13 +591,13 @@ class detector(nn.Module):
 			else:
 				entry = {
 					const.BOXES: attribute_dictionary[const.FINAL_BBOXES],
-					const.LABELS: attribute_dictionary[const.ASSIGNED_LABELS],
 					const.SCORES: attribute_dictionary[const.FINAL_SCORES],
 					const.DISTRIBUTION: attribute_dictionary[const.FINAL_DISTRIBUTIONS],
 					const.PRED_LABELS: attribute_dictionary[const.PRED_LABELS],
 					const.FEATURES: attribute_dictionary[const.FINAL_FEATURES],
 					const.FMAPS: attribute_dictionary[const.FINAL_BASE_FEATURES],
-					const.IM_INFO: attribute_dictionary[const.IM_INFO]
+					const.IM_INFO: attribute_dictionary[const.IM_INFO],
+					const.LABELS: attribute_dictionary[const.ASSIGNED_LABELS]
 				}
 		elif self.mode == 'sgcls':
 			entry = {

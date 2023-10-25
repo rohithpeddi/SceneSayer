@@ -95,147 +95,147 @@ tr = []
 matcher= HungarianMatcher(0.5,1,1,0.5)
 matcher.eval()
 for epoch in range(1):
-    # object_detector.is_train = True
-    # model.train()
-    # object_detector.train_x = True
-    # start_time = time.time()
-    # train_iter = iter(dataloader_train)
+    object_detector.is_train = True
+    model.train()
+    object_detector.train_x = True
+    start_time = time.time()
+    train_iter = iter(dataloader_train)
     test_iter = iter(dataloader_test)
-    # counter = 0
-    # for b in range(len(dataloader_train)):
-    #     data = next(train_iter)
-    #     im_data = copy.deepcopy(data[0].cuda(0))
-    #     im_info = copy.deepcopy(data[1].cuda(0))
-    #     gt_boxes = copy.deepcopy(data[2].cuda(0))
-    #     num_boxes = copy.deepcopy(data[3].cuda(0))
-    #     gt_annotation = AG_dataset_train.gt_annotations[data[4]]
+    counter = 0
+    for b in range(len(dataloader_train)):
+        data = next(train_iter)
+        im_data = copy.deepcopy(data[0].cuda(0))
+        im_info = copy.deepcopy(data[1].cuda(0))
+        gt_boxes = copy.deepcopy(data[2].cuda(0))
+        num_boxes = copy.deepcopy(data[3].cuda(0))
+        gt_annotation = AG_dataset_train.gt_annotations[data[4]]
     
-    #     # prevent gradients to FasterRCNN
-    #     with torch.no_grad():
-    #         entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-    #     get_sequence(entry, gt_annotation, matcher, (im_info[0][:2]/im_info[0,2]).cpu().data, conf.mode)
+        # prevent gradients to FasterRCNN
+        with torch.no_grad():
+            entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+        get_sequence(entry, gt_annotation, matcher, (im_info[0][:2]/im_info[0,2]).cpu().data, conf.mode)
 
-    #     pred = model(entry)
+        pred = model(entry)
         
-    #     start =0 
-    #     start_index = 0
-    #     context = 2
-    #     future = 3
-    #     count = 0
-    #     losses = {}
+        start =0 
+        start_index = 0
+        context = 2
+        future = 3
+        count = 0
+        losses = {}
 
-    #     if conf.mode == 'sgcls' or conf.mode == 'sgdet':
-    #             losses['object_loss'] = ce_loss(pred['distribution'], pred['labels'])
+        if conf.mode == 'sgcls' or conf.mode == 'sgdet':
+                losses['object_loss'] = ce_loss(pred['distribution'], pred['labels'])
 
-    #     losses["attention_relation_loss"] = 0
-    #     losses["spatial_relation_loss"] = 0
-    #     losses["contact_relation_loss"] = 0
+        losses["attention_relation_loss"] = 0
+        losses["spatial_relation_loss"] = 0
+        losses["contact_relation_loss"] = 0
 
-    #     while (start+context+1 <= len(entry["im_idx"].unique())):
+        while (start+context+1 <= len(entry["im_idx"].unique())):
 
-    #         try:
-    #             end = int(torch.where(entry["im_idx"]==start+context)[0][0])
-    #         except IndexError:
-    #             start = start+1
-    #             end = int(torch.where(entry["im_idx"]==start+context)[0][0])
+            try:
+                end = int(torch.where(entry["im_idx"]==start+context)[0][0])
+            except IndexError:
+                start = start+1
+                end = int(torch.where(entry["im_idx"]==start+context)[0][0])
 
-    #         if (start+context+future> len(entry["im_idx"].unique())):
-    #             future = len(entry["im_idx"].unique()) - context
+            if (start+context+future> len(entry["im_idx"].unique())):
+                future = len(entry["im_idx"].unique()) - context
 
-    #         if (start+context+future > len(entry["im_idx"].unique())):
-    #             break
+            if (start+context+future > len(entry["im_idx"].unique())):
+                break
 
-    #         if (start+context+future == len(entry["im_idx"].unique())):
-    #             future_end = len(entry["im_idx"])
-    #         else:
-    #             try:
-    #                 future_end = int(torch.where(entry["im_idx"]==start+context+future)[0][0])
-    #             except IndexError:
-    #                 start +=1
-    #                 future_end = int(torch.where(entry["im_idx"]==start+context+future)[0][0])
+            if (start+context+future == len(entry["im_idx"].unique())):
+                future_end = len(entry["im_idx"])
+            else:
+                try:
+                    future_end = int(torch.where(entry["im_idx"]==start+context+future)[0][0])
+                except IndexError:
+                    start +=1
+                    future_end = int(torch.where(entry["im_idx"]==start+context+future)[0][0])
 
-    #         future_frame_idx = entry["im_idx"][end:future_end]
-    #         future_frame_len = future_frame_idx.shape[0]
+            future_frame_idx = entry["im_idx"][end:future_end]
+            future_frame_len = future_frame_idx.shape[0]
                     
-    #         attention_distribution = pred["output"][count]["attention_distribution"]
-    #         spatial_distribution = pred["output"][count]["spatial_distribution"]
-    #         contact_distribution = pred["output"][count]["contacting_distribution"]
+            attention_distribution = pred["output"][count]["attention_distribution"]
+            spatial_distribution = pred["output"][count]["spatial_distribution"]
+            contact_distribution = pred["output"][count]["contacting_distribution"]
 
-    #         attention_label = torch.tensor(pred["attention_gt"][end:future_end], dtype=torch.long).to(device=attention_distribution.device).squeeze()
-    #         try:    
-    #             losses["attention_relation_loss"] = ce_loss(attention_distribution, attention_label)
-    #         except ValueError:
-    #             attention_label = attention_label.unsqueeze(0)
-    #             losses["attention_relation_loss"] = ce_loss(attention_distribution, attention_label)
+            attention_label = torch.tensor(pred["attention_gt"][end:future_end], dtype=torch.long).to(device=attention_distribution.device).squeeze()
+            try:    
+                losses["attention_relation_loss"] = ce_loss(attention_distribution, attention_label)
+            except ValueError:
+                attention_label = attention_label.unsqueeze(0)
+                losses["attention_relation_loss"] = ce_loss(attention_distribution, attention_label)
             
-    #         if not conf.bce_loss:
-    #         # multi-label margin loss or adaptive loss
-    #             spatial_label = -torch.ones([len(pred["spatial_gt"][end:future_end]), 6], dtype=torch.long).to(device=attention_distribution.device)
-    #             contact_label = -torch.ones([len(pred["contacting_gt"][end:future_end]), 17], dtype=torch.long).to(device=attention_distribution.device)
-    #             for i in range(len(pred["spatial_gt"][end:future_end])):
-    #                 spatial_label[i, : len(pred["spatial_gt"][end:future_end][i])] = torch.tensor(pred["spatial_gt"][end:future_end][i])
-    #                 contact_label[i, : len(pred["contacting_gt"][end:future_end][i])] = torch.tensor(pred["contacting_gt"][end:future_end][i])
+            if not conf.bce_loss:
+            # multi-label margin loss or adaptive loss
+                spatial_label = -torch.ones([len(pred["spatial_gt"][end:future_end]), 6], dtype=torch.long).to(device=attention_distribution.device)
+                contact_label = -torch.ones([len(pred["contacting_gt"][end:future_end]), 17], dtype=torch.long).to(device=attention_distribution.device)
+                for i in range(len(pred["spatial_gt"][end:future_end])):
+                    spatial_label[i, : len(pred["spatial_gt"][end:future_end][i])] = torch.tensor(pred["spatial_gt"][end:future_end][i])
+                    contact_label[i, : len(pred["contacting_gt"][end:future_end][i])] = torch.tensor(pred["contacting_gt"][end:future_end][i])
 
-    #         else:
-    #         # bce loss
-    #             spatial_label = torch.zeros([len(pred["spatial_gt"][end:future_end]), 6], dtype=torch.float32).to(device=attention_distribution.device)
-    #             contact_label = torch.zeros([len(pred["contacting_gt"][end:future_end]), 17], dtype=torch.float32).to(device=attention_distribution.device)
-    #             for i in range(len(pred["spatial_gt"][end:future_end])):
-    #                 spatial_label[i, pred["spatial_gt"][end:future_end][i]] = 1
-    #                 contact_label[i, pred["contacting_gt"][end:future_end][i]] = 1
+            else:
+            # bce loss
+                spatial_label = torch.zeros([len(pred["spatial_gt"][end:future_end]), 6], dtype=torch.float32).to(device=attention_distribution.device)
+                contact_label = torch.zeros([len(pred["contacting_gt"][end:future_end]), 17], dtype=torch.float32).to(device=attention_distribution.device)
+                for i in range(len(pred["spatial_gt"][end:future_end])):
+                    spatial_label[i, pred["spatial_gt"][end:future_end][i]] = 1
+                    contact_label[i, pred["contacting_gt"][end:future_end][i]] = 1
 
-    #         vid_no = gt_annotation[0][0]["frame"].split('.')[0]
+            vid_no = gt_annotation[0][0]["frame"].split('.')[0]
 
-    #         # losses = {}
-    #         # if conf.mode == 'sgcls' or conf.mode == 'sgdet':
-    #         #     losses['object_loss'] = ce_loss(pred['distribution'], pred['labels'])
+            # losses = {}
+            # if conf.mode == 'sgcls' or conf.mode == 'sgdet':
+            #     losses['object_loss'] = ce_loss(pred['distribution'], pred['labels'])
 
-    #         losses["attention_relation_loss"] += ce_loss(attention_distribution, attention_label)
-    #         if not conf.bce_loss:
-    #             losses["spatial_relation_loss"] += mlm_loss(spatial_distribution, spatial_label)
-    #             losses["contact_relation_loss"] += mlm_loss(contact_distribution, contact_label)
+            losses["attention_relation_loss"] += ce_loss(attention_distribution, attention_label)
+            if not conf.bce_loss:
+                losses["spatial_relation_loss"] += mlm_loss(spatial_distribution, spatial_label)
+                losses["contact_relation_loss"] += mlm_loss(contact_distribution, contact_label)
 
-    #         else:
-    #             losses["spatial_relation_loss"] += bce_loss(spatial_distribution, spatial_label)
-    #             losses["contact_relation_loss"] += bce_loss(contact_distribution, contact_label)
+            else:
+                losses["spatial_relation_loss"] += bce_loss(spatial_distribution, spatial_label)
+                losses["contact_relation_loss"] += bce_loss(contact_distribution, contact_label)
 
-    #         # optimizer.zero_grad()
-    #         # loss = sum(losses.values())
-    #         # loss.backward(retain_graph = True)
-    #         # if counter%1000 ==0:
-    #         #     print(f"Loss for forecasting : {loss}")
+            # optimizer.zero_grad()
+            # loss = sum(losses.values())
+            # loss.backward(retain_graph = True)
+            # if counter%1000 ==0:
+            #     print(f"Loss for forecasting : {loss}")
             
-    #         count += 1
-    #         start += 1
-    #         # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
-    #         # optimizer.step()
+            count += 1
+            start += 1
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
+            # optimizer.step()
             
-    #     losses["attention_relation_loss"] = losses["attention_relation_loss"]/count
-    #     losses["spatial_relation_loss"] = losses["spatial_relation_loss"]/count
-    #     losses["contact_relation_loss"] = losses["contact_relation_loss"]/count
-    #     optimizer.zero_grad()
-    #     loss = sum(losses.values())
-    #     loss.backward()
-    #     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
-    #     optimizer.step()
-    #     # if b%100 ==0:
-    #     #     print("Loss for forecasting : ",loss)
-    #     tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
+        losses["attention_relation_loss"] = losses["attention_relation_loss"]/count
+        losses["spatial_relation_loss"] = losses["spatial_relation_loss"]/count
+        losses["contact_relation_loss"] = losses["contact_relation_loss"]/count
+        optimizer.zero_grad()
+        loss = sum(losses.values())
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
+        optimizer.step()
+        # if b%100 ==0:
+        #     print("Loss for forecasting : ",loss)
+        tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
 
-    #     if b % 1000 == 0 and b >= 1000:
-    #         time_per_batch = (time.time() - start_time) / 1000
-    #         print("\ne{:2d}encoder_tran  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, b, len(dataloader_train),
-    #                                                                             time_per_batch, len(dataloader_train) * time_per_batch / 60))
+        if b % 1000 == 0 and b >= 1000:
+            time_per_batch = (time.time() - start_time) / 1000
+            print("\ne{:2d}encoder_tran  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, b, len(dataloader_train),
+                                                                                time_per_batch, len(dataloader_train) * time_per_batch / 60))
 
-    #         mn = pd.concat(tr[-1000:], axis=1).mean(1)
-    #         print(mn)
-    #         start_time = time.time()
+            mn = pd.concat(tr[-1000:], axis=1).mean(1)
+            print(mn)
+            start_time = time.time()
 
-    # torch.save({"state_dict": model.state_dict()}, os.path.join(conf.save_path, "forecast_{}.tar".format(epoch)))
-    # print("*" * 40)
-    # print("save the checkpoint after {} epochs".format(epoch))
-    # with open(evaluator.save_file, "a") as f:
-    #     f.write("save the checkpoint after {} epochs\n".format(epoch))
+    torch.save({"state_dict": model.state_dict()}, os.path.join(conf.save_path, "forecast_{}.tar".format(epoch)))
+    print("*" * 40)
+    print("save the checkpoint after {} epochs".format(epoch))
+    with open(evaluator.save_file, "a") as f:
+        f.write("save the checkpoint after {} epochs\n".format(epoch))
     model.eval()
     object_detector.is_train = False
     c=0

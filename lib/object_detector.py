@@ -347,11 +347,11 @@ class detector(nn.Module):
 		pair_rois = torch.cat((FINAL_BBOXES[pair[:, 0], 1:], FINAL_BBOXES[pair[:, 1], 1:]), 1).data.cpu().numpy()
 		spatial_masks = torch.tensor(draw_union_boxes(pair_rois, 27) - 0.5).to(FINAL_FEATURES.device)
 		
-		FINAL_DISTRIBUTIONS, FINAL_SCORES, PRED_LABELS = self._compute_final_distributions_and_labels(FINAL_FEATURES)
+		FINAL_DISTRIBUTIONS, FINAL_PRED_SCORES, PRED_LABELS = self._compute_final_distributions_and_labels(FINAL_FEATURES)
 		attribute_dictionary = self._construct_attribute_dictionary(
 			FINAL_BBOXES, FINAL_LABELS, FINAL_SCORES, im_idx, pair, HUMAN_IDX, FINAL_FEATURES,
 			union_boxes, union_feat, spatial_masks, a_rel, s_rel, c_rel, FINAL_DISTRIBUTIONS, PRED_LABELS,
-			FINAL_BASE_FEATURES, im_info
+			FINAL_BASE_FEATURES, im_info, FINAL_PRED_SCORES
 		)
 		return attribute_dictionary
 	
@@ -436,7 +436,7 @@ class detector(nn.Module):
 	def _construct_attribute_dictionary(
 			self, FINAL_BBOXES, FINAL_LABELS, FINAL_SCORES, im_idx, pair, HUMAN_IDX, FINAL_FEATURES,
 			union_boxes, union_feat, spatial_masks, a_rel, s_rel, c_rel, FINAL_DISTRIBUTIONS, PRED_LABELS,
-			FINAL_BASE_FEATURES, im_info
+			FINAL_BASE_FEATURES, im_info, FINAL_PRED_SCORES
 	):
 		attribute_dictionary = {
 			const.FINAL_BBOXES: FINAL_BBOXES,
@@ -455,7 +455,8 @@ class detector(nn.Module):
 			const.FINAL_DISTRIBUTIONS: FINAL_DISTRIBUTIONS,
 			const.PRED_LABELS: PRED_LABELS,
 			const.FINAL_BASE_FEATURES: FINAL_BASE_FEATURES,
-			const.IM_INFO: im_info[0, 2]
+			const.IM_INFO: im_info[0, 2],
+			const.FINAL_PRED_SCORES: FINAL_PRED_SCORES
 		}
 		return attribute_dictionary
 	
@@ -492,7 +493,7 @@ class detector(nn.Module):
 			entry = {
 				const.BOXES: attribute_dictionary[const.FINAL_BBOXES],
 				const.LABELS: attribute_dictionary[const.FINAL_LABELS],  # labels are gt!
-				const.SCORES: attribute_dictionary[const.FINAL_SCORES],
+				const.SCORES: attribute_dictionary[const.FINAL_PRED_SCORES],
 				const.IMAGE_IDX: attribute_dictionary[const.IMAGE_IDX],
 				const.PAIR_IDX: attribute_dictionary[const.PAIR_IDX],
 				const.HUMAN_IDX: attribute_dictionary[const.HUMAN_IDX],

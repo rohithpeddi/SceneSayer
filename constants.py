@@ -122,6 +122,7 @@ class DetectorConstants:
 	CONTACTING_GT = "contacting_gt"
 	FMAPS = "fmaps"
 	IM_INFO = "im_info"
+	FINAL_PRED_SCORES = "FINAL_PRED_SCORES"
 	
 	PERSON_BBOX = "person_bbox"
 	BBOX = "bbox"

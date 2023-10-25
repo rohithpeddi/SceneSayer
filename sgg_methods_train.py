@@ -12,6 +12,7 @@ import copy
 from dataloader.supervised.generation.action_genome.ag_dataset import AG, cuda_collate_fn
 from constants import Constants as const
 from lib.object_detector import detector
+from lib.object_detector_old import DetectorOld
 from lib.supervised.config import Config
 from lib.supervised.evaluation_recall import BasicSceneGraphEvaluator
 from lib.AdamW import AdamW
@@ -215,8 +216,12 @@ def train_sttran():
 			gt_annotation = AG_dataset_train.gt_annotations[data[4]]
 			
 			# prevent gradients to FasterRCNN
+			# TODO: Write an assert to check match between both the things
 			with torch.no_grad():
 				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+				old_entry = object_detector_old(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+				
+				assert entry == old_entry
 			
 			pred = model(entry)
 			
@@ -303,10 +308,6 @@ def train_sttran():
 		scheduler.step(score)
 
 
-def train_tempura():
-	pass
-
-
 if __name__ == '__main__':
 	conf = Config()
 	print('The CKPT saved here:', conf.save_path)
@@ -358,6 +359,14 @@ if __name__ == '__main__':
 		mode=conf.mode
 	).to(device=gpu_device)
 	object_detector.eval()
+	
+	object_detector_old = DetectorOld(
+		train=True,
+		object_classes=AG_dataset_train.object_classes,
+		use_SUPPLY=True,
+		mode=conf.mode
+	).to(device=gpu_device)
+	object_detector_old.eval()
 	
 	evaluator = BasicSceneGraphEvaluator(
 		mode=conf.mode,

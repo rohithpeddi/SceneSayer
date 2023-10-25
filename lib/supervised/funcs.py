@@ -4,47 +4,44 @@ import cv2
 
 
 def assign_relations(prediction, gt_annotations, assign_IOU_threshold):
-	'''
-    :param prediction(list): results from FasterRCNN, each element is a dictionary including the predicted boxes,
+	"""
+    :param prediction: results from FasterRCNN, each element is a dictionary including the predicted boxes,
                             labels, scores, base_feature(image), features(rois), im_info (w,h,scale)
-    :param gt_annotations(list):  ground-truth, each element is a list including person info(always element 0) and objects
+    :param gt_annotations:  ground-truth, each element is a list including person info(always element 0) and objects
     :param assign_IOU_threshold: hyperparameter for SGDET, 0.5
     :return: DETECTOR_FOUND_IDX
              GT_RELATIONS
              SUPPLY_RELATIONS
-    '''
+    """
 	FINAL_BBOXES = prediction['FINAL_BBOXES']
 	FINAL_LABELS = prediction['FINAL_LABELS']
 	DETECTOR_FOUND_IDX = []
 	GT_RELATIONS = []
 	SUPPLY_RELATIONS = []
-	
 	assigned_labels = np.zeros(FINAL_LABELS.shape[0])
-	
-	for i, j in enumerate(gt_annotations):
-		
-		gt_boxes = np.zeros([len(j), 4])
-		gt_labels = np.zeros(len(j))
-		gt_boxes[0] = j[0]['person_bbox']
+	for frame_idx, gt_frame_bboxes in enumerate(gt_annotations):
+		gt_boxes = np.zeros([len(gt_frame_bboxes), 4])
+		gt_labels = np.zeros(len(gt_frame_bboxes))
+		gt_boxes[0] = gt_frame_bboxes[0]['person_bbox']
 		gt_labels[0] = 1
-		for m, n in enumerate(j[1:]):
+		for m, n in enumerate(gt_frame_bboxes[1:]):
 			gt_boxes[m + 1, :] = n['bbox']
 			gt_labels[m + 1] = n['class']
 		
-		pred_boxes = FINAL_BBOXES[FINAL_BBOXES[:, 0] == i, 1:].detach().cpu().numpy()
+		pred_boxes = FINAL_BBOXES[FINAL_BBOXES[:, 0] == frame_idx, 1:].detach().cpu().numpy()
 		# labels = FINAL_LABELS[FINAL_BBOXES[:,0] == i].detach().cpu().numpy()
 		
 		IOUs = bbox_overlaps(pred_boxes, gt_boxes)
 		IOUs_bool = IOUs > assign_IOU_threshold
 		#
-		assigned_labels[(FINAL_BBOXES[:, 0].cpu().numpy() == i).nonzero()[0][np.max(IOUs, axis=1) > 0.5]] = \
-		gt_labels[np.argmax(IOUs, axis=1)][np.max(IOUs, axis=1) > 0.5]
+		assigned_labels[(FINAL_BBOXES[:, 0].cpu().numpy() == frame_idx).nonzero()[0][np.max(IOUs, axis=1) > assign_IOU_threshold]] = \
+		gt_labels[np.argmax(IOUs, axis=1)][np.max(IOUs, axis=1) > assign_IOU_threshold]
 		
 		detector_found_idx = []
 		gt_relations = []
 		supply_relations = []
 		candidates = []
-		for m, n in enumerate(gt_annotations[i]):
+		for m, n in enumerate(gt_annotations[frame_idx]):
 			if m == 0:
 				# 1 is the person index, np.where find out the pred_boxes and check which one corresponds to gt_label
 				if sum(IOUs[:, m] > assign_IOU_threshold) > 0:
@@ -66,7 +63,7 @@ def assign_relations(prediction, gt_annotations, assign_IOU_threshold):
 					detector_found_idx.append(candidate)
 					gt_relations.append(n)
 					candidates.append(candidate)
-					assigned_labels[(FINAL_BBOXES[:, 0].cpu().numpy() == i).nonzero()[0][candidate]] = n['class']
+					assigned_labels[(FINAL_BBOXES[:, 0].cpu().numpy() == frame_idx).nonzero()[0][candidate]] = n['class']
 				else:
 					# no overlapped box
 					supply_relations.append(n)
@@ -80,13 +77,13 @@ def assign_relations(prediction, gt_annotations, assign_IOU_threshold):
 
 def _get_image_blob(im):
 	"""Converts an image into a network input.
-  Arguments:
-    im (ndarray): a color image in BGR order
-  Returns:
-    blob (ndarray): a data blob holding an image pyramid
-    im_scale_factors (list): list of image scales (relative to im) used
-      in the image pyramid
-  """
+	  Arguments:
+	    im (ndarray): a color image in BGR order
+	  Returns:
+	    blob (ndarray): a data blob holding an image pyramid
+	    im_scale_factors (list): list of image scales (relative to im) used
+	      in the image pyramid
+    """
 	im_orig = im.astype(np.float32, copy=True)
 	im_orig -= np.array([[[102.9801, 115.9465, 122.7717]]])
 	

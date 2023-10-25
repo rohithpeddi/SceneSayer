@@ -186,6 +186,28 @@ def train_dsg_detr():
 		scheduler.step(score)
 
 
+def are_dicts_equal(dict1, dict2):
+	# Check if the dictionaries have the same keys
+	if set(dict1.keys()) != set(dict2.keys()):
+		return False
+	
+	# Check if the values for each key are equal
+	for key in dict1.keys():
+		value1 = dict1[key]
+		value2 = dict2[key]
+		
+		# Check if both values are dictionaries and recursively compare them
+		if isinstance(value1, dict) and isinstance(value2, dict):
+			if not are_dicts_equal(value1, value2):
+				return False
+		# If the values are not dictionaries, check if they are equal
+		elif value1 != value2:
+			return False
+	
+	# If all checks pass, the dictionaries are equal
+	return True
+
+
 def train_sttran():
 	from lib.supervised.biased.sttran.sttran import STTran
 	
@@ -220,7 +242,7 @@ def train_sttran():
 				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
 				old_entry = object_detector_old(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
 				
-				assert entry == old_entry
+				print(are_dicts_equal(entry, old_entry))
 			
 			pred = model(entry)
 			

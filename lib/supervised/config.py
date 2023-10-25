@@ -34,7 +34,7 @@ class Config(object):
         parser = ArgumentParser(description='training code')
         parser.add_argument('-method', dest='method', help='Method dsg_detr/sttran/tempura', default='dsg_detr',
                             type=str)
-        parser.add_argument('-mode', dest='mode', help='predcls/sgcls/sgdet', default='predcls', type=str)
+        parser.add_argument('-mode', dest='mode', help='predcls/sgcls/sgdet', default='sgdet', type=str)
         parser.add_argument('-save_path', default='data', type=str)
         parser.add_argument('-model_path', default=None, type=str)
         parser.add_argument('-data_path', default='/data/rohith/ag', type=str)

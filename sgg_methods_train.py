@@ -281,11 +281,15 @@ def train_sttran():
                    dec_layer_num=conf.dec_layer).to(device=gpu_device)
 
     optimizer, scheduler = prepare_optimizer(model)
+    print('-----------------------------------------------------------------------------------')
+    print(f"Mode : {conf.mode}")
+    print('-----------------------------------------------------------------------------------')
 
     tr = []
     for epoch in range(conf.nepoch):
         model.train()
         object_detector.is_train = True
+        object_detector_old.is_train = True
         start = time.time()
         train_iter = iter(dataloader_train)
         test_iter = iter(dataloader_test)
@@ -376,6 +380,7 @@ def train_sttran():
 
         model.eval()
         object_detector.is_train = False
+        object_detector_old.is_train = False
         with torch.no_grad():
             for b in range(len(dataloader_test)):
                 data = next(test_iter)

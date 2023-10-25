@@ -17,7 +17,7 @@ def setup_logging():
 	if not os.path.exists(log_directory):
 		os.makedirs(log_directory)
 	
-	log_file_path = os.path.join(log_directory, f"std.log")
+	log_file_path = os.path.join(log_directory, f"std_test_numpy.log")
 	logging.basicConfig(filename=log_file_path, filemode='a', level=logging.INFO,
 	                    format='%(asctime)s - %(levelname)s - %(threadName)s - %(message)s')
 

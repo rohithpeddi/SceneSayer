@@ -1,4 +1,5 @@
 import copy
+import gzip
 import os
 import pickle
 
@@ -39,7 +40,7 @@ class SupervisedFeatureExtractor:
 		logger.info("---------------------------------------------")
 		logger.info('Configurations:')
 		for i in self.config.args:
-			logger.info(i, ':', self.config.args[i])
+			logger.info(f"{i} : {self.config.args[i]}")
 		logger.info("---------------------------------------------")
 	
 	def _initialize_data_loaders(self):
@@ -86,11 +87,18 @@ class SupervisedFeatureExtractor:
 		
 		with torch.no_grad():
 			entry = self.object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+
+		numpy_entry = {}
+		for key, val in entry.items():
+			if isinstance(val, torch.Tensor):
+				numpy_entry[key] = val.cpu().numpy()
+			else:
+				numpy_entry[key] = val
 			
-		pkl_path = os.path.join(output_directory, mode + '.pkl')
-		
+		pkl_path = os.path.join(output_directory, mode, video_name + '.pkl')
+		os.makedirs(os.path.dirname(pkl_path), exist_ok=True)
 		try:
-			with open(pkl_path, 'ab') as pkl_file:
+			with open(pkl_path, 'wb') as pkl_file:
 				pickle.dump(entry, pkl_file)
 				logger.info("Dumped features for video: {}".format(video_name))
 		except Exception as e:
@@ -99,14 +107,21 @@ class SupervisedFeatureExtractor:
 	
 	def generate_supervised_features(self, output_directory):
 		os.makedirs(output_directory, exist_ok=True)
-		logger.info("Generating features for train data")
-		for video in tqdm(self.train_dataloader):
-			self._generate_features(video, output_directory, self.train_dataset, mode=const.TRAIN)
+		# logger.info("Generating features for train data")
+		# for video in tqdm(self.train_dataloader):
+		# 	self._generate_features(video, output_directory, self.train_dataset, mode=const.TRAIN)
 		logger.info("Generating features for test data")
 		for video in tqdm(self.test_dataloader):
 			self._generate_features(video, output_directory, self.test_dataset, mode=const.TEST)
 
 
+def load_pickle(pkl_path):
+	with open(pkl_path, 'rb') as pkl_file:
+		entry = pickle.load(pkl_file)
+	return entry
+
+
 if __name__ == "__main__":
 	supervised_feature_extractor = SupervisedFeatureExtractor()
 	supervised_feature_extractor.generate_supervised_features(output_directory="/data/rohith/ag/features/supervised")
+	# load_pickle("/data/rohith/ag/features/supervised/train/1BVUA.mp4.pkl")

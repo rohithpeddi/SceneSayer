@@ -14,10 +14,6 @@ from fasterRCNN.lib.model.roi_layers import nms
 from constants import DetectorConstants as const
 
 
-def to_cuda(tensor, dtype=torch.float):
-	return tensor.type(dtype).cuda(const.CUDA_DEVICE)
-
-
 class detector(nn.Module):
 	"""first part: object detection (image/video)"""
 	
@@ -41,7 +37,6 @@ class detector(nn.Module):
 		
 		self.NMS_THRESHOLD = 0.4
 		self.SCORE_THRESHOLD = 0.1
-		self.BBOX_REGRESSION_MULTIPLIERS = to_cuda(torch.tensor([0.1, 0.1, 0.2, 0.2]))
 	
 	def _batch_processing(self, counter, data_list):
 		if counter + const.FASTER_RCNN_BATCH_SIZE < data_list[0].shape[0]:
@@ -72,9 +67,9 @@ class detector(nn.Module):
 			roi_features[indices[order[keep]]]
 		]
 	
-	def _process_results_for_class(self, i, j, rois, scores, pred_boxes, roi_features):
-		boxes, scores, features = self._nms_for_class(scores[i], pred_boxes[i], j, roi_features[i])
-		labels = torch.full((len(scores),), j, dtype=torch.int64).cuda()
+	def _process_results_for_class(self, roi_idx, class_idx, rois, scores, pred_boxes, roi_features):
+		boxes, scores, features = self._nms_for_class(scores[roi_idx], pred_boxes[roi_idx], class_idx, roi_features[roi_idx])
+		labels = torch.full((len(scores),), class_idx, dtype=torch.int64).cuda()
 		return boxes, scores, labels, features
 	
 	def _nms_and_collect_results(self, rois, scores, pred_boxes, base_features, roi_features, counter_image):

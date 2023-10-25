@@ -518,7 +518,7 @@ class detector(nn.Module):
 				const.LABELS: attribute_dictionary[const.FINAL_LABELS],  # labels are gt!
 				const.SCORES: attribute_dictionary[const.FINAL_SCORES],
 				const.IMAGE_IDX: attribute_dictionary[const.IMAGE_IDX],
-				const.PAIR_IDX: attribute_dictionary[const.PAIR_IDX],
+				const.PAIR_IDX: attribute_dictionary[const.PAIR],
 				const.HUMAN_IDX: attribute_dictionary[const.HUMAN_IDX],
 				const.FEATURES: attribute_dictionary[const.FINAL_FEATURES],
 				const.UNION_FEAT: attribute_dictionary[const.UNION_FEAT],

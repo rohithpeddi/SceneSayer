@@ -216,7 +216,6 @@ def train_sttran():
 			gt_annotation = AG_dataset_train.gt_annotations[data[4]]
 			
 			# prevent gradients to FasterRCNN
-			# TODO: Write an assert to check match between both the things
 			with torch.no_grad():
 				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
 				old_entry = object_detector_old(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)

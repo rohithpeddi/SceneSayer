@@ -48,11 +48,12 @@ class detector(nn.Module):
 			return [data[counter:counter + const.FASTER_RCNN_BATCH_SIZE] for data in data_list]
 		return [data[counter:] for data in data_list]
 	
-	def _box_regression(self, bbox_pred):
+	def _box_regression(self, bbox_pred, rois):
 		box_deltas = bbox_pred.data
-		# TODO: Change according to the original method
-		box_deltas.mul_(self.BBOX_REGRESSION_MULTIPLIERS)
-		return box_deltas.view(-1, 4 * len(self.object_classes))
+		box_deltas = box_deltas.view(-1, 4) * torch.FloatTensor([0.1, 0.1, 0.2, 0.2]).to(self.device) \
+		             + torch.FloatTensor([0.0, 0.0, 0.0, 0.0]).cuda(0)  # the first is normalize std, the second is mean
+		box_deltas = box_deltas.view(-1, rois.shape[1], 4 * len(self.object_classes))  # post_NMS_NTOP: 30
+		return box_deltas
 	
 	def _nms_for_class(self, region_scores, region_pred_boxes, j, roi_features):
 		indices = torch.nonzero(region_scores[:, j] > self.SCORE_THRESHOLD).view(-1)
@@ -258,7 +259,7 @@ class detector(nn.Module):
 				inputs_data, inputs_info, inputs_gt_boxes, inputs_num_boxes)
 			
 			boxes = rois.data[:, :, 1:5]
-			box_deltas = self._box_regression(bbox_pred)
+			box_deltas = self._box_regression(bbox_pred, rois)
 			pred_boxes = bbox_transform_inv(boxes, box_deltas, 1)
 			transformed_pred_boxes = clip_boxes(pred_boxes, im_info.data, 1)
 			transformed_pred_boxes /= inputs_info[0, 2]

@@ -342,6 +342,11 @@ class detector(nn.Module):
 		FINAL_FEATURES = self._compute_final_features(FINAL_BASE_FEATURES, FINAL_BBOXES)
 		union_boxes, spatial_masks = self._compute_union_boxes_and_masks(FINAL_BBOXES, pair, im_idx)
 		union_feat = self.fasterRCNN.RCNN_roi_align(FINAL_BASE_FEATURES, union_boxes)
+		
+		FINAL_BBOXES[:, 1:] = FINAL_BBOXES[:, 1:] / im_info[0, 2]
+		pair_rois = torch.cat((FINAL_BBOXES[pair[:, 0], 1:], FINAL_BBOXES[pair[:, 1], 1:]), 1).data.cpu().numpy()
+		spatial_masks = torch.tensor(draw_union_boxes(pair_rois, 27) - 0.5).to(FINAL_FEATURES.device)
+		
 		FINAL_DISTRIBUTIONS, FINAL_SCORES, PRED_LABELS = self._compute_final_distributions_and_labels(FINAL_FEATURES)
 		attribute_dictionary = self._construct_attribute_dictionary(
 			FINAL_BBOXES, FINAL_LABELS, FINAL_SCORES, im_idx, pair, HUMAN_IDX, FINAL_FEATURES,

@@ -271,34 +271,146 @@ class detector(nn.Module):
 		}
 		return attribute_dictionary
 	
+	# def _forward_sgdet(self, im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all):
+	# 	counter = 0
+	# 	counter_image = 0
+	# 	FINAL_BBOXES, FINAL_LABELS, FINAL_SCORES, FINAL_FEATURES, FINAL_BASE_FEATURES = self._init_sgdet_tensors()
+	# 	while counter < im_data.shape[0]:
+	# 		inputs_data, inputs_info, inputs_gt_boxes, inputs_num_boxes = self._batch_processing(
+	# 			counter, [im_data, im_info, gt_boxes, num_boxes])
+	#
+	# 		rois, cls_prob, bbox_pred, base_feat, roi_features = self.fasterRCNN(
+	# 			inputs_data, inputs_info, inputs_gt_boxes, inputs_num_boxes)
+	#
+	# 		SCORES = cls_prob.data
+	# 		boxes = rois.data[:, :, 1:5]
+	# 		box_deltas = self._box_regression(bbox_pred, rois)
+	# 		pred_boxes = bbox_transform_inv(boxes, box_deltas, 1)
+	#
+	# 		transformed_pred_boxes = clip_boxes(pred_boxes, im_info.data, 1)
+	# 		transformed_pred_boxes /= inputs_info[0, 2]
+	#
+	# 		FINAL_BBOXES, FINAL_LABELS, FINAL_SCORES, FINAL_FEATURES, FINAL_BASE_FEATURES, counter_image = self._nms_and_collect_results(
+	# 			rois, SCORES, transformed_pred_boxes, base_feat, roi_features, counter_image,
+	# 			[FINAL_BBOXES, FINAL_LABELS, FINAL_SCORES, FINAL_FEATURES, FINAL_BASE_FEATURES]
+	# 		)
+	# 		counter += const.FASTER_RCNN_BATCH_SIZE
+	#
+	# 	FINAL_BBOXES = torch.clamp(FINAL_BBOXES, 0)
+	# 	prediction = self._pack_attribute_dictionary(FINAL_BBOXES, FINAL_LABELS, FINAL_SCORES, FINAL_FEATURES,
+	# 	                                             FINAL_BASE_FEATURES)
+	#
+	# 	DETECTOR_FOUND_IDX, GT_RELATIONS, SUPPLY_RELATIONS, assigned_labels = assign_relations(prediction,
+	# 	                                                                                       gt_annotation,
+	# 	                                                                                       assign_IOU_threshold=0.5)
+	#
+	# 	FINAL_DISTRIBUTIONS = torch.softmax(self.fasterRCNN.RCNN_cls_score(prediction[const.FINAL_FEATURES])[:, 1:],
+	# 	                                    dim=1)
+	# 	FINAL_SCORES, PRED_LABELS = torch.max(FINAL_DISTRIBUTIONS, dim=1)
+	# 	PRED_LABELS = PRED_LABELS + 1
+	#
+	# 	prediction[const.DETECTOR_FOUND_IDX] = DETECTOR_FOUND_IDX
+	# 	prediction[const.GT_RELATIONS] = GT_RELATIONS
+	# 	prediction[const.SUPPLY_RELATIONS] = SUPPLY_RELATIONS
+	# 	prediction[const.ASSIGNED_LABELS] = assigned_labels
+	#
+	# 	if self.is_train:
+	# 		return self._augment_gt_annotation(prediction, gt_annotation, im_info)
+	# 	else:
+	# 		prediction[const.FINAL_DISTRIBUTIONS] = FINAL_DISTRIBUTIONS
+	# 		prediction[const.PRED_LABELS] = PRED_LABELS
+	# 		prediction[const.FINAL_SCORES] = FINAL_SCORES
+	# 		prediction[const.IM_INFO] = im_info[0, 2]
+	# 		return prediction
+	
 	def _forward_sgdet(self, im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all):
 		counter = 0
 		counter_image = 0
-		FINAL_BBOXES, FINAL_LABELS, FINAL_SCORES, FINAL_FEATURES, FINAL_BASE_FEATURES = self._init_sgdet_tensors()
+		
+		# create saved-bbox, labels, scores, features
+		FINAL_BBOXES = torch.tensor([]).cuda(0)
+		FINAL_LABELS = torch.tensor([], dtype=torch.int64).cuda(0)
+		FINAL_SCORES = torch.tensor([]).cuda(0)
+		FINAL_FEATURES = torch.tensor([]).cuda(0)
+		FINAL_BASE_FEATURES = torch.tensor([]).cuda(0)
+		
 		while counter < im_data.shape[0]:
-			inputs_data, inputs_info, inputs_gt_boxes, inputs_num_boxes = self._batch_processing(
-				counter, [im_data, im_info, gt_boxes, num_boxes])
+			# compute 10 images in batch and  collect all frames data in the video
+			if counter + 10 < im_data.shape[0]:
+				inputs_data = im_data[counter:counter + 10]
+				inputs_info = im_info[counter:counter + 10]
+				inputs_gtboxes = gt_boxes[counter:counter + 10]
+				inputs_numboxes = num_boxes[counter:counter + 10]
 			
-			rois, cls_prob, bbox_pred, base_feat, roi_features = self.fasterRCNN(
-				inputs_data, inputs_info, inputs_gt_boxes, inputs_num_boxes)
+			else:
+				inputs_data = im_data[counter:]
+				inputs_info = im_info[counter:]
+				inputs_gtboxes = gt_boxes[counter:]
+				inputs_numboxes = num_boxes[counter:]
+			
+			rois, cls_prob, bbox_pred, base_feat, roi_features = self.fasterRCNN(inputs_data, inputs_info,
+			                                                                     inputs_gtboxes, inputs_numboxes)
 			
 			SCORES = cls_prob.data
 			boxes = rois.data[:, :, 1:5]
-			box_deltas = self._box_regression(bbox_pred, rois)
+			# bbox regression (class specific)
+			box_deltas = bbox_pred.data
+			box_deltas = box_deltas.view(-1, 4) * torch.FloatTensor([0.1, 0.1, 0.2, 0.2]).cuda(0) \
+			             + torch.FloatTensor([0.0, 0.0, 0.0, 0.0]).cuda(
+				0)  # the first is normalize std, the second is mean
+			box_deltas = box_deltas.view(-1, rois.shape[1], 4 * len(self.object_classes))  # post_NMS_NTOP: 30
 			pred_boxes = bbox_transform_inv(boxes, box_deltas, 1)
+			PRED_BOXES = clip_boxes(pred_boxes, im_info.data, 1)
 			
-			transformed_pred_boxes = clip_boxes(pred_boxes, im_info.data, 1)
-			transformed_pred_boxes /= inputs_info[0, 2]
+			PRED_BOXES /= inputs_info[0, 2]  # original bbox scale!!!!!!!!!!!!!!
 			
-			FINAL_BBOXES, FINAL_LABELS, FINAL_SCORES, FINAL_FEATURES, FINAL_BASE_FEATURES, counter_image = self._nms_and_collect_results(
-				rois, SCORES, transformed_pred_boxes, base_feat, roi_features, counter_image,
-				[FINAL_BBOXES, FINAL_LABELS, FINAL_SCORES, FINAL_FEATURES, FINAL_BASE_FEATURES]
-			)
-			counter += const.FASTER_RCNN_BATCH_SIZE
-		
+			# traverse frames
+			for i in range(rois.shape[0]):
+				# images in the batch
+				scores = SCORES[i]
+				pred_boxes = PRED_BOXES[i]
+				
+				for j in range(1, len(self.object_classes)):
+					# NMS according to obj categories
+					inds = torch.nonzero(scores[:, j] > 0.1).view(-1)  # 0.05 is score threshold
+					# inds = torch.nonzero(torch.argmax(scores, dim=1) == j).view(-1)
+					# if there is det
+					if inds.numel() > 0:
+						cls_scores = scores[:, j][inds]
+						_, order = torch.sort(cls_scores, 0, True)
+						cls_boxes = pred_boxes[inds][:, j * 4:(j + 1) * 4]
+						cls_dets = torch.cat((cls_boxes, cls_scores.unsqueeze(1)), 1)
+						cls_dets = cls_dets[order]
+						keep = nms(cls_boxes[order, :], cls_scores[order], 0.4)  # NMS threshold
+						cls_dets = cls_dets[keep.view(-1).long()]
+						
+						if j == 1:
+							# for person we only keep the highest score for person!
+							final_bbox = cls_dets[0, 0:4].unsqueeze(0)
+							final_score = cls_dets[0, 4].unsqueeze(0)
+							final_labels = torch.tensor([j]).cuda(0)
+							final_features = roi_features[i, inds[order[keep][0]]].unsqueeze(0)
+						else:
+							final_bbox = cls_dets[:, 0:4]
+							final_score = cls_dets[:, 4]
+							final_labels = torch.tensor([j]).repeat(keep.shape[0]).cuda(0)
+							final_features = roi_features[i, inds[order[keep]]]
+						
+						final_bbox = torch.cat((torch.tensor([[counter_image]], dtype=torch.float).repeat(
+							final_bbox.shape[0], 1).cuda(0),
+						                        final_bbox), 1)
+						FINAL_BBOXES = torch.cat((FINAL_BBOXES, final_bbox), 0)
+						FINAL_LABELS = torch.cat((FINAL_LABELS, final_labels), 0)
+						FINAL_SCORES = torch.cat((FINAL_SCORES, final_score), 0)
+						FINAL_FEATURES = torch.cat((FINAL_FEATURES, final_features), 0)
+				FINAL_BASE_FEATURES = torch.cat((FINAL_BASE_FEATURES, base_feat[i].unsqueeze(0)), 0)
+				
+				counter_image += 1
+			
+			counter += 10
 		FINAL_BBOXES = torch.clamp(FINAL_BBOXES, 0)
-		prediction = self._pack_attribute_dictionary(FINAL_BBOXES, FINAL_LABELS, FINAL_SCORES, FINAL_FEATURES,
-		                                             FINAL_BASE_FEATURES)
+		prediction = {'FINAL_BBOXES': FINAL_BBOXES, 'FINAL_LABELS': FINAL_LABELS, 'FINAL_SCORES': FINAL_SCORES,
+		              'FINAL_FEATURES': FINAL_FEATURES, 'FINAL_BASE_FEATURES': FINAL_BASE_FEATURES}
 		
 		DETECTOR_FOUND_IDX, GT_RELATIONS, SUPPLY_RELATIONS, assigned_labels = assign_relations(prediction,
 		                                                                                       gt_annotation,

@@ -412,26 +412,26 @@ class detector(nn.Module):
 		prediction = {'FINAL_BBOXES': FINAL_BBOXES, 'FINAL_LABELS': FINAL_LABELS, 'FINAL_SCORES': FINAL_SCORES,
 		              'FINAL_FEATURES': FINAL_FEATURES, 'FINAL_BASE_FEATURES': FINAL_BASE_FEATURES}
 		
-		DETECTOR_FOUND_IDX, GT_RELATIONS, SUPPLY_RELATIONS, assigned_labels = assign_relations(prediction,
-		                                                                                       gt_annotation,
-		                                                                                       assign_IOU_threshold=0.5)
-		
-		FINAL_DISTRIBUTIONS = torch.softmax(self.fasterRCNN.RCNN_cls_score(prediction[const.FINAL_FEATURES])[:, 1:],
-		                                    dim=1)
-		FINAL_SCORES, PRED_LABELS = torch.max(FINAL_DISTRIBUTIONS, dim=1)
-		PRED_LABELS = PRED_LABELS + 1
-		
-		prediction[const.DETECTOR_FOUND_IDX] = DETECTOR_FOUND_IDX
-		prediction[const.GT_RELATIONS] = GT_RELATIONS
-		prediction[const.SUPPLY_RELATIONS] = SUPPLY_RELATIONS
-		prediction[const.ASSIGNED_LABELS] = assigned_labels
-		
 		if self.is_train:
 			return self._augment_gt_annotation(prediction, gt_annotation, im_info)
 		else:
-			prediction[const.FINAL_DISTRIBUTIONS] = FINAL_DISTRIBUTIONS
-			prediction[const.PRED_LABELS] = PRED_LABELS
+			DETECTOR_FOUND_IDX, GT_RELATIONS, SUPPLY_RELATIONS, assigned_labels = assign_relations(prediction,
+			                                                                                       gt_annotation,
+			                                                                                       assign_IOU_threshold=0.5)
+			
+			FINAL_DISTRIBUTIONS = torch.softmax(self.fasterRCNN.RCNN_cls_score(prediction[const.FINAL_FEATURES])[:, 1:],
+			                                    dim=1)
+			FINAL_SCORES, PRED_LABELS = torch.max(FINAL_DISTRIBUTIONS, dim=1)
+			PRED_LABELS = PRED_LABELS + 1
+			
+			prediction[const.FINAL_BBOXES] = FINAL_BBOXES
+			prediction[const.FINAL_LABELS] = FINAL_LABELS
 			prediction[const.FINAL_SCORES] = FINAL_SCORES
+			prediction[const.FINAL_FEATURES] = FINAL_FEATURES
+			prediction[const.FINAL_BASE_FEATURES] = FINAL_BASE_FEATURES
+			prediction[const.FINAL_DISTRIBUTIONS] = FINAL_DISTRIBUTIONS
+			prediction[const.ASSIGNED_LABELS] = torch.LongTensor(assigned_labels).to(self.device)
+			prediction[const.PRED_LABELS] = PRED_LABELS
 			prediction[const.IM_INFO] = im_info[0, 2]
 			return prediction
 	
@@ -591,7 +591,7 @@ class detector(nn.Module):
 			else:
 				entry = {
 					const.BOXES: attribute_dictionary[const.FINAL_BBOXES],
-					const.LABELS: torch.LongTensor(attribute_dictionary[const.ASSIGNED_LABELS]).to(self.device),
+					const.LABELS: attribute_dictionary[const.ASSIGNED_LABELS],
 					const.SCORES: attribute_dictionary[const.FINAL_SCORES],
 					const.DISTRIBUTION: attribute_dictionary[const.FINAL_DISTRIBUTIONS],
 					const.PRED_LABELS: attribute_dictionary[const.PRED_LABELS],

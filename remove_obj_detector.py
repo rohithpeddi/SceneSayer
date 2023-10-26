@@ -27,14 +27,23 @@ class SupervisedFeatureExtractor:
 		self._initialize_object_detector()
 	
 	def _initialize_object_detector(self):
-		self.object_detector = detector(
+		self.sgcls_object_detector = detector(
 			train=True,
 			object_classes=self.train_dataset.object_classes,
 			use_SUPPLY=True,
-			mode=self.config.mode
+			mode=const.SGCLS
 		).to(device=self.device)
 		
-		self.object_detector.eval()
+		self.sgcls_object_detector.eval()
+		
+		self.sgdet_object_detector = detector(
+			train=True,
+			object_classes=self.train_dataset.object_classes,
+			use_SUPPLY=True,
+			mode=const.SGDET
+		).to(device=self.device)
+		
+		self.sgdet_object_detector.eval()
 	
 	def _print_config(self):
 		logger.info("---------------------------------------------")
@@ -75,7 +84,7 @@ class SupervisedFeatureExtractor:
 			collate_fn=cuda_collate_fn,
 			pin_memory=False
 		)
-		
+	
 	def _generate_features(self, video_data, output_directory, dataset, mode):
 		im_data = copy.deepcopy(video_data[0].cuda(0))
 		im_info = copy.deepcopy(video_data[1].cuda(0))
@@ -86,15 +95,21 @@ class SupervisedFeatureExtractor:
 		video_name = gt_annotation[0][0][const.FRAME].split('/')[0]
 		
 		with torch.no_grad():
-			entry = self.object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-
-		numpy_entry = {}
-		for key, val in entry.items():
-			if isinstance(val, torch.Tensor):
-				numpy_entry[key] = val.cpu().numpy()
+			if mode == const.TRAIN:
+				self.sgdet_object_detector.is_train = True
+				self.sgcls_object_detector.is_train = True
 			else:
-				numpy_entry[key] = val
+				self.sgdet_object_detector.is_train = False
+				self.sgcls_object_detector.is_train = False
 			
+			sgdet_entry = self.sgdet_object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+			sgcls_entry = self.sgcls_object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+			
+			entry = {
+				const.SGDET: sgdet_entry,
+				const.SGCLS: sgcls_entry
+			}
+		
 		pkl_path = os.path.join(output_directory, mode, video_name + '.pkl')
 		os.makedirs(os.path.dirname(pkl_path), exist_ok=True)
 		try:
@@ -107,9 +122,9 @@ class SupervisedFeatureExtractor:
 	
 	def generate_supervised_features(self, output_directory):
 		os.makedirs(output_directory, exist_ok=True)
-		# logger.info("Generating features for train data")
-		# for video in tqdm(self.train_dataloader):
-		# 	self._generate_features(video, output_directory, self.train_dataset, mode=const.TRAIN)
+		logger.info("Generating features for train data")
+		for video in tqdm(self.train_dataloader):
+			self._generate_features(video, output_directory, self.train_dataset, mode=const.TRAIN)
 		logger.info("Generating features for test data")
 		for video in tqdm(self.test_dataloader):
 			self._generate_features(video, output_directory, self.test_dataset, mode=const.TEST)
@@ -124,4 +139,4 @@ def load_pickle(pkl_path):
 if __name__ == "__main__":
 	supervised_feature_extractor = SupervisedFeatureExtractor()
 	supervised_feature_extractor.generate_supervised_features(output_directory="/data/rohith/ag/features/supervised")
-	# load_pickle("/data/rohith/ag/features/supervised/train/1BVUA.mp4.pkl")
+# load_pickle("/data/rohith/ag/features/supervised/train/1BVUA.mp4.pkl")

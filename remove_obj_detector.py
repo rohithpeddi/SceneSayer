@@ -184,11 +184,11 @@ class SupervisedFeatureExtractor:
     def generate_frame_idx(self, output_directory):
         os.makedirs(output_directory, exist_ok=True)
         logger.info("Generating frame idx pkl for train data")
-        for video in tqdm(self.train_dataloader):
-            self._generate_video_frame_idx_pkl(video, output_directory, self.train_dataset, mode=const.TRAIN)
-        logger.info("Generating frame idx pkl for test data")
-        for video in tqdm(self.test_dataloader):
-            self._generate_video_frame_idx_pkl(video, output_directory, self.test_dataset, mode=const.TEST)
+        # for video in tqdm(self.train_dataloader):
+        #     self._generate_video_frame_idx_pkl(video, output_directory, self.train_dataset, mode=const.TRAIN)
+        # logger.info("Generating frame idx pkl for test data")
+        # for video in tqdm(self.test_dataloader):
+        #     self._generate_video_frame_idx_pkl(video, output_directory, self.test_dataset, mode=const.TEST)
 
 
 def load_pickle(pkl_path):

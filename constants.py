@@ -162,6 +162,8 @@ class DataloaderConstants:
 	SGDET = "sgdet"
 	SGCLS = "sgcls"
 	PREDCLS = "predcls"
+
+	FEATURES = "features"
 	
 	SUPERVISED = "supervised"
 	

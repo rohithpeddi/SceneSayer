@@ -29,8 +29,8 @@ class AGFeatures(Dataset):
 		self.filter_small_box = filter_small_box
 		
 		self.entry_mode = const.SGDET if self.mode == const.SGDET else const.SGCLS  # Same attribute dictionary for SGCLS and PREDCLS
-		self.features_path = os.path.join(self.root_path, const.SUPERVISED, self.data_split)
-		self.additional_data_path = os.path.join(self.root_path, const.SUPERVISED, const.ADDITIONAL, self.data_split)
+		self.features_path = os.path.join(self.root_path, const.FEATURES, const.SUPERVISED, self.data_split)
+		self.additional_data_path = os.path.join(self.root_path, const.FEATURES, const.SUPERVISED, const.ADDITIONAL, self.data_split)
 		
 		logger.info(f"Initializing static data from dataset in {self.mode}")
 		self._init_dataset_static_data()
@@ -47,8 +47,10 @@ class AGFeatures(Dataset):
 				if os.path.isfile(video_feature_file_path):
 					self.video_list.append(video_feature_file_path)
 			else:
-				if self.entry_mode in video_feature_file and os.path.isdir(video_feature_file_path):
+				if self.entry_mode in video_feature_file and os.path.isfile(video_feature_file_path):
 					self.video_list.append(video_feature_file_path)
+
+		logger.info(f"Finished initializing dataset in {self.mode}")
 	
 	def _init_dataset_static_data(self):
 		self.object_classes = [const.BACKGROUND]

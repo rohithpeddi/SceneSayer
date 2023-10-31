@@ -46,8 +46,8 @@ class Constants:
 	
 	TRAIN = "train"
 	TEST = "test"
-	
-	PREDCLS = "predcls"
+
+	FRAME_IDX = "frame_idx"
 	
 	OBJECT_CLASSES_FILE = "object_classes.txt"
 	RELATIONSHIP_CLASSES_FILE = "relationship_classes.txt"

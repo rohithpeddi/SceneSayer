@@ -102,6 +102,8 @@ class Constants:
 	FINAL_SCORES_X = "FINAL_SCORES_X"
 	FINAL_FEATURES_X = "FINAL_FEATURES_X"
 	PAIR = "pair"
+	
+	GT_ANNOTATION = "gt_annotation"
 
 
 class DetectorConstants:
@@ -163,6 +165,9 @@ class DataloaderConstants:
 	
 	SUPERVISED = "supervised"
 	
+	ADDITIONAL = "additional"
+	FRAME_IDX = "frame_idx"
+	
 	BOXES = "boxes"
 	LABELS = "labels"
 	SCORES = "scores"
@@ -212,3 +217,21 @@ class DataloaderConstants:
 	FINAL_LABELS_X = "FINAL_LABELS_X"
 	FINAL_SCORES_X = "FINAL_SCORES_X"
 	FINAL_FEATURES_X = "FINAL_FEATURES_X"
+	
+	BACKGROUND = "__background__"
+	ANNOTATIONS = "annotations"
+	OBJECT_CLASSES_FILE = "object_classes.txt"
+	RELATIONSHIP_CLASSES_FILE = "relationship_classes.txt"
+	PERSON_BOUNDING_BOX_PKL = "person_bbox.pkl"
+	OBJECT_BOUNDING_BOX_RELATIONSHIP_PKL = "object_bbox_and_relationship.pkl"
+	PROGRESS_TEXT_FILE = "progress.txt"
+	
+	METADATA = "metadata"
+	VISIBLE = "visible"
+	SET = "set"
+	
+	BOUNDING_BOX = "bbox"
+	PERSON_BOUNDING_BOX = "person_bbox"
+	FRAME = "frame"
+	BOUNDING_BOX_SIZE = "bbox_size"
+	GT_ANNOTATION = "gt_annotation"

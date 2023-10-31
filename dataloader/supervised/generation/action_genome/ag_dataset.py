@@ -69,7 +69,6 @@ class AG(Dataset):
 		print('-------loading annotations---------slowly-----------')
 		
 		annotations_path = os.path.join(root_path, const.ANNOTATIONS)
-		
 		if filter_small_box:
 			with open(os.path.join(annotations_path, const.PERSON_BOUNDING_BOX_PKL), 'rb') as f:
 				person_bbox = pickle.load(f)

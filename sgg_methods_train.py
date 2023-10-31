@@ -287,94 +287,94 @@ def train_sttran():
 
     tr = []
     for epoch in range(conf.nepoch):
-        # model.train()
-        # object_detector.is_train = True
-        # object_detector_old.is_train = True
-        # start = time.time()
-        # train_iter = iter(dataloader_train)
+        model.train()
+        object_detector.is_train = True
+        object_detector_old.is_train = True
+        start = time.time()
+        train_iter = iter(dataloader_train)
         test_iter = iter(dataloader_test)
-        # for b in range(len(dataloader_train)):
-        #     data = next(train_iter)
-		#
-        #     im_data = copy.deepcopy(data[0].cuda(0))
-        #     im_info = copy.deepcopy(data[1].cuda(0))
-        #     gt_boxes = copy.deepcopy(data[2].cuda(0))
-        #     num_boxes = copy.deepcopy(data[3].cuda(0))
-        #     gt_annotation = AG_dataset_train.gt_annotations[data[4]]
-		#
-        #     # prevent gradients to FasterRCNN
-        #     with torch.no_grad():
-        #         entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-        #         old_entry = object_detector_old(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-		#
-        #         result = are_dicts_equal(entry, old_entry)
-        #         print(f"{b} : {result}")
-		#
-        #         if not result:
-        #             print("=================================================================================")
-        #             print(f"{b}: ERROR NOT MATCHING OLD AND NEW ENTRIES")
-        #             print("=================================================================================")
-		#
-        #     pred = model(entry)
-        #     attention_distribution = pred[const.ATTENTION_DISTRIBUTION]
-        #     spatial_distribution = pred[const.SPATIAL_DISTRIBUTION]
-        #     contact_distribution = pred[const.CONTACTING_DISTRIBUTION]
-		#
-        #     attention_label = torch.tensor(pred[const.ATTENTION_GT], dtype=torch.long).to(
-        #         device=attention_distribution.device).squeeze()
-        #     if not conf.bce_loss:
-        #         # multi-label margin loss or adaptive loss
-        #         spatial_label = -torch.ones([len(pred[const.SPATIAL_GT]), 6], dtype=torch.long).to(
-        #             device=attention_distribution.device)
-        #         contact_label = -torch.ones([len(pred[const.CONTACTING_GT]), 17], dtype=torch.long).to(
-        #             device=attention_distribution.device)
-        #         for i in range(len(pred[const.SPATIAL_GT])):
-        #             spatial_label[i, : len(pred[const.SPATIAL_GT][i])] = torch.tensor(pred[const.SPATIAL_GT][i])
-        #             contact_label[i, : len(pred[const.CONTACTING_GT][i])] = torch.tensor(pred[const.CONTACTING_GT][i])
-        #     else:
-        #         # bce loss
-        #         spatial_label = torch.zeros([len(pred[const.SPATIAL_GT]), 6], dtype=torch.float32).to(
-        #             device=attention_distribution.device)
-        #         contact_label = torch.zeros([len(pred[const.CONTACTING_GT]), 17], dtype=torch.float32).to(
-        #             device=attention_distribution.device)
-        #         for i in range(len(pred[const.SPATIAL_GT])):
-        #             spatial_label[i, pred[const.SPATIAL_GT][i]] = 1
-        #             contact_label[i, pred[const.CONTACTING_GT][i]] = 1
-		#
-        #     losses = {}
-        #     if conf.mode == const.SGCLS or conf.mode == const.SGDET:
-        #         losses[const.OBJECT_LOSS] = ce_loss(pred[const.DISTRIBUTION], pred[const.LABELS])
-		#
-        #     losses[const.ATTENTION_RELATION_LOSS] = ce_loss(attention_distribution, attention_label)
-        #     if not conf.bce_loss:
-        #         losses[const.SPATIAL_RELATION_LOSS] = mlm_loss(spatial_distribution, spatial_label)
-        #         losses[const.CONTACTING_RELATION_LOSS] = mlm_loss(contact_distribution, contact_label)
-		#
-        #     else:
-        #         losses[const.SPATIAL_RELATION_LOSS] = bce_loss(spatial_distribution, spatial_label)
-        #         losses[const.CONTACTING_RELATION_LOSS] = bce_loss(contact_distribution, contact_label)
-		#
-        #     optimizer.zero_grad()
-        #     loss = sum(losses.values())
-        #     loss.backward()
-        #     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
-        #     optimizer.step()
-		#
-        #     tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
-		#
-        #     if b % 1000 == 0 and b >= 1000:
-        #         time_per_batch = (time.time() - start) / 1000
-        #         print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, b, len(dataloader_train),
-        #                                                                             time_per_batch,
-        #                                                                             len(dataloader_train) * time_per_batch / 60))
-		#
-        #         mn = pd.concat(tr[-1000:], axis=1).mean(1)
-        #         print(mn)
-        #         start = time.time()
-		#
-        # torch.save({"state_dict": model.state_dict()}, os.path.join(conf.save_path, "model_{}.tar".format(epoch)))
-        # print("*" * 40)
-        # print("save the checkpoint after {} epochs".format(epoch))
+        for b in range(len(dataloader_train)):
+            data = next(train_iter)
+
+            im_data = copy.deepcopy(data[0].cuda(0))
+            im_info = copy.deepcopy(data[1].cuda(0))
+            gt_boxes = copy.deepcopy(data[2].cuda(0))
+            num_boxes = copy.deepcopy(data[3].cuda(0))
+            gt_annotation = AG_dataset_train.gt_annotations[data[4]]
+
+            # prevent gradients to FasterRCNN
+            with torch.no_grad():
+                entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+                old_entry = object_detector_old(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+
+                result = are_dicts_equal(entry, old_entry)
+                print(f"{b} : {result}")
+
+                if not result:
+                    print("=================================================================================")
+                    print(f"{b}: ERROR NOT MATCHING OLD AND NEW ENTRIES")
+                    print("=================================================================================")
+
+            pred = model(entry)
+            attention_distribution = pred[const.ATTENTION_DISTRIBUTION]
+            spatial_distribution = pred[const.SPATIAL_DISTRIBUTION]
+            contact_distribution = pred[const.CONTACTING_DISTRIBUTION]
+
+            attention_label = torch.tensor(pred[const.ATTENTION_GT], dtype=torch.long).to(
+                device=attention_distribution.device).squeeze()
+            if not conf.bce_loss:
+                # multi-label margin loss or adaptive loss
+                spatial_label = -torch.ones([len(pred[const.SPATIAL_GT]), 6], dtype=torch.long).to(
+                    device=attention_distribution.device)
+                contact_label = -torch.ones([len(pred[const.CONTACTING_GT]), 17], dtype=torch.long).to(
+                    device=attention_distribution.device)
+                for i in range(len(pred[const.SPATIAL_GT])):
+                    spatial_label[i, : len(pred[const.SPATIAL_GT][i])] = torch.tensor(pred[const.SPATIAL_GT][i])
+                    contact_label[i, : len(pred[const.CONTACTING_GT][i])] = torch.tensor(pred[const.CONTACTING_GT][i])
+            else:
+                # bce loss
+                spatial_label = torch.zeros([len(pred[const.SPATIAL_GT]), 6], dtype=torch.float32).to(
+                    device=attention_distribution.device)
+                contact_label = torch.zeros([len(pred[const.CONTACTING_GT]), 17], dtype=torch.float32).to(
+                    device=attention_distribution.device)
+                for i in range(len(pred[const.SPATIAL_GT])):
+                    spatial_label[i, pred[const.SPATIAL_GT][i]] = 1
+                    contact_label[i, pred[const.CONTACTING_GT][i]] = 1
+
+            losses = {}
+            if conf.mode == const.SGCLS or conf.mode == const.SGDET:
+                losses[const.OBJECT_LOSS] = ce_loss(pred[const.DISTRIBUTION], pred[const.LABELS])
+
+            losses[const.ATTENTION_RELATION_LOSS] = ce_loss(attention_distribution, attention_label)
+            if not conf.bce_loss:
+                losses[const.SPATIAL_RELATION_LOSS] = mlm_loss(spatial_distribution, spatial_label)
+                losses[const.CONTACTING_RELATION_LOSS] = mlm_loss(contact_distribution, contact_label)
+
+            else:
+                losses[const.SPATIAL_RELATION_LOSS] = bce_loss(spatial_distribution, spatial_label)
+                losses[const.CONTACTING_RELATION_LOSS] = bce_loss(contact_distribution, contact_label)
+
+            optimizer.zero_grad()
+            loss = sum(losses.values())
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
+            optimizer.step()
+
+            tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
+
+            if b % 1000 == 0 and b >= 1000:
+                time_per_batch = (time.time() - start) / 1000
+                print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, b, len(dataloader_train),
+                                                                                    time_per_batch,
+                                                                                    len(dataloader_train) * time_per_batch / 60))
+
+                mn = pd.concat(tr[-1000:], axis=1).mean(1)
+                print(mn)
+                start = time.time()
+
+        torch.save({"state_dict": model.state_dict()}, os.path.join(conf.save_path, "model_{}.tar".format(epoch)))
+        print("*" * 40)
+        print("save the checkpoint after {} epochs".format(epoch))
 
         model.eval()
         object_detector.is_train = False

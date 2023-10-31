@@ -128,6 +128,36 @@ class SupervisedFeatureExtractor:
 		logger.info("Generating features for test data")
 		for video in tqdm(self.test_dataloader):
 			self._generate_features(video, output_directory, self.test_dataset, mode=const.TEST)
+	
+	def _generate_video_frame_idx_pkl(self, video_data, output_directory, dataset, mode):
+		im_data = copy.deepcopy(video_data[0].cuda(0))
+		im_info = copy.deepcopy(video_data[1].cuda(0))
+		gt_boxes = copy.deepcopy(video_data[2].cuda(0))
+		num_boxes = copy.deepcopy(video_data[3].cuda(0))
+		gt_annotation = dataset.gt_annotations[video_data[4]]
+		
+		video_name = gt_annotation[0][0][const.FRAME].split('/')[0]
+		
+		entry = {}
+		
+		pkl_path = os.path.join(output_directory, mode, video_name + '.pkl')
+		os.makedirs(os.path.dirname(pkl_path), exist_ok=True)
+		try:
+			with open(pkl_path, 'wb') as pkl_file:
+				pickle.dump(entry, pkl_file)
+				logger.info("Dumped features for video: {}".format(video_name))
+		except Exception as e:
+			logger.error("Error in dumping features for video: {}".format(video_name))
+			logger.error("Error: {}".format(e))
+	
+	def generate_frame_idx(self, output_directory):
+		os.makedirs(output_directory, exist_ok=True)
+		logger.info("Generating frame idx pkl for train data")
+		for video in tqdm(self.train_dataloader):
+			self._generate_video_frame_idx_pkl(video, output_directory, self.train_dataset, mode=const.TRAIN)
+		logger.info("Generating frame idx pkl for test data")
+		for video in tqdm(self.test_dataloader):
+			self._generate_video_frame_idx_pkl(video, output_directory, self.test_dataset, mode=const.TEST)
 
 
 def load_pickle(pkl_path):
@@ -138,5 +168,6 @@ def load_pickle(pkl_path):
 
 if __name__ == "__main__":
 	supervised_feature_extractor = SupervisedFeatureExtractor()
-	supervised_feature_extractor.generate_supervised_features(output_directory="/data/rohith/ag/features/supervised")
+	# supervised_feature_extractor.generate_supervised_features(output_directory="/data/rohith/ag/features/supervised")
+	supervised_feature_extractor.generate_frame_idx(output_directory="/data/rohith/ag/features/supervised")
 # load_pickle("/data/rohith/ag/features/supervised/train/1BVUA.mp4.pkl")

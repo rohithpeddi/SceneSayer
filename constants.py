@@ -154,3 +154,61 @@ class DetectorConstants:
 	FINAL_LABELS_X = "FINAL_LABELS_X"
 	FINAL_SCORES_X = "FINAL_SCORES_X"
 	FINAL_FEATURES_X = "FINAL_FEATURES_X"
+
+
+class DataloaderConstants:
+	SGDET = "sgdet"
+	SGCLS = "sgcls"
+	PREDCLS = "predcls"
+	
+	SUPERVISED = "supervised"
+	
+	BOXES = "boxes"
+	LABELS = "labels"
+	SCORES = "scores"
+	DISTRIBUTION = "distribution"
+	PRED_LABELS = "pred_labels"
+	IM_IDX = "im_idx"
+	PAIR_IDX = "pair_idx"
+	HUMAN_IDX = "human_idx"
+	FEATURES = "features"
+	UNION_FEAT = "union_feat"
+	UNION_BOX = "union_box"
+	SPATIAL_MASKS = "spatial_masks"
+	ATTENTION_GT = "attention_gt"
+	SPATIAL_GT = "spatial_gt"
+	CONTACTING_GT = "contacting_gt"
+	FMAPS = "fmaps"
+	IM_INFO = "im_info"
+	FINAL_PRED_SCORES = "FINAL_PRED_SCORES"
+	
+	PERSON_BBOX = "person_bbox"
+	BBOX = "bbox"
+	CLASS = "class"
+	ATTENTION_RELATIONSHIP = "attention_relationship"
+	SPATIAL_RELATIONSHIP = "spatial_relationship"
+	CONTACTING_RELATIONSHIP = "contacting_relationship"
+	
+	FINAL_BBOXES = "FINAL_BBOXES"
+	FINAL_SCORES = "FINAL_SCORES"
+	FINAL_LABELS = "FINAL_LABELS"
+	IMAGE_IDX = "im_idx"
+	PAIR = "pair"
+	FINAL_FEATURES = "FINAL_FEATURES"
+	ATTENTION_REL = "a_rel"
+	SPATIAL_REL = "s_rel"
+	CONTACTING_REL = "c_rel"
+	FINAL_DISTRIBUTIONS = "FINAL_DISTRIBUTIONS"
+	FINAL_BASE_FEATURES = "FINAL_BASE_FEATURES"
+	
+	FASTER_RCNN_BATCH_SIZE = 10
+	
+	DETECTOR_FOUND_IDX = "DETECTOR_FOUND_IDX"
+	GT_RELATIONS = "GT_RELATIONS"
+	SUPPLY_RELATIONS = "SUPPLY_RELATIONS"
+	ASSIGNED_LABELS = "ASSIGNED_LABELS"
+	
+	FINAL_BBOXES_X = "FINAL_BBOXES_X"
+	FINAL_LABELS_X = "FINAL_LABELS_X"
+	FINAL_SCORES_X = "FINAL_SCORES_X"
+	FINAL_FEATURES_X = "FINAL_FEATURES_X"

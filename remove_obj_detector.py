@@ -198,8 +198,9 @@ def load_pickle(pkl_path):
 
 
 if __name__ == "__main__":
-    supervised_feature_extractor = SupervisedFeatureExtractor()
+    # supervised_feature_extractor = SupervisedFeatureExtractor()
     # supervised_feature_extractor.generate_supervised_features(output_directory="/data/rohith/ag/features/supervised")
-    supervised_feature_extractor.generate_frame_idx(output_directory="/data/rohith/ag/features/supervised/additional")
+    # supervised_feature_extractor.generate_frame_idx(output_directory="/data/rohith/ag/features/supervised/additional")
     # frame_idx_pkl = load_pickle("/data/rohith/ag/features/supervised/additional/train/0M2DO.mp4_frame_idx.pkl")
-    # print(frame_idx_pkl)
+    frame_idx_pkl = load_pickle("/data/rohith/ag/features/supervised/train/PTQE0.mp4_sgdet.pkl")
+    print(frame_idx_pkl)

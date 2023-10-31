@@ -71,15 +71,13 @@ def train_dsg_detr():
     for epoch in range(conf.nepoch):
         model.train()
         start = time.time()
-        train_iter = iter(dataloader_train)
-        test_iter = iter(dataloader_test)
-        for b in range(len(dataloader_train)):
-            data = next(train_iter)
+        counter = 0
+        for train_entry in tqdm(dataloader_train):
+            gt_annotation = train_entry[const.GT_ANNOTATION]
+            frame_size = train_entry[const.FRAME_SIZE]
 
-            gt_annotation = ag_features_train.gt_annotations[data[4]]
-
-            get_sequence(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
-            pred = model(entry)
+            get_sequence(train_entry, gt_annotation, matcher, frame_size, conf.mode)
+            pred = model(train_entry)
 
             attention_distribution = pred[const.ATTENTION_DISTRIBUTION]
             spatial_distribution = pred[const.SPATIAL_DISTRIBUTION]
@@ -126,15 +124,16 @@ def train_dsg_detr():
 
             tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
 
-            if b % 1000 == 0 and b >= 1000:
+            if counter % 1000 == 0 and counter >= 1000:
                 time_per_batch = (time.time() - start) / 1000
-                print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, b, len(dataloader_train),
+                print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, counter, len(dataloader_train),
                                                                                     time_per_batch,
                                                                                     len(dataloader_train) * time_per_batch / 60))
 
                 mn = pd.concat(tr[-1000:], axis=1).mean(1)
                 print(mn)
                 start = time.time()
+            counter += 1
 
         torch.save({const.STATE_DICT: model.state_dict()}, os.path.join(conf.save_path, "model_{}.tar".format(epoch)))
         print("*" * 40)
@@ -146,8 +145,9 @@ def train_dsg_detr():
         with torch.no_grad():
             for test_entry in tqdm(dataloader_test):
                 gt_annotation = test_entry[const.GT_ANNOTATION]
+                frame_size = test_entry[const.FRAME_SIZE]
 
-                get_sequence(test_entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
+                get_sequence(test_entry, gt_annotation, matcher, frame_size, conf.mode)
                 pred = model(test_entry)
 
                 vid_no = gt_annotation[0][0][const.FRAME].split('.')[0]
@@ -329,5 +329,5 @@ if __name__ == '__main__':
         ce_loss = nn.CrossEntropyLoss()
         mlm_loss = nn.MultiLabelMarginLoss()
 
-    # train_dsg_detr()
-    train_sttran()
+    train_dsg_detr()
+    # train_sttran()

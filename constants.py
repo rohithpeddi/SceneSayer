@@ -104,6 +104,7 @@ class Constants:
 	PAIR = "pair"
 	
 	GT_ANNOTATION = "gt_annotation"
+	FRAME_SIZE = "frame_size"
 
 
 class DetectorConstants:
@@ -238,3 +239,5 @@ class DataloaderConstants:
 	FRAME = "frame"
 	BOUNDING_BOX_SIZE = "bbox_size"
 	GT_ANNOTATION = "gt_annotation"
+
+	FRAME_SIZE = "frame_size"

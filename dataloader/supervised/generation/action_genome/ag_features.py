@@ -134,7 +134,7 @@ class AGFeatures(Dataset):
 		all_video_names = np.unique(q)
 		self.valid_video_names = []
 		self.video_list = []
-		self.video_size = []  # (w,h)
+		self.video_size = {}  # (w,h)
 		self.gt_annotations = {}
 		self.non_gt_human_nums = 0
 		self.non_heatmap_nums = 0
@@ -191,7 +191,7 @@ class AGFeatures(Dataset):
 			
 			if len(video) > 2:
 				self.video_list.append(video)
-				self.video_size.append(person_bbox[j][const.BOUNDING_BOX_SIZE])
+				self.video_size[i] = person_bbox[j][const.BOUNDING_BOX_SIZE]
 				self.gt_annotations[i] = gt_annotation_video
 			elif len(video) == 1:
 				self.one_frame_video += 1
@@ -288,6 +288,7 @@ class AGFeatures(Dataset):
 			additional_info = pickle.load(pkl_file)
 		entry[const.FRAME_IDX] = additional_info[const.FRAME_IDX]
 		entry[const.GT_ANNOTATION] = self.gt_annotations[video_name]
+		entry[const.FRAME_SIZE] = self.video_size[video_name]
 		return entry
 	
 	def __getitem__(self, index):

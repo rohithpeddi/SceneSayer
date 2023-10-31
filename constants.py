@@ -159,6 +159,7 @@ class DetectorConstants:
 
 
 class DataloaderConstants:
+	TRAIN = "train"
 	SGDET = "sgdet"
 	SGCLS = "sgcls"
 	PREDCLS = "predcls"

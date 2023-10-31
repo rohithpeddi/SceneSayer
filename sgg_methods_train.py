@@ -186,10 +186,10 @@ def train_sttran():
     for epoch in range(conf.nepoch):
         model.train()
         start = time.time()
-        train_iter = iter(dataloader_train)
-        test_iter = iter(dataloader_test)
-        for b in range(len(dataloader_train)):
-            train_entry = next(train_iter)
+        # train_iter = iter(dataloader_train)
+        # test_iter = iter(dataloader_test)
+        counter = 0
+        for train_entry in tqdm(dataloader_train):
             pred = model(train_entry)
             attention_distribution = pred[const.ATTENTION_DISTRIBUTION]
             spatial_distribution = pred[const.SPATIAL_DISTRIBUTION]
@@ -237,15 +237,16 @@ def train_sttran():
 
             tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
             
-            if b % 1000 == 0 and b >= 1000:
+            if counter % 1000 == 0 and counter >= 1000:
                 time_per_batch = (time.time() - start) / 1000
-                print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, b, len(dataloader_train),
+                print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, counter, len(dataloader_train),
                                                                                     time_per_batch,
                                                                                     len(dataloader_train) * time_per_batch / 60))
                 
                 mn = pd.concat(tr[-1000:], axis=1).mean(1)
                 print(mn)
                 start = time.time()
+            counter += 1
 
         torch.save({"state_dict": model.state_dict()}, os.path.join(conf.save_path, "model_{}.tar".format(epoch)))
         print("*" * 40)
@@ -253,8 +254,8 @@ def train_sttran():
 
         model.eval()
         with torch.no_grad():
-            for b in range(len(dataloader_test)):
-                test_entry = next(test_iter)
+            # for b in range(len(dataloader_test)):
+            for test_entry in tqdm(dataloader_test):
                 gt_annotation = test_entry[const.GT_ANNOTATION]
                 pred = model(test_entry)
                 evaluator.evaluate_scene_graph(gt_annotation, pred)
@@ -286,7 +287,6 @@ if __name__ == '__main__':
     dataloader_train = DataLoader(
         ag_features_train,
         shuffle=True,
-        num_workers=1,
         collate_fn=cuda_collate_fn,
         pin_memory=False
     )
@@ -303,7 +303,6 @@ if __name__ == '__main__':
     dataloader_test = DataLoader(
         ag_features_test,
         shuffle=False,
-        num_workers=1,
         collate_fn=cuda_collate_fn,
         pin_memory=False
     )

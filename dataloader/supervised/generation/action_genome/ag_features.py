@@ -27,7 +27,8 @@ class AGFeatures(Dataset):
 		self.is_compiled_together = is_compiled_together
 		self.filter_nonperson_box_frame = filter_nonperson_box_frame
 		self.filter_small_box = filter_small_box
-		
+
+		self.is_train = True if self.data_split == const.TRAIN else False
 		self.entry_mode = const.SGDET if self.mode == const.SGDET else const.SGCLS  # Same attribute dictionary for SGCLS and PREDCLS
 		self.features_path = os.path.join(self.root_path, const.FEATURES, const.SUPERVISED, self.data_split)
 		self.additional_data_path = os.path.join(self.root_path, const.FEATURES, const.SUPERVISED, const.ADDITIONAL, self.data_split)

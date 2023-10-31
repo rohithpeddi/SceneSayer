@@ -84,7 +84,18 @@ class SupervisedFeatureExtractor:
 			collate_fn=cuda_collate_fn,
 			pin_memory=False
 		)
-	
+
+	def _make_numpy_array(self, entry):
+		numpy_dict = {}
+		for key in entry:
+			if isinstance(entry[key], torch.Tensor):
+				numpy_dict[key] = entry[key].cpu().numpy()
+			elif isinstance(entry[key], dict):
+				numpy_dict[key] = self._make_numpy_array(entry[key])
+			else:
+				numpy_dict[key] = entry[key]
+		return numpy_dict
+
 	def _generate_features(self, video_data, output_directory, dataset, mode):
 		im_data = copy.deepcopy(video_data[0].cuda(0))
 		im_info = copy.deepcopy(video_data[1].cuda(0))
@@ -102,20 +113,27 @@ class SupervisedFeatureExtractor:
 				self.sgdet_object_detector.is_train = False
 				self.sgcls_object_detector.is_train = False
 			
-			sgdet_entry = self.sgdet_object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-			sgcls_entry = self.sgcls_object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+			sgdet_entry = self.sgdet_object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None, is_feature_extraction=True)
+			sgcls_entry = self.sgcls_object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None, is_feature_extraction=True)
 			
-			entry = {
-				const.SGDET: sgdet_entry,
-				const.SGCLS: sgcls_entry
-			}
+			# entry = {
+			# 	const.SGDET: sgdet_entry,
+			# 	const.SGCLS: sgcls_entry
+			# }
+
+		# sgdet_entry = self._make_numpy_array(sgdet_entry)
+		# sgcls_entry = self._make_numpy_array(sgcls_entry)
 		
-		pkl_path = os.path.join(output_directory, mode, video_name + '.pkl')
-		os.makedirs(os.path.dirname(pkl_path), exist_ok=True)
+		sgdet_pkl_path = os.path.join(output_directory, mode, f"{video_name}_sgdet.pkl")
+		sgcls_pkl_path = os.path.join(output_directory, mode, f"{video_name}_sgcls.pkl")
+		os.makedirs(os.path.dirname(sgdet_pkl_path), exist_ok=True)
 		try:
-			with open(pkl_path, 'wb') as pkl_file:
-				pickle.dump(entry, pkl_file)
-				logger.info("Dumped features for video: {}".format(video_name))
+			with open(sgdet_pkl_path, 'wb') as pkl_file:
+				pickle.dump(sgdet_entry, pkl_file)
+				logger.info("Dumped sgdet features for video: {}".format(video_name))
+			with open(sgcls_pkl_path, 'wb') as pkl_file:
+				pickle.dump(sgcls_entry, pkl_file)
+				logger.info("Dumped sgcls features for video: {}".format(video_name))
 		except Exception as e:
 			logger.error("Error in dumping features for video: {}".format(video_name))
 			logger.error("Error: {}".format(e))

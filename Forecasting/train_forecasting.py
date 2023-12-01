@@ -19,12 +19,13 @@ from lib.config import Config
 from lib.evaluation_forecast import BasicSceneGraphEvaluator
 from lib.AdamW import AdamW
 #from lib.object_mask import STTran
-from lib.forecasting2 import STTran
+from lib.forecasting import STTran
 from lib.track import get_sequence
 from lib.matcher import *
 import pdb
 
-
+CONTEXT = 4
+FUTURE = 1
 """------------------------------------some settings----------------------------------------"""
 conf = Config()
 print('The CKPT saved here:', conf.save_path)
@@ -94,7 +95,7 @@ scheduler = ReduceLROnPlateau(optimizer, "max", patience=1, factor=0.5, verbose=
 tr = []
 matcher= HungarianMatcher(0.5,1,1,0.5)
 matcher.eval()
-for epoch in range(1):
+for epoch in range(10):
     object_detector.is_train = True
     model.train()
     object_detector.train_x = True
@@ -115,82 +116,74 @@ for epoch in range(1):
             entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
         get_sequence(entry, gt_annotation, matcher, (im_info[0][:2]/im_info[0,2]).cpu().data, conf.mode)
 
-        pred = model(entry)
-        
+        pred = model(entry,CONTEXT,FUTURE)
+
         start =0 
-        start_index = 0
-        context = 2
-        future = 3
+        context = CONTEXT
+        future = FUTURE
         count = 0
         losses = {}
 
         if conf.mode == 'sgcls' or conf.mode == 'sgdet':
-                losses['object_loss'] = ce_loss(pred['distribution'], pred['labels'])
+            losses['object_loss'] = ce_loss(pred['distribution'], pred['labels'])
 
         losses["attention_relation_loss"] = 0
         losses["spatial_relation_loss"] = 0
         losses["contact_relation_loss"] = 0
 
+        if (start+context+1>len(entry["im_idx"].unique())):
+            while(start+context+1 != len(entry["im_idx"].unique()) and context >1):
+                context -= 1
+            future = 1
+
+        if (start+context+future > len(entry["im_idx"].unique()) and start+context < len(entry["im_idx"].unique())):
+            future = len(entry["im_idx"].unique()) - (start+context)
+        
         while (start+context+1 <= len(entry["im_idx"].unique())):
 
-            try:
-                end = int(torch.where(entry["im_idx"]==start+context)[0][0])
-            except IndexError:
-                start = start+1
-                end = int(torch.where(entry["im_idx"]==start+context)[0][0])
+            future_frame_start_id = entry["im_idx"].unique()[context]
+            
+            if (start+context+future > len(entry["im_idx"].unique()) and start+context < len(entry["im_idx"].unique())):
+                future = len(entry["im_idx"].unique()) - (start+context)
 
-            if (start+context+future> len(entry["im_idx"].unique())):
-                future = len(entry["im_idx"].unique()) - context
+            future_frame_end_id = entry["im_idx"].unique()[context+future-1]
 
-            if (start+context+future > len(entry["im_idx"].unique())):
-                break
+            context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
+            context_idx = entry["im_idx"][:context_end_idx]
+            context_len = context_idx.shape[0]
 
-            if (start+context+future == len(entry["im_idx"].unique())):
-                future_end = len(entry["im_idx"])
-            else:
-                try:
-                    future_end = int(torch.where(entry["im_idx"]==start+context+future)[0][0])
-                except IndexError:
-                    start +=1
-                    future_end = int(torch.where(entry["im_idx"]==start+context+future)[0][0])
+            future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1])+1
+            future_idx = entry["im_idx"][context_end_idx:future_end_idx]
+            future_len = future_idx.shape[0]
 
-            future_frame_idx = entry["im_idx"][end:future_end]
-            future_frame_len = future_frame_idx.shape[0]
-                    
             attention_distribution = pred["output"][count]["attention_distribution"]
             spatial_distribution = pred["output"][count]["spatial_distribution"]
             contact_distribution = pred["output"][count]["contacting_distribution"]
 
-            attention_label = torch.tensor(pred["attention_gt"][end:future_end], dtype=torch.long).to(device=attention_distribution.device).squeeze()
-            try:    
-                losses["attention_relation_loss"] = ce_loss(attention_distribution, attention_label)
-            except ValueError:
-                attention_label = attention_label.unsqueeze(0)
-                losses["attention_relation_loss"] = ce_loss(attention_distribution, attention_label)
-            
+            attention_label = torch.tensor(pred["attention_gt"][context_end_idx:future_end_idx], dtype=torch.long).to(device=attention_distribution.device).squeeze()
             if not conf.bce_loss:
             # multi-label margin loss or adaptive loss
-                spatial_label = -torch.ones([len(pred["spatial_gt"][end:future_end]), 6], dtype=torch.long).to(device=attention_distribution.device)
-                contact_label = -torch.ones([len(pred["contacting_gt"][end:future_end]), 17], dtype=torch.long).to(device=attention_distribution.device)
-                for i in range(len(pred["spatial_gt"][end:future_end])):
-                    spatial_label[i, : len(pred["spatial_gt"][end:future_end][i])] = torch.tensor(pred["spatial_gt"][end:future_end][i])
-                    contact_label[i, : len(pred["contacting_gt"][end:future_end][i])] = torch.tensor(pred["contacting_gt"][end:future_end][i])
+                spatial_label = -torch.ones([len(pred["spatial_gt"][context_end_idx:future_end_idx]), 6], dtype=torch.long).to(device=attention_distribution.device)
+                contact_label = -torch.ones([len(pred["contacting_gt"][context_end_idx:future_end_idx]), 17], dtype=torch.long).to(device=attention_distribution.device)
+                for i in range(len(pred["spatial_gt"][context_end_idx:future_end_idx])):
+                    spatial_label[i, : len(pred["spatial_gt"][context_end_idx:future_end_idx][i])] = torch.tensor(pred["spatial_gt"][context_end_idx:future_end_idx][i])
+                    contact_label[i, : len(pred["contacting_gt"][context_end_idx:future_end_idx][i])] = torch.tensor(pred["contacting_gt"][context_end_idx:future_end_idx][i])
 
             else:
             # bce loss
-                spatial_label = torch.zeros([len(pred["spatial_gt"][end:future_end]), 6], dtype=torch.float32).to(device=attention_distribution.device)
-                contact_label = torch.zeros([len(pred["contacting_gt"][end:future_end]), 17], dtype=torch.float32).to(device=attention_distribution.device)
-                for i in range(len(pred["spatial_gt"][end:future_end])):
-                    spatial_label[i, pred["spatial_gt"][end:future_end][i]] = 1
-                    contact_label[i, pred["contacting_gt"][end:future_end][i]] = 1
+                spatial_label = torch.zeros([len(pred["spatial_gt"][context_end_idx:future_end_idx]), 6], dtype=torch.float32).to(device=attention_distribution.device)
+                contact_label = torch.zeros([len(pred["contacting_gt"][context_end_idx:future_end_idx]), 17], dtype=torch.float32).to(device=attention_distribution.device)
+                for i in range(len(pred["spatial_gt"][context_end_idx:future_end_idx])):
+                    spatial_label[i, pred["spatial_gt"][context_end_idx:future_end_idx][i]] = 1
+                    contact_label[i, pred["contacting_gt"][context_end_idx:future_end_idx][i]] = 1
 
             vid_no = gt_annotation[0][0]["frame"].split('.')[0]
+            try:    
+                losses["attention_relation_loss"] += ce_loss(attention_distribution, attention_label)
+            except ValueError:
+                attention_label = attention_label.unsqueeze(0)
+                losses["attention_relation_loss"] += ce_loss(attention_distribution, attention_label)
 
-            # losses = {}
-            # if conf.mode == 'sgcls' or conf.mode == 'sgdet':
-            #     losses['object_loss'] = ce_loss(pred['distribution'], pred['labels'])
-
-            losses["attention_relation_loss"] += ce_loss(attention_distribution, attention_label)
             if not conf.bce_loss:
                 losses["spatial_relation_loss"] += mlm_loss(spatial_distribution, spatial_label)
                 losses["contact_relation_loss"] += mlm_loss(contact_distribution, contact_label)
@@ -199,16 +192,12 @@ for epoch in range(1):
                 losses["spatial_relation_loss"] += bce_loss(spatial_distribution, spatial_label)
                 losses["contact_relation_loss"] += bce_loss(contact_distribution, contact_label)
 
-            # optimizer.zero_grad()
-            # loss = sum(losses.values())
-            # loss.backward(retain_graph = True)
-            # if counter%1000 ==0:
-            #     print(f"Loss for forecasting : {loss}")
-            
+
+            context += 1
             count += 1
-            start += 1
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
-            # optimizer.step()
+
+            if(start+context+future > len(entry["im_idx"].unique())):
+                break
             
         losses["attention_relation_loss"] = losses["attention_relation_loss"]/count
         losses["spatial_relation_loss"] = losses["spatial_relation_loss"]/count
@@ -218,8 +207,7 @@ for epoch in range(1):
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
         optimizer.step()
-        # if b%100 ==0:
-        #     print("Loss for forecasting : ",loss)
+
         tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
 
         if b % 1000 == 0 and b >= 1000:
@@ -238,7 +226,6 @@ for epoch in range(1):
         f.write("save the checkpoint after {} epochs\n".format(epoch))
     model.eval()
     object_detector.is_train = False
-    c=0
     with torch.no_grad():
         for b in range(len(dataloader_test)):
             data = next(test_iter)
@@ -247,75 +234,52 @@ for epoch in range(1):
             gt_boxes = copy.deepcopy(data[2].cuda(0))
             num_boxes = copy.deepcopy(data[3].cuda(0))
             gt_annotation = AG_dataset_test.gt_annotations[data[4]]
-            vid_no = gt_annotation[0][0]["frame"].split('.')[0]
-            #PF7HH
-            # c +=1
-            # print(f"{vid_no} : {c}")
-            
-            if (vid_no in ["PF7HH","6C0BK","CR2IM","KZR42","Q0IHP","RXELU","ZJ37U"] ):
-                continue
-
             entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
             get_sequence(entry, gt_annotation, matcher, (im_info[0][:2]/im_info[0,2]).cpu().data, conf.mode)
-            # if (entry["im_idx"].unique()[-1] > len(entry["im_idx"].unique())-1):
-            #     continue
-            pred = model(entry)
+
+            start =0 
+            context = CONTEXT
+            future = FUTURE
             count = 0
-            start = 0
-            future = 3
-            context = 2
+            pred = model(entry,context,future)
+
+
+            if (start+context+1>len(entry["im_idx"].unique())):
+                while(start+context+1 != len(entry["im_idx"].unique()) and context >1):
+                    context -= 1
+                future = 1
+
+            if (start+context+future > len(entry["im_idx"].unique()) and start+context < len(entry["im_idx"].unique())):
+                future = len(entry["im_idx"].unique()) - (start+context)
             while (start+context+1 <= len(entry["im_idx"].unique())):
-                context = 2
-                minus = 0
-                for i in range(1,context+1):
-                    if (start+i not in entry["im_idx"]):
-                        minus +=1
-                context += minus
-                try:
-                    end = int(torch.where(entry["im_idx"]==start+context)[0][0])
-                except IndexError:
-                    t=0
-                    while(start+context+t not in entry["im_idx"]):
-                        t=t+1
-                    end = int(torch.where(entry["im_idx"]==start+context+t)[0][0])
-                    context = context+t
-                if (start+context+future> len(entry["im_idx"].unique())):
-                    future = len(entry["im_idx"].unique()) - context
 
-                if (start+context+future > len(entry["im_idx"].unique())):
-                    break
+                future_frame_start_id = entry["im_idx"].unique()[context]
+                
+                if (start+context+future > len(entry["im_idx"].unique()) and start+context < len(entry["im_idx"].unique())):
+                    future = len(entry["im_idx"].unique()) - (start+context)
 
-                if (start+context+future == len(entry["im_idx"].unique())):
-                    future_end = len(entry["im_idx"])
-                else:
-                    try:
-                        future_end = int(torch.where(entry["im_idx"]==start+context+future)[0][0])
-                    except IndexError:
-                        t=0
-                        while(start+context+future+t not in entry["im_idx"]):
-                            t=t+1
-                        future_end = int(torch.where(entry["im_idx"]==start+context+future+t)[0][0])
-                future_frame_idx = entry["im_idx"][end:future_end]
-                future_frame_len = future_frame_idx.shape[0]
-    
-                s = int(torch.where(entry["im_idx"].unique()==future_frame_idx.unique()[0])[0])
-                e = int(torch.where(entry["im_idx"].unique()==future_frame_idx.unique()[-1])[0])+1
-                gt_future = gt_annotation[s:e]
+                future_frame_end_id = entry["im_idx"].unique()[context+future-1]
 
+                context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
+                context_idx = entry["im_idx"][:context_end_idx]
+                context_len = context_idx.shape[0]
+
+                future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1])+1
+                future_idx = entry["im_idx"][context_end_idx:future_end_idx]
+                future_len = future_idx.shape[0]
+
+                gt_future = gt_annotation[start+context:start+context+future]
+
+                vid_no = gt_annotation[0][0]["frame"].split('.')[0]
                 #pickle.dump(pred,open('/home/cse/msr/csy227518/Dsg_masked_output/sgdet/test'+'/'+vid_no+'.pkl','wb'))
-                evaluator.evaluate_scene_graph(gt_future, pred,end,future_end,future_frame_idx,count)
+                evaluator.evaluate_scene_graph(gt_future, pred,context_end_idx,future_end_idx,future_idx,count)
                 #evaluator.print_stats()
                 count += 1
+                context += 1
+
+                if(start+context+future > len(entry["im_idx"].unique())):
+                    break
                 
-                if (start+1 not in entry["im_idx"]):
-                    t=1
-                    while (start+t not in entry["im_idx"] and start+t < len(entry["im_idx"])-2):
-                        # print("check start")
-                        t = t+1
-                    # print("check end")
-                    start = int(torch.where(entry["im_idx"]==start+t)[0][0])
-                else:    
-                    start += 1
         print('-----------', flush=True)
     score = np.mean(evaluator.result_dict[conf.mode + "_recall"][20])
     evaluator.print_stats()
@@ -328,6 +292,5 @@ for epoch in range(1):
 
 
 
-""" python train_obj_mask2.py -mode sgdet -save_path forecasting/sgdet/ -ckpt forecasting/sgdet/DSG_masked_9.tar -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ """
+""" python train_forecasting.py -mode sgcls  -save_path forecasting/sgcls_full_context_f1/ -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ """
 
-""" python train_obj_mask2.py -mode sgdet -save_path forecasting/sgdet/ -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ """

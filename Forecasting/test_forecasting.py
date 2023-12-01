@@ -8,7 +8,7 @@ from dataloader.action_genome import AG, cuda_collate_fn
 from lib.config import Config
 from lib.evaluation_forecast import BasicSceneGraphEvaluator
 from lib.object_detector import detector
-from lib.forecasting2 import STTran
+from lib.forecasting import STTran
 from lib.track import get_sequence
 from lib.matcher import *
 import pdb 
@@ -43,7 +43,7 @@ relationship_classes = ['looking_at', 'not_looking_at', 'unsure', 'above',
 attention_relationships = ['looking_at', 'not_looking_at', 'unsure']
 
 spatial_relationships = ['above', 'beneath', 'in_front_of', 'behind', 'on_the_side_of', 'in']
-q
+
 contacting_relationships = ['carrying', 'covered_by', 'drinking_from', 'eating', 
                             'have_it_on_the_back', 'holding', 'leaning_on', 
                             'lying_on', 'not_contacting', 'other_relationship', 
@@ -108,80 +108,58 @@ with torch.no_grad():
         num_boxes = copy.deepcopy(data[3].cuda(0))
         gt_annotation = AG_dataset.gt_annotations[data[4]]
         vid_no = gt_annotation[0][0]["frame"].split('.')[0]
-        #PF7HH
-        # c +=1
-        # print(f"{vid_no} : {c}")
-        
-        if (vid_no in ["PF7HH","6C0BK","CR2IM","KZR42","Q0IHP","RXELU","ZJ37U"] ):
-            continue
+
 
         entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
         get_sequence(entry, gt_annotation, matcher, (im_info[0][:2]/im_info[0,2]).cpu().data, conf.mode)
-        # if (entry["im_idx"].unique()[-1] > len(entry["im_idx"].unique())-1):
-        #     continue
-        pred = model(entry)
-        all_time.append(time()-start_time)
+
         count = 0
         start = 0
-        future = 3
-        context = 2
-        pdb.set_trace()
+        future = 1
+        context = 4
+
+        pred = model(entry,context,future)
+        all_time.append(time()-start_time)
+
+        if (start+context+1>len(entry["im_idx"].unique())):
+            while(start+context+1 != len(entry["im_idx"].unique()) and context >1):
+                context -= 1
+            future = 1
+
+        if (start+context+future > len(entry["im_idx"].unique()) and start+context < len(entry["im_idx"].unique())):
+            future = len(entry["im_idx"].unique()) - (start+context)
+
         while (start+context+1 <= len(entry["im_idx"].unique())):
-            context = 2
-            minus = 0
-            for i in range(1,context+1):
-                if (start+i not in entry["im_idx"]):
-                    minus +=1
-            context += minus
-            try:
-                end = int(torch.where(entry["im_idx"]==start+context)[0][0])
-            except IndexError:
-                t=0
-                while(start+context+t not in entry["im_idx"]):
-                    t=t+1
-                end = int(torch.where(entry["im_idx"]==start+context+t)[0][0])
-                context = context+t
-            if (start+context+future> len(entry["im_idx"].unique())):
-                future = len(entry["im_idx"].unique()) - context
+            future_frame_start_id = entry["im_idx"].unique()[context]
+            if (start+context+future > len(entry["im_idx"].unique()) and start+context < len(entry["im_idx"].unique())):
+                future = len(entry["im_idx"].unique()) - (start+context)
 
-            if (start+context+future > len(entry["im_idx"].unique())):
-                break
+            future_frame_end_id = entry["im_idx"].unique()[context+future-1]
 
-            if (start+context+future == len(entry["im_idx"].unique())):
-                future_end = len(entry["im_idx"])
-            else:
-                try:
-                    future_end = int(torch.where(entry["im_idx"]==start+context+future)[0][0])
-                except IndexError:
-                    t=0
-                    while(start+context+future+t not in entry["im_idx"]):
-                        t=t+1
-                    future_end = int(torch.where(entry["im_idx"]==start+context+future+t)[0][0])
-            future_frame_idx = entry["im_idx"][end:future_end]
-            future_frame_len = future_frame_idx.shape[0]
+            context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
+            context_idx = entry["im_idx"][:context_end_idx]
+            context_len = context_idx.shape[0]
 
-            s = int(torch.where(entry["im_idx"].unique()==future_frame_idx.unique()[0])[0])
-            e = int(torch.where(entry["im_idx"].unique()==future_frame_idx.unique()[-1])[0])+1
-            gt_future = gt_annotation[s:e]
+            future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1])+1
+            future_idx = entry["im_idx"][context_end_idx:future_end_idx]
+            future_len = future_idx.shape[0]
 
+            gt_future = gt_annotation[start+context:start+context+future]
+            vid_no = gt_annotation[0][0]["frame"].split('.')[0]
             #pickle.dump(pred,open('/home/cse/msr/csy227518/Dsg_masked_output/sgdet/test'+'/'+vid_no+'.pkl','wb'))
-            evaluator1.evaluate_scene_graph(gt_future, pred,end,future_end,future_frame_idx,count)
-            evaluator2.evaluate_scene_graph(gt_future, pred,end,future_end,future_frame_idx,count)
-            evaluator3.evaluate_scene_graph(gt_future, pred,end,future_end,future_frame_idx,count)
+            evaluator1.evaluate_scene_graph(gt_future, pred,context_end_idx,future_end_idx,future_idx,count)
+            evaluator2.evaluate_scene_graph(gt_future, pred,context_end_idx,future_end_idx,future_idx,count)
+            evaluator3.evaluate_scene_graph(gt_future, pred,context_end_idx,future_end_idx,future_idx,count)
+
             #evaluator.print_stats()
             count += 1
+            context +=1
             
-            if (start+1 not in entry["im_idx"]):
-                t=1
-                while (start+t not in entry["im_idx"] and start+t < len(entry["im_idx"])-2):
-                    # print("check start")
-                    t = t+1
-                # print("check end")
-                start = int(torch.where(entry["im_idx"]==start+t)[0][0])
-            else:    
-                start += 1
+            if(start+context+future > len(entry["im_idx"].unique())):
+                break
+                
 print('Averge inference time', np.mean(all_time))
-        
+print(f'------------------------- for future = {future}--------------------------')       
 print('-------------------------with constraint-------------------------------')
 evaluator1.print_stats()
 print('-------------------------semi constraint-------------------------------')
@@ -189,4 +167,4 @@ evaluator2.print_stats()
 print('-------------------------no constraint-------------------------------')
 evaluator3.print_stats()
 
-""" python test_forecasting.py -mode sgdet -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ -model_path forecasting/sgdet/DSG_masked_6.tar """
+""" python test_forecasting.py -mode predcls -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ -model_path forecasting/predcls_full_context_f1/forecast_9.tar """

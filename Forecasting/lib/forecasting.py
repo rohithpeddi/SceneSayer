@@ -489,7 +489,7 @@ class STTran(nn.Module):
         self.c_rel_compress = nn.Linear(d_model, self.contact_class_num)
 
 
-    def forward(self, entry):
+    def forward(self, entry,context,future):
 
         entry = self.object_classifier(entry)
         # visual part
@@ -535,58 +535,47 @@ class STTran(nn.Module):
 
         """ ################# changes regarding forecasting #################### """
         start = 0
-        start_index = 0
-        context = 2
-        future = 3
-        error_count = 0
-        past_frame_len = 0
+        # context = context
+        # future = future
+        error_count=0
         count = 0
         result = {}
+        if (start+context+1>len(entry["im_idx"].unique())):
+            while(start+context+1 != len(entry["im_idx"].unique()) and context >1):
+                context -= 1
+            future = 1
+        if (start+context+future > len(entry["im_idx"].unique()) and start+context < len(entry["im_idx"].unique())):
+            future = len(entry["im_idx"].unique()) - (start+context)
+
         while (start+context+1 <= len(entry["im_idx"].unique())):
-            context = 2
-            minus = 0
-            for i in range(1,context+1):
-                if (start+i not in entry["im_idx"]):
-                    minus +=1
-            context += minus
-            try:
-                end = int(torch.where(entry["im_idx"]==start+context)[0][0])
-            except IndexError:
-                t=0
-                while(start+context+t not in entry["im_idx"]):
-                    t=t+1
-                end = int(torch.where(entry["im_idx"]==start+context+t)[0][0])
-                context += t
-            context_frame_idx = entry["im_idx"][start_index:end]
-            context_frame_len = context_frame_idx.shape[0]
-            if (start+context+future> len(entry["im_idx"].unique())):
-                future = len(entry["im_idx"].unique()) - context
+            future_frame_start_id = entry["im_idx"].unique()[context]
             
-            if (start+context+future > len(entry["im_idx"].unique())):
-                break
+            if (start+context+future > len(entry["im_idx"].unique()) and start+context < len(entry["im_idx"].unique())):
+                future = len(entry["im_idx"].unique()) - (start+context)
+
+            future_frame_end_id = entry["im_idx"].unique()[context+future-1]
+
+            context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
+            context_idx = entry["im_idx"][:context_end_idx]
+            context_len = context_idx.shape[0]
+
+            future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1])+1
+            future_idx = entry["im_idx"][context_end_idx:future_end_idx]
+            future_len = future_idx.shape[0]
             
-            if (start+context+future == len(entry["im_idx"].unique())):
-                future_end = len(entry["im_idx"])
-            else:
-                try:
-                    future_end = int(torch.where(entry["im_idx"]==start+context+future)[0][0])
-                except IndexError:
-                    t=0
-                    while(start+context+future+t not in entry["im_idx"]):
-                        t=t+1
-                    future_end = int(torch.where(entry["im_idx"]==start+context+future+t)[0][0])
-            future_frame_idx = entry["im_idx"][end:future_end]
-            future_frame_len = future_frame_idx.shape[0]
+
+
             seq = []
             
             for s in sequences:
-                index = s[(s>= past_frame_len) & (s<(past_frame_len + context_frame_len))]
+                index = s[ (s<( context_len))]
                 seq.append(index) 
 
             future_seq = []
             for s in sequences:
-                index = s[(s>=(past_frame_len + context_frame_len)) & (s < (past_frame_len + context_frame_len+future_frame_len))]
+                index = s[(s>=context_len) & (s < (context_len+future_len))]
                 future_seq.append(index)
+            
             
             pos_index = []
             for index in seq:
@@ -619,12 +608,25 @@ class STTran(nn.Module):
                 output.append(out[:,-1,:].unsqueeze(1))
                 out_last = [out[:,-1,:]]
                 pred = torch.stack(out_last,dim =1)
-                mask_input = torch.cat([mask_input[:,1:,:],pred],1)
+                mask_input = torch.cat([mask_input,pred],1)
+                in_mask = (1-torch.tril(torch.ones(mask_input.shape[1],mask_input.shape[1]),diagonal = 0)).type(torch.bool)
+                in_mask = in_mask.cuda()
 
             output = torch.cat(output,dim=1)
             rel_ = output
             rel_ = rel_.cuda()
-            rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(future_seq,rel_)])
+            rel_flat1 = []
+
+            for index,rel in zip(future_seq,rel_):
+                if len(index)==0:
+                    continue
+                for i in range(len(index)):
+                    rel_flat1.extend(rel)
+
+            rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
+            rel_flat = torch.tensor(rel_flat1)
+            rel_flat = rel_flat.to('cuda:0')
+            #rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(future_seq,rel_)])
             indices_flat = torch.cat(future_seq).unsqueeze(1).repeat(1,rel_features.shape[1])
             #assert len(indices_flat) == len(entry["pair_idx"])
             
@@ -633,18 +635,13 @@ class STTran(nn.Module):
                 global_output.scatter_(0, indices_flat, rel_flat)
             except RuntimeError:
                 error_count += 1
+                print("global_scatter : ",error_count)
+                pdb.set_trace()
 
-            gb_output = global_output[end:future_end]
-            try:
-                start_index = int(torch.where(entry["im_idx"]==start+1)[0][0])
-            except IndexError:
-                t=1
-                while(start+t not in entry["im_idx"] and start+t < len(entry["im_idx"])-2):
-                    t +=1
-                start_index = int(torch.where(entry["im_idx"]==start+t)[0][0])
-                
-            start +=1
-            past_frame_len = start_index
+
+            gb_output = global_output[context_len:context_len+future_len]
+
+            context +=1
             
             temp = {}
             temp["attention_distribution"] = self.a_rel_compress(gb_output)
@@ -658,6 +655,8 @@ class STTran(nn.Module):
 
             result[count] = temp
             count+=1
+            if(start+context+future > len(entry["im_idx"].unique())):
+                break
 
         entry["output"] = result
 

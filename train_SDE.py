@@ -1,8 +1,6 @@
 import sys
 from SDE import SDE as SDE
 
-sys.path.insert(0, '/home/maths/btech/mt1200841/scratch/NeSysVideoPrediction')
-
 import torch
 import torch.nn as nn
 from torch import optim
@@ -27,7 +25,7 @@ from lib.supervised.evaluation_recall import BasicSceneGraphEvaluator
 from lib.AdamW import AdamW
 from torch.utils.data import DataLoader
 from logger_config import get_logger, setup_logging
-from AGFeatures import AGFeatures, cuda_collate_fn
+from dataloader.supervised.generation.action_genome.ag_features import AGFeatures, cuda_collate_fn
 
 from lib.supervised.biased.dsgdetr.track import get_sequence
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher

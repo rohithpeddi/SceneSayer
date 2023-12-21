@@ -7,9 +7,7 @@ from SDE import SDE as SDE
 import sys
 import pdb
 
-sys.path.insert(0, '/home/maths/btech/mt1200841/scratch/NeSysVideoPrediction')
-
-from AGFeatures import AGFeatures, cuda_collate_fn
+from dataloader.supervised.generation.action_genome.ag_features import AGFeatures, cuda_collate_fn
 from constants import Constants as const
 from tqdm import tqdm
 from lib.supervised.config import Config

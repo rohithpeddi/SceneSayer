@@ -6,7 +6,7 @@ from time import time
 from ODE import ODE as ODE
 import pdb
 
-from AGFeatures import AGFeatures, cuda_collate_fn
+from dataloader.supervised.generation.action_genome.ag_features import AGFeatures, cuda_collate_fn
 from constants import Constants as const
 from tqdm import tqdm
 from lib.supervised.config import Config

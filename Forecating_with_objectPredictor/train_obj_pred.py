@@ -79,11 +79,11 @@ evaluator = BasicSceneGraphEvaluator(mode=conf.mode,
                                     AG_attention_predicates=AG_dataset_train.attention_relationships,
                                     AG_spatial_predicates=AG_dataset_train.spatial_relationships,
                                     AG_contacting_predicates=AG_dataset_train.contacting_relationships,
-                                    iou_threshold=0.5,
+                                    iou_threshold=0,
                                     save_file = os.path.join(conf.save_path, "progress.txt"),
                                     constraint='with')
 
-bce_loss = nn.BCEWithLogitsLoss()
+
 l1_loss = nn.SmoothL1Loss()
 mse_loss = nn.MSELoss()
 
@@ -109,7 +109,7 @@ scheduler = ReduceLROnPlateau(optimizer, "max", patience=1, factor=0.5, verbose=
 tr = []
 matcher= HungarianMatcher(0.5,1,1,0.5)
 matcher.eval()
-for epoch in range(10):
+for epoch in range(0,10):
     object_detector.is_train = True
     model.train()
     object_detector.train_x = True
@@ -129,7 +129,8 @@ for epoch in range(10):
         with torch.no_grad():
             entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
         get_sequence(entry, gt_annotation, matcher, (im_info[0][:2]/im_info[0,2]).cpu().data, conf.mode)
-        dec_out,pred,vr,vr_out = model(entry,CONTEXT,FUTURE)
+        dec_out,bbox_out,pred,vr,vr_out = model(entry,CONTEXT,FUTURE,epoch)
+        # dec_out,pred,vr,vr_out = model(entry,CONTEXT,FUTURE,epoch)
 
         start =0 
         context = CONTEXT
@@ -172,6 +173,7 @@ for epoch in range(10):
             out_boxes =[]
             
             for i in gt_ind:
+                # out_boxes.append(bbox_out[count]["box"][entry["labels"][i]])
                 out_boxes.append(dec_out[count]["box"][entry["labels"][i]])
 
             out_boxes = [list(x) for x in out_boxes]
@@ -183,8 +185,11 @@ for epoch in range(10):
                 labels[idx] = 1
             
             labels = labels.cuda()
+            weight = torch.ones(labels.shape).cuda()
+            weight[labels==1]=7.0
             vid_no = gt_annotation[0][0]["frame"].split('.')[0]
             losses["boxes"] += l1_loss(out_boxes,boxes_gt)
+            bce_loss = nn.BCEWithLogitsLoss(pos_weight = weight)
             losses["object_pred_loss"] += bce_loss(dec_out[count]["object"],labels)
 
             context += 1
@@ -256,7 +261,8 @@ for epoch in range(10):
             print(mn)
             start_time = time.time()
 
-    torch.save({"state_dict": model.state_dict()}, os.path.join(conf.save_path, "obj_pred_{}.tar".format(epoch)))
+    # torch.save({"state_dict": model.state_dict()}, os.path.join(conf.save_path, "obj_predictor_with_bbox_new_{}.tar".format(epoch)))
+    torch.save({"state_dict": model.state_dict()}, os.path.join(conf.save_path, "obj_predictor_new_sub_obj_{}.tar".format(epoch)))
 
     model.eval()
     object_detector.is_train = False
@@ -277,9 +283,8 @@ for epoch in range(10):
             future = FUTURE
             count = 0
             #entry = model_ST(entry,context,future)
-            dec_out,pred = model(entry,context,future)
-
-
+            dec_out,pred = model(entry,context,future,epoch)
+            #pdb.set_trace()
         #     acc = 0
             if (start+context+1>len(entry["im_idx"].unique())):
                 while(start+context+1 != len(entry["im_idx"].unique()) and context >1):
@@ -296,5 +301,6 @@ for epoch in range(10):
 
 
 
-""" python train_obj_pred.py -mode sgdet -save_path obj_pred_forecast/sgdet/ -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ """
+""" python train_obj_pred.py -mode sgdet -ckpt obj_pred_forecast/sgdet/obj_predictor_new_sub_obj_10.tar -save_path obj_pred_forecast/sgdet/ -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ """
 
+""" python train_obj_pred.py -mode sgdet -save_path obj_pred_forecast/sgdet/ -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ """

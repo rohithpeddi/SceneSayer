@@ -640,7 +640,6 @@ class STTran(nn.Module):
 
 
             gb_output = global_output[context_len:context_len+future_len]
-
             context +=1
             
             temp = {}

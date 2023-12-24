@@ -25,7 +25,7 @@ from lib.matcher import *
 import pdb
 
 CONTEXT = 4
-FUTURE = 1
+FUTURE = 5
 """------------------------------------some settings----------------------------------------"""
 conf = Config()
 print('The CKPT saved here:', conf.save_path)
@@ -292,5 +292,5 @@ for epoch in range(10):
 
 
 
-""" python train_forecasting.py -mode sgcls  -save_path forecasting/sgcls_full_context_f1/ -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ """
+""" python train_obj_mask.py -mode sgdet -save_path forecasting/sgcls_full_context_f5/ -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ """
 

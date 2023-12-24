@@ -95,6 +95,7 @@ def _get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
 
 
+
 class ObjectClassifier(nn.Module):
     """
     Module for computing the object contexts and edge contexts
@@ -626,7 +627,11 @@ class obj_decoder(nn.Module):
             future_idx = entry["im_idx"][context_end_idx:future_end_idx]
             future_len = future_idx.shape[0]
             
-            inp = entry["features"][entry["pair_idx"][:len(context_idx)][:,1]]
+            # inp = entry["features"][entry["pair_idx"][:len(context_idx)][:,1]]
+            ob_idx = entry["pair_idx"][:len(context_idx)][:,1]
+            sub_idx = entry["pair_idx"][:len(context_idx)][:,0].unique()
+            feat_idx,_ = torch.sort(torch.cat((ob_idx,sub_idx)))
+            inp = entry["features"][feat_idx]
             inp = inp.unsqueeze(0)
             
             inp= inp.permute(1,0,2)
@@ -712,7 +717,7 @@ class STTran(nn.Module):
         self.c_rel_compress = nn.Linear(d_model, self.contact_class_num)
 
 
-    def forward(self, entry,context,future):
+    def forward(self, entry,context,future,epoch):
         
         dec_out = self.object_decoder(entry,context,future)
 
@@ -826,6 +831,11 @@ class STTran(nn.Module):
             pred_scores = []
             boxes = []
             out_dict = {}
+            thres = 0.01
+            if epoch >2 and epoch <=5:
+                thres = 0.05
+            if epoch >5:
+                thres = 0.1
             for c in count:
                 obj_prob = torch.sigmoid(dec_out[c]["object"])
                 human_score = obj_prob[1][0]

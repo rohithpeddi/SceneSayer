@@ -73,7 +73,7 @@ evaluator1 = BasicSceneGraphEvaluator(
     AG_attention_predicates=AG_dataset.attention_relationships,
     AG_spatial_predicates=AG_dataset.spatial_relationships,
     AG_contacting_predicates=AG_dataset.contacting_relationships,
-    iou_threshold=0.5,
+    iou_threshold=0,
     constraint='with')
 
 evaluator2 = BasicSceneGraphEvaluator(
@@ -93,7 +93,7 @@ evaluator3 = BasicSceneGraphEvaluator(
     AG_attention_predicates=AG_dataset.attention_relationships,
     AG_spatial_predicates=AG_dataset.spatial_relationships,
     AG_contacting_predicates=AG_dataset.contacting_relationships,
-    iou_threshold=0.5,
+    iou_threshold=0,
     constraint='no')
 matcher= HungarianMatcher(0.5, 1, 1, 0.5)
 matcher.eval()
@@ -115,7 +115,7 @@ with torch.no_grad():
 
         count = 0
         start = 0
-        future = 1
+        future = 3
         context = 4
 
         pred = model(entry,context,future)
@@ -167,4 +167,4 @@ evaluator2.print_stats()
 print('-------------------------no constraint-------------------------------')
 evaluator3.print_stats()
 
-""" python test_forecasting.py -mode predcls -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ -model_path forecasting/predcls_full_context_f1/forecast_9.tar """
+""" python test_forecasting.py -mode sgdet -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ -model_path forecasting/sgdet_full_context_f3/DSG_masked_9.tar """

@@ -726,7 +726,7 @@ class SDE(nn.Module):
             end = indices[i]
             batch_y0 = global_output[curr_id : end]
             batch_times = t_unique[i : i + self.max_window + 1]
-            ret = sdeint(self.diff_func, batch_y0, batch_times, method='reversible_heun', adjoint_method="adjoint_reversible_heun", dt=1)[1 : ]
+            ret = sdeint(self.diff_func, batch_y0, batch_times, method='reversible_heun', adjoint_method='adjoint_reversible_heun', dt=1)[1 : ]
             anticipated_vals = torch.cat((anticipated_vals, ret), dim=1)
             #obj_bounding_boxes[ :, curr_id : end, : ].data.copy_(self.dsgdetr.get_obj_boxes(ret))
             curr_id = end

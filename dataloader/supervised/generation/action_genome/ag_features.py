@@ -16,6 +16,7 @@ class AGFeatures(Dataset):
 			self,
 			mode,
 			data_split,
+			device,
 			data_path=None,
 			is_compiled_together=True,
 			filter_nonperson_box_frame=True,
@@ -24,6 +25,8 @@ class AGFeatures(Dataset):
 		self.root_path = data_path
 		self.data_split = data_split
 		self.mode = mode
+		self.device = device
+		self.change_device = self.device != torch.device("cuda:0")
 		self.is_compiled_together = is_compiled_together
 		self.filter_nonperson_box_frame = filter_nonperson_box_frame
 		self.filter_small_box = filter_small_box
@@ -291,6 +294,14 @@ class AGFeatures(Dataset):
 		entry[const.FRAME_SIZE] = self.video_size[video_name]
 		return entry
 	
+	def _load_dictionary_tensors_to_device(self, attribute_dictionary):
+		for key in attribute_dictionary.keys():
+			if type(attribute_dictionary[key]) == torch.Tensor:
+				attribute_dictionary[key] = attribute_dictionary[key].to(self.device)
+			elif type(attribute_dictionary[key]) == np.ndarray:
+				attribute_dictionary[key] = torch.from_numpy(attribute_dictionary[key]).to(self.device)
+		return attribute_dictionary
+	
 	def __getitem__(self, index):
 		video_feature_file_path = self.video_list[index]
 		with open(os.path.join(video_feature_file_path), 'rb') as pkl_file:
@@ -309,6 +320,8 @@ class AGFeatures(Dataset):
 			video_name = video_feature_filename.split('.mp4')[0] + ".mp4"
 		
 		entry = self._add_additional_info(entry, video_name)
+		if self.change_device:
+			entry = self._load_dictionary_tensors_to_device(entry)
 		return entry
 	
 	def __len__(self):

@@ -274,10 +274,14 @@ if __name__ == '__main__':
     print('spatial encoder layer num: {} / temporal decoder layer num: {}'.format(conf.enc_layer, conf.dec_layer))
     for i in conf.args:
         print(i, ':', conf.args[i])
+    
+    # Set the preferred device
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     ag_features_train = AGFeatures(
         mode=conf.mode,
         data_split=const.TRAIN,
+        device=device,
         data_path=conf.data_path,
         is_compiled_together=False,
         filter_nonperson_box_frame=True,
@@ -294,6 +298,7 @@ if __name__ == '__main__':
     ag_features_test = AGFeatures(
         mode=conf.mode,
         data_split=const.TEST,
+        device=device,
         data_path=conf.data_path,
         is_compiled_together=False,
         filter_nonperson_box_frame=True,

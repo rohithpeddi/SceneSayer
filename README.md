@@ -1,3 +1,60 @@
+# AFTER FEATURE EXTRACTION
+
+### Build draw_rectangles modules
+
+```
+cd lib/draw_rectangles
+```
+Remove any previous builds
+```
+rm -rf build/
+rm -rf *.so
+rm -rf *.c
+rm -rf *.pyd
+```
+Build the module
+```
+python setup.py build_ext --inplace
+cd ..
+```
+Add the path to the current directory to the PYTHONPATH
+
+```
+conda develop draw_rectangles/
+```
+
+### Install required libraries
+
+```
+conda create -n sga python=3.9 pip
+conda activate sga
+pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu116
+pip install -r sga_requirements.txt
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # NeSysVideoPrediction
 Neuro Symbolic Video Prediction/ Action Anticipation
 

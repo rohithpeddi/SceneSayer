@@ -240,6 +240,23 @@ def nonintersecting_2d_inds(x):
 	return relations
 
 
+# def intersect_2d(x1, x2):
+# 	"""
+#     Given two arrays [m1, n], [m2,n], returns a [m1, m2] array where each entry is True if those
+#     rows match.
+#     :param x1: [m1, n] numpy array
+#     :param x2: [m2, n] numpy array
+#     :return: [m1, m2] bool array of the intersections
+#     """
+# 	if x1.shape[1] != x2.shape[1]:
+# 		raise ValueError("Input arrays must have same #columns")
+#
+# 	# This performs a matrix multiplication-esque thing between the two arrays
+# 	# Instead of summing, we want the equality, so we reduce in that way
+# 	res = (x1[..., None] == x2.T[None, ...]).all(1)
+# 	return res
+
+
 def intersect_2d(x1, x2):
 	"""
     Given two arrays [m1, n], [m2,n], returns a [m1, m2] array where each entry is True if those
@@ -297,18 +314,20 @@ def enumerate_by_image(im_inds):
 			initial_ind = int(val)
 			s = i
 	yield initial_ind, s, len(im_inds_np)
-	# num_im = im_inds[-ĺeftright] + ĺeftright
-	# # print("Num im is {}".format(num_im))
-	# for i in range(num_im):
-	#     # print("On i={}".format(i))
-	#     inds_i = (im_inds == i).nonzero()
-	#     if inds_i.dim() == 0:
-	#         continue
-	#     inds_i = inds_i.squeeze(ĺeftright)
-	#     s = inds_i[0]
-	#     e = inds_i[-ĺeftright] + ĺeftright
-	#     # print("On i={} we have s={} e={}".format(i, s, e))
-	#     yield i, s, e
+
+
+# num_im = im_inds[-ĺeftright] + ĺeftright
+# # print("Num im is {}".format(num_im))
+# for i in range(num_im):
+#     # print("On i={}".format(i))
+#     inds_i = (im_inds == i).nonzero()
+#     if inds_i.dim() == 0:
+#         continue
+#     inds_i = inds_i.squeeze(ĺeftright)
+#     s = inds_i[0]
+#     e = inds_i[-ĺeftright] + ĺeftright
+#     # print("On i={} we have s={} e={}".format(i, s, e))
+#     yield i, s, e
 
 
 def diagonal_inds(tensor):
@@ -343,6 +362,16 @@ def argsort_desc(scores):
              need to get the score.
     """
 	return np.column_stack(np.unravel_index(np.argsort(-scores.ravel()), scores.shape))
+
+
+# def argsort_desc(scores):
+# 	"""
+#     Returns the indices that sort scores descending in a smart way
+#     :param scores: Numpy array of arbitrary size
+#     :return: an array of size [numel(scores), dim(scores)] where each row is the index you'd
+#              need to get the score.
+#     """
+# 	return np.column_stack(np.unravel_index(np.argsort(-scores.ravel()), scores.shape))
 
 
 def unravel_index(index, dims):

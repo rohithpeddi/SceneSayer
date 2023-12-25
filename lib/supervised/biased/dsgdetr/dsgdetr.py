@@ -247,19 +247,22 @@ class ObjectClassifier(nn.Module):
 					if torch.sum(entry[const.PRED_LABELS][entry[const.BOXES][:, 0] == i] == duplicate_class) > 0:
 						duplicate_position = entry[const.PRED_LABELS][present] == duplicate_class
 						
-						ppp = torch.argsort(entry[const.DISTRIBUTION][present][duplicate_position][:, duplicate_class - 1])[
+						ppp = torch.argsort(
+							entry[const.DISTRIBUTION][present][duplicate_position][:, duplicate_class - 1])[
 						      :-1]
 						for j in ppp:
 							changed_idx = global_idx[present][duplicate_position][j]
 							entry[const.DISTRIBUTION][changed_idx, duplicate_class - 1] = 0
-							entry[const.PRED_LABELS][changed_idx] = torch.argmax(entry[const.DISTRIBUTION][changed_idx]) + 1
+							entry[const.PRED_LABELS][changed_idx] = torch.argmax(
+								entry[const.DISTRIBUTION][changed_idx]) + 1
 							entry[const.PRED_SCORES][changed_idx] = torch.max(entry[const.DISTRIBUTION][changed_idx])
 				
 				im_idx = []  # which frame are the relations belong to
 				pair = []
 				for j, i in enumerate(HUMAN_IDX):
 					for m in global_idx[box_idx == j][
-						entry[const.PRED_LABELS][box_idx == j] != 1]:  # this long term contains the objects in the frame
+						entry[const.PRED_LABELS][
+							box_idx == j] != 1]:  # this long term contains the objects in the frame
 						im_idx.append(j)
 						pair.append([int(i), int(m)])
 				
@@ -270,7 +273,8 @@ class ObjectClassifier(nn.Module):
 				
 				entry[const.BOXES][:, 1:] = entry[const.BOXES][:, 1:] * entry[const.IM_INFO]
 				union_boxes = torch.cat(
-					(im_idx[:, None], torch.min(entry[const.BOXES][:, 1:3][pair[:, 0]], entry[const.BOXES][:, 1:3][pair[:, 1]]),
+					(im_idx[:, None],
+					 torch.min(entry[const.BOXES][:, 1:3][pair[:, 0]], entry[const.BOXES][:, 1:3][pair[:, 1]]),
 					 torch.max(entry[const.BOXES][:, 3:5][pair[:, 0]], entry[const.BOXES][:, 3:5][pair[:, 1]])), 1)
 				
 				union_feat = self.RCNN_roi_align(entry[const.FMAPS], union_boxes)
@@ -408,7 +412,8 @@ class ObjectClassifier(nn.Module):
 				pair = []
 				for j, i in enumerate(HUMAN_IDX):
 					for m in global_idx[box_idx == j][
-						entry[const.PRED_LABELS][box_idx == j] != 1]:  # this long term contains the objects in the frame
+						entry[const.PRED_LABELS][
+							box_idx == j] != 1]:  # this long term contains the objects in the frame
 						im_idx.append(j)
 						pair.append([int(i), int(m)])
 				
@@ -421,7 +426,8 @@ class ObjectClassifier(nn.Module):
 				entry[const.HUMAN_IDX] = HUMAN_IDX
 				entry[const.BOXES][:, 1:] = entry[const.BOXES][:, 1:] * entry[const.IM_INFO]
 				union_boxes = torch.cat(
-					(im_idx[:, None], torch.min(entry[const.BOXES][:, 1:3][pair[:, 0]], entry[const.BOXES][:, 1:3][pair[:, 1]]),
+					(im_idx[:, None],
+					 torch.min(entry[const.BOXES][:, 1:3][pair[:, 0]], entry[const.BOXES][:, 1:3][pair[:, 1]]),
 					 torch.max(entry[const.BOXES][:, 3:5][pair[:, 0]], entry[const.BOXES][:, 3:5][pair[:, 1]])), 1)
 				
 				union_feat = self.RCNN_roi_align(entry[const.FMAPS], union_boxes)
@@ -530,6 +536,7 @@ class DsgDETR(nn.Module):
 		masks = (1 - pad_sequence([torch.ones(len(index)) for index in frames], batch_first=True)).bool()
 		rel_ = self.local_transformer(frame_features, src_key_padding_mask=masks.cuda())
 		rel_features = torch.cat([rel_[i, :len(index)] for i, index in enumerate(frames)])
+		
 		# temporal message passing
 		sequences = []
 		for l in obj_class.unique():

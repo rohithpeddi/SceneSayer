@@ -38,7 +38,7 @@ def assign_relations(prediction, gt_annotations, assign_IOU_threshold):
 		IOUs_bool = IOUs > assign_IOU_threshold
 		#
 		assigned_labels[(FINAL_BBOXES[:, 0].cpu().numpy() == i).nonzero()[0][np.max(IOUs, axis=1) > 0.5]] = \
-		gt_labels[np.argmax(IOUs, axis=1)][np.max(IOUs, axis=1) > 0.5]
+			gt_labels[np.argmax(IOUs, axis=1)][np.max(IOUs, axis=1) > 0.5]
 		
 		detector_found_idx = []
 		gt_relations = []
@@ -80,13 +80,13 @@ def assign_relations(prediction, gt_annotations, assign_IOU_threshold):
 
 def _get_image_blob(im):
 	"""Converts an image into a network input.
-  Arguments:
-    im (ndarray): a color image in BGR order
-  Returns:
-    blob (ndarray): a data blob holding an image pyramid
-    im_scale_factors (list): list of image scales (relative to im) used
-      in the image pyramid
-  """
+	  Arguments:
+	    im (ndarray): a color image in BGR order
+	  Returns:
+	    blob (ndarray): a data blob holding an image pyramid
+	    im_scale_factors (list): list of image scales (relative to im) used
+	      in the image pyramid
+    """
 	im_orig = im.astype(np.float32, copy=True)
 	im_orig -= np.array([[[102.9801, 115.9465, 122.7717]]])
 	

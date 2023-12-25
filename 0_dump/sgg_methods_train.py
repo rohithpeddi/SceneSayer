@@ -9,24 +9,21 @@ import warnings
 import pandas as pd
 import copy
 
-from tqdm import tqdm
-
-from dataloader.supervised.generation.action_genome.ag_features import AGFeatures, cuda_collate_fn
+from dataloader.supervised.generation.action_genome.ag_dataset import AG, cuda_collate_fn
 from constants import Constants as const
+from lib.object_detector import detector
+from lib.object_detector_old import DetectorOld
 from lib.supervised.config import Config
 from lib.supervised.evaluation_recall import BasicSceneGraphEvaluator
 from lib.AdamW import AdamW
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader
 from torch import optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from logger_config import get_logger, setup_logging
 
 np.set_printoptions(precision=3)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
-
-setup_logging()
-logger = get_logger(__name__)
 
 
 def prepare_optimizer(model):
@@ -51,10 +48,10 @@ def train_dsg_detr():
     from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 
     model = DsgDETR(mode=conf.mode,
-                    attention_class_num=len(ag_features_train.attention_relationships),
-                    spatial_class_num=len(ag_features_train.spatial_relationships),
-                    contact_class_num=len(ag_features_train.contacting_relationships),
-                    obj_classes=ag_features_train.object_classes,
+                    attention_class_num=len(AG_dataset_train.attention_relationships),
+                    spatial_class_num=len(AG_dataset_train.spatial_relationships),
+                    contact_class_num=len(AG_dataset_train.contacting_relationships),
+                    obj_classes=AG_dataset_train.object_classes,
                     enc_layer_num=conf.enc_layer,
                     dec_layer_num=conf.dec_layer).to(device=gpu_device)
 
@@ -69,15 +66,26 @@ def train_dsg_detr():
     matcher.eval()
 
     for epoch in range(conf.nepoch):
+        object_detector.is_train = True
         model.train()
+        object_detector.train_x = True
         start = time.time()
-        counter = 0
-        for train_entry in tqdm(dataloader_train):
-            gt_annotation = train_entry[const.GT_ANNOTATION]
-            frame_size = train_entry[const.FRAME_SIZE]
+        train_iter = iter(dataloader_train)
+        test_iter = iter(dataloader_test)
+        for b in range(len(dataloader_train)):
+            data = next(train_iter)
 
-            get_sequence(train_entry, gt_annotation, matcher, frame_size, conf.mode)
-            pred = model(train_entry)
+            im_data = copy.deepcopy(data[0].cuda(0))
+            im_info = copy.deepcopy(data[1].cuda(0))
+            gt_boxes = copy.deepcopy(data[2].cuda(0))
+            num_boxes = copy.deepcopy(data[3].cuda(0))
+            gt_annotation = AG_dataset_train.gt_annotations[data[4]]
+
+            # prevent gradients to FasterRCNN
+            with torch.no_grad():
+                entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+            get_sequence(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
+            pred = model(entry)
 
             attention_distribution = pred[const.ATTENTION_DISTRIBUTION]
             spatial_distribution = pred[const.SPATIAL_DISTRIBUTION]
@@ -104,6 +112,14 @@ def train_dsg_detr():
                     spatial_label[i, pred[const.SPATIAL_GT][i]] = 1
                     contact_label[i, pred[const.CONTACTING_GT][i]] = 1
 
+            vid_no = gt_annotation[0][0][const.FRAME].split('.')[0]
+            train_intermediate_dump_directory = os.path.join(conf.data_path, f"frames_{conf.mode}",
+                                                             f"train_{str(epoch)}")
+            os.makedirs(train_intermediate_dump_directory, exist_ok=True)
+            train_intermediate_dump_file = os.path.join(train_intermediate_dump_directory, f"{vid_no}.pkl")
+            with open(train_intermediate_dump_file, 'wb') as f:
+                pickle.dump(pred, f)
+
             losses = {}
             if conf.mode == const.SGCLS or conf.mode == const.SGDET:
                 losses[const.OBJECT_LOSS] = ce_loss(pred[const.DISTRIBUTION], pred[const.LABELS])
@@ -124,16 +140,15 @@ def train_dsg_detr():
 
             tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
 
-            if counter % 1000 == 0 and counter >= 1000:
+            if b % 1000 == 0 and b >= 1000:
                 time_per_batch = (time.time() - start) / 1000
-                print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, counter, len(dataloader_train),
+                print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, b, len(dataloader_train),
                                                                                     time_per_batch,
                                                                                     len(dataloader_train) * time_per_batch / 60))
 
                 mn = pd.concat(tr[-1000:], axis=1).mean(1)
                 print(mn)
                 start = time.time()
-            counter += 1
 
         torch.save({const.STATE_DICT: model.state_dict()}, os.path.join(conf.save_path, "model_{}.tar".format(epoch)))
         print("*" * 40)
@@ -142,13 +157,18 @@ def train_dsg_detr():
             f.write("save the checkpoint after {} epochs\n".format(epoch))
 
         model.eval()
+        object_detector.is_train = False
         with torch.no_grad():
-            for test_entry in tqdm(dataloader_test):
-                gt_annotation = test_entry[const.GT_ANNOTATION]
-                frame_size = test_entry[const.FRAME_SIZE]
-
-                get_sequence(test_entry, gt_annotation, matcher, frame_size, conf.mode)
-                pred = model(test_entry)
+            for b in range(len(dataloader_test)):
+                data = next(test_iter)
+                im_data = copy.deepcopy(data[0].cuda(0))
+                im_info = copy.deepcopy(data[1].cuda(0))
+                gt_boxes = copy.deepcopy(data[2].cuda(0))
+                num_boxes = copy.deepcopy(data[3].cuda(0))
+                gt_annotation = AG_dataset_test.gt_annotations[data[4]]
+                entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+                get_sequence(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
+                pred = model(entry)
 
                 vid_no = gt_annotation[0][0][const.FRAME].split('.')[0]
                 test_intermediate_dump_directory = os.path.join(conf.data_path, f"frames_{conf.mode}",
@@ -166,14 +186,97 @@ def train_dsg_detr():
         scheduler.step(score)
 
 
+def are_dicts_equal(dict1, dict2):
+    # Check if the dictionaries have the same keys
+    if set(dict1.keys()) != set(dict2.keys()):
+        return False
+
+    # Check if the values for each key are equal
+    for key in dict1.keys():
+        value1 = dict1[key]
+        value2 = dict2[key]
+
+        # Check if both values are dictionaries and recursively compare them
+        if isinstance(value1, dict) and isinstance(value2, dict):
+            if not are_dicts_equal(value1, value2):
+                return False
+        # If the values are not dictionaries, check if they are equal
+        elif isinstance(value1, list) and isinstance(value2, list):
+            if not are_lists_equal(value1, value2):
+                return False
+        elif isinstance(value1, np.ndarray) and isinstance(value2, np.ndarray):
+            if not are_ndarrays_equal(value1, value2):
+                return False
+        elif isinstance(value1, torch.Tensor) and isinstance(value2, torch.Tensor):
+            if not are_tensors_equal(value1, value2):
+                return False
+        elif value1 != value2:
+            return False
+
+    # If all checks pass, the dictionaries are equal
+    return True
+
+
+def are_lists_equal(list1, list2):
+    # Check if the lists have the same length
+    if len(list1) != len(list2):
+        return False
+
+    # Check if the values for each index are equal
+    for index in range(len(list1)):
+        value1 = list1[index]
+        value2 = list2[index]
+
+        # Check if both values are lists and recursively compare them
+        if isinstance(value1, list) and isinstance(value2, list):
+            if not are_lists_equal(value1, value2):
+                return False
+        # If the values are not lists, check if they are equal
+        elif isinstance(value1, np.ndarray) and isinstance(value2, np.ndarray):
+            if not are_ndarrays_equal(value1, value2):
+                return False
+        elif isinstance(value1, torch.Tensor) and isinstance(value2, torch.Tensor):
+            if not are_tensors_equal(value1, value2):
+                return False
+        elif value1 != value2:
+            return False
+
+    # If all checks pass, the lists are equal
+    return True
+
+
+def are_ndarrays_equal(ndarray1, ndarray2):
+    # Check if the ndarrays have the same shape
+    if ndarray1.shape != ndarray2.shape:
+        return False
+
+    if not np.array_equal(ndarray1, ndarray2):
+        return False
+
+    # If all checks pass, the ndarrays are equal
+    return True
+
+
+def are_tensors_equal(tensor1, tensor2):
+    # Check if the tensors have the same shape
+    if tensor1.shape != tensor2.shape:
+        return False
+
+    if not torch.equal(tensor1, tensor2):
+        return False
+
+    # If all checks pass, the tensors are equal
+    return True
+
+
 def train_sttran():
     from lib.supervised.biased.sttran.sttran import STTran
 
     model = STTran(mode=conf.mode,
-                   attention_class_num=len(ag_features_train.attention_relationships),
-                   spatial_class_num=len(ag_features_train.spatial_relationships),
-                   contact_class_num=len(ag_features_train.contacting_relationships),
-                   obj_classes=ag_features_train.object_classes,
+                   attention_class_num=len(AG_dataset_train.attention_relationships),
+                   spatial_class_num=len(AG_dataset_train.spatial_relationships),
+                   contact_class_num=len(AG_dataset_train.contacting_relationships),
+                   obj_classes=AG_dataset_train.object_classes,
                    enc_layer_num=conf.enc_layer,
                    dec_layer_num=conf.dec_layer).to(device=gpu_device)
 
@@ -185,12 +288,34 @@ def train_sttran():
     tr = []
     for epoch in range(conf.nepoch):
         model.train()
+        object_detector.is_train = True
+        object_detector_old.is_train = True
         start = time.time()
-        # train_iter = iter(dataloader_train)
-        # test_iter = iter(dataloader_test)
-        counter = 0
-        for train_entry in tqdm(dataloader_train):
-            pred = model(train_entry)
+        train_iter = iter(dataloader_train)
+        test_iter = iter(dataloader_test)
+        for b in range(len(dataloader_train)):
+            data = next(train_iter)
+
+            im_data = copy.deepcopy(data[0].cuda(0))
+            im_info = copy.deepcopy(data[1].cuda(0))
+            gt_boxes = copy.deepcopy(data[2].cuda(0))
+            num_boxes = copy.deepcopy(data[3].cuda(0))
+            gt_annotation = AG_dataset_train.gt_annotations[data[4]]
+
+            # prevent gradients to FasterRCNN
+            with torch.no_grad():
+                entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+                old_entry = object_detector_old(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+
+                result = are_dicts_equal(entry, old_entry)
+                print(f"{b} : {result}")
+
+                if not result:
+                    print("=================================================================================")
+                    print(f"{b}: ERROR NOT MATCHING OLD AND NEW ENTRIES")
+                    print("=================================================================================")
+
+            pred = model(entry)
             attention_distribution = pred[const.ATTENTION_DISTRIBUTION]
             spatial_distribution = pred[const.SPATIAL_DISTRIBUTION]
             contact_distribution = pred[const.CONTACTING_DISTRIBUTION]
@@ -236,29 +361,48 @@ def train_sttran():
             optimizer.step()
 
             tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
-            
-            if counter % 1000 == 0 and counter >= 1000:
+
+            if b % 1000 == 0 and b >= 1000:
                 time_per_batch = (time.time() - start) / 1000
-                print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, counter, len(dataloader_train),
+                print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, b, len(dataloader_train),
                                                                                     time_per_batch,
                                                                                     len(dataloader_train) * time_per_batch / 60))
-                
+
                 mn = pd.concat(tr[-1000:], axis=1).mean(1)
                 print(mn)
                 start = time.time()
-            counter += 1
 
         torch.save({"state_dict": model.state_dict()}, os.path.join(conf.save_path, "model_{}.tar".format(epoch)))
         print("*" * 40)
         print("save the checkpoint after {} epochs".format(epoch))
 
         model.eval()
+        object_detector.is_train = False
+        object_detector_old.is_train = False
         with torch.no_grad():
-            # for b in range(len(dataloader_test)):
-            for test_entry in tqdm(dataloader_test):
-                gt_annotation = test_entry[const.GT_ANNOTATION]
-                pred = model(test_entry)
-                evaluator.evaluate_scene_graph(gt_annotation, pred)
+            for b in range(len(dataloader_test)):
+                data = next(test_iter)
+
+                im_data = copy.deepcopy(data[0].cuda(0))
+                im_info = copy.deepcopy(data[1].cuda(0))
+                gt_boxes = copy.deepcopy(data[2].cuda(0))
+                num_boxes = copy.deepcopy(data[3].cuda(0))
+                gt_annotation = AG_dataset_test.gt_annotations[data[4]]
+
+                with torch.no_grad():
+                    entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+                    old_entry = object_detector_old(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+
+                    result = are_dicts_equal(entry, old_entry)
+                    print(f"{b} : {result}")
+
+                    if not result:
+                        print("=================================================================================")
+                        print(f"{b}: ERROR NOT MATCHING OLD AND NEW ENTRIES")
+                        print("=================================================================================")
+
+                # pred = model(entry)
+                # evaluator.evaluate_scene_graph(gt_annotation, pred)
             print('-----------', flush=True)
         score = np.mean(evaluator.result_dict[conf.mode + "_recall"][20])
         evaluator.print_stats()
@@ -274,53 +418,65 @@ if __name__ == '__main__':
     print('spatial encoder layer num: {} / temporal decoder layer num: {}'.format(conf.enc_layer, conf.dec_layer))
     for i in conf.args:
         print(i, ':', conf.args[i])
-    
-    # Set the preferred device
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    ag_features_train = AGFeatures(
-        mode=conf.mode,
-        data_split=const.TRAIN,
-        device=device,
+    # 	TODO: Add code for saving method specific model
+    AG_dataset_train = AG(
+        mode=const.TRAIN,
+        datasize=conf.datasize,
         data_path=conf.data_path,
-        is_compiled_together=False,
         filter_nonperson_box_frame=True,
         filter_small_box=False if conf.mode == const.PREDCLS else True
     )
 
     dataloader_train = DataLoader(
-        ag_features_train,
+        AG_dataset_train,
         shuffle=True,
+        num_workers=1,
         collate_fn=cuda_collate_fn,
         pin_memory=False
     )
 
-    ag_features_test = AGFeatures(
-        mode=conf.mode,
-        data_split=const.TEST,
-        device=device,
+    AG_dataset_test = AG(
+        mode=const.TEST,
+        datasize=conf.datasize,
         data_path=conf.data_path,
-        is_compiled_together=False,
         filter_nonperson_box_frame=True,
-        filter_small_box=False if conf.mode == const.PREDCLS else True
+        filter_small_box=False if conf.mode == 'predcls' else True
     )
 
     dataloader_test = DataLoader(
-        ag_features_test,
+        AG_dataset_test,
         shuffle=False,
+        num_workers=1,
         collate_fn=cuda_collate_fn,
         pin_memory=False
     )
 
     gpu_device = torch.device("cuda:0")
 
+    object_detector = detector(
+        train=True,
+        object_classes=AG_dataset_train.object_classes,
+        use_SUPPLY=True,
+        mode=conf.mode
+    ).to(device=gpu_device)
+    object_detector.eval()
+
+    object_detector_old = DetectorOld(
+        train=True,
+        object_classes=AG_dataset_train.object_classes,
+        use_SUPPLY=True,
+        mode=conf.mode
+    ).to(device=gpu_device)
+    object_detector_old.eval()
+
     evaluator = BasicSceneGraphEvaluator(
         mode=conf.mode,
-        AG_object_classes=ag_features_train.object_classes,
-        AG_all_predicates=ag_features_train.relationship_classes,
-        AG_attention_predicates=ag_features_train.attention_relationships,
-        AG_spatial_predicates=ag_features_train.spatial_relationships,
-        AG_contacting_predicates=ag_features_train.contacting_relationships,
+        AG_object_classes=AG_dataset_train.object_classes,
+        AG_all_predicates=AG_dataset_train.relationship_classes,
+        AG_attention_predicates=AG_dataset_train.attention_relationships,
+        AG_spatial_predicates=AG_dataset_train.spatial_relationships,
+        AG_contacting_predicates=AG_dataset_train.contacting_relationships,
         iou_threshold=0.5,
         save_file=os.path.join(conf.save_path, const.PROGRESS_TEXT_FILE),
         constraint='with'
@@ -334,5 +490,5 @@ if __name__ == '__main__':
         ce_loss = nn.CrossEntropyLoss()
         mlm_loss = nn.MultiLabelMarginLoss()
 
-    train_dsg_detr()
-    # train_sttran()
+    # train_dsg_detr()
+    train_sttran()

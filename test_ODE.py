@@ -3,7 +3,7 @@ np.set_printoptions(precision=4)
 import copy
 import torch
 from time import time
-from ODE import ODE as ODE
+from lib.supervised.biased.sga.ODE import ODE as ODE
 import pdb
 
 from dataloader.supervised.generation.action_genome.ag_features import AGFeatures, cuda_collate_fn

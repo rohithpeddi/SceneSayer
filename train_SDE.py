@@ -1,5 +1,5 @@
 import sys
-from SDE import SDE as SDE
+
 
 import torch
 import torch.nn as nn
@@ -29,6 +29,7 @@ from dataloader.supervised.generation.action_genome.ag_features import AGFeature
 
 from lib.supervised.biased.dsgdetr.track import get_sequence
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
+from lib.supervised.biased.sga.SDE import SDE as SDE
 
 """------------------------------------some settings----------------------------------------"""
 conf = Config()

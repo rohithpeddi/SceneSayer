@@ -3,7 +3,7 @@ np.set_printoptions(precision=4)
 import copy
 import torch
 from time import time
-from SDE import SDE as SDE
+from lib.supervised.biased.sga.SDE import SDE as SDE
 import sys
 import pdb
 

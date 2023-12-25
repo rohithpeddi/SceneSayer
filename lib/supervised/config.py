@@ -22,6 +22,13 @@ class Config(object):
         self.enc_layer = 1
         self.dec_layer = 3
         self.nepoch = 10
+        
+        self.max_window = 3
+        self.brownian_size = 1
+        self.ode_ratio = 1.0
+        self.sde_ratio = 1.0
+        self.bbox_ratio = 0.1
+        
         self.parser = self.setup_parser()
         self.args = vars(self.parser.parse_args())
         self.__dict__.update(self.args)

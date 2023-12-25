@@ -6,6 +6,8 @@ import pickle
 import os
 from constants import DataloaderConstants as const
 from logger_config import get_logger
+import pdb
+
 
 logger = get_logger(__name__)
 
@@ -35,7 +37,6 @@ class AGFeatures(Dataset):
 		self.entry_mode = const.SGDET if self.mode == const.SGDET else const.SGCLS  # Same attribute dictionary for SGCLS and PREDCLS
 		self.features_path = os.path.join(self.root_path, const.FEATURES, const.SUPERVISED, self.data_split)
 		self.additional_data_path = os.path.join(self.root_path, const.FEATURES, const.SUPERVISED, const.ADDITIONAL, self.data_split)
-		
 		logger.info(f"Initializing static data from dataset in {self.mode}")
 		self._init_dataset_static_data()
 		logger.info(f"Finished processing static data from dataset in {self.mode}")
@@ -105,7 +106,7 @@ class AGFeatures(Dataset):
 			with open(os.path.join(annotations_path, const.PERSON_BOUNDING_BOX_PKL), 'rb') as f:
 				person_bbox = pickle.load(f)
 			f.close()
-			with open('dataloader/object_bbox_and_relationship_filtersmall.pkl', 'rb') as f:
+			with open(os.path.join(annotations_path, const.OBJECT_BOUNDING_BOX_RELATIONSHIP_FILTERSMALL_PKL), 'rb') as f:
 				object_bbox = pickle.load(f)
 		else:
 			with open(os.path.join(annotations_path, const.PERSON_BOUNDING_BOX_PKL), 'rb') as f:
@@ -304,6 +305,7 @@ class AGFeatures(Dataset):
 	
 	def __getitem__(self, index):
 		video_feature_file_path = self.video_list[index]
+		print(video_feature_file_path)
 		with open(os.path.join(video_feature_file_path), 'rb') as pkl_file:
 			data_dictionary = pickle.load(pkl_file)
 			if self.is_compiled_together:

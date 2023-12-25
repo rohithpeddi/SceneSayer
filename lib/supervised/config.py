@@ -37,6 +37,9 @@ class Config(object):
         parser.add_argument('-mode', dest='mode', help='predcls/sgcls/sgdet', default='sgdet', type=str)
         parser.add_argument('-save_path', default='data', type=str)
         parser.add_argument('-model_path', default=None, type=str)
+        parser.add_argument('-max_window', default=3, type=int)
+        parser.add_argument('-ode_ratio', default=1.0, type=float)
+        parser.add_argument('-bbox_ratio', default=0.1, type=float)
         parser.add_argument('-data_path', default='/data/rohith/ag', type=str)
         parser.add_argument('-datasize', dest='datasize', help='mini dataset or whole', default='large', type=str)
         parser.add_argument('-ckpt', dest='ckpt', help='checkpoint', default=None, type=str)
@@ -46,4 +49,5 @@ class Config(object):
         parser.add_argument('-enc_layer', dest='enc_layer', help='spatial encoder layer', default=1, type=int)
         parser.add_argument('-dec_layer', dest='dec_layer', help='temporal decoder layer', default=3, type=int)
         parser.add_argument('-bce_loss', action='store_true')
+        parser.add_argument('-modified_gt', action='store_true')
         return parser

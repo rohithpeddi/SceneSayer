@@ -229,6 +229,7 @@ class DataloaderConstants:
 	PERSON_BOUNDING_BOX_PKL = "person_bbox.pkl"
 	OBJECT_BOUNDING_BOX_RELATIONSHIP_PKL = "object_bbox_and_relationship.pkl"
 	PROGRESS_TEXT_FILE = "progress.txt"
+	OBJECT_BOUNDING_BOX_RELATIONSHIP_FILTERSMALL_PKL = "object_bbox_and_relationship_filtersmall.pkl"
 	
 	METADATA = "metadata"
 	VISIBLE = "visible"

@@ -1,6 +1,9 @@
 # --------------------------------------- REQUIREMENTS AFTER FEATURE EXTRACTION ---------------------------------------
-transformers==4.36.2
-torchdiffeq==0.2.3
-torchsde==0.2.6
-cython==3.0.7
-pandas==2.1.4
+transformers
+torchdiffeq
+torchsde
+cython==0.29.33
+pandas==1.1.5
+numpy==1.19.2
+h5py==3.1.0
+dill==0.3.6

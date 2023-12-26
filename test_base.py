@@ -54,12 +54,12 @@ def fetch_test_basic_config():
 	
 	semi_constraint_evaluator = BasicSceneGraphEvaluator(
 		mode=conf.mode,
-		AG_object_classes=AG_dataset.object_classes,
-		AG_all_predicates=AG_dataset.relationship_classes,
-		AG_attention_predicates=AG_dataset.attention_relationships,
-		AG_spatial_predicates=AG_dataset.spatial_relationships,
-		AG_contacting_predicates=AG_dataset.contacting_relationships,
+		AG_object_classes=ag_features_test.object_classes,
+		AG_all_predicates=ag_features_test.relationship_classes,
+		AG_attention_predicates=ag_features_test.attention_relationships,
+		AG_spatial_predicates=ag_features_test.spatial_relationships,
+		AG_contacting_predicates=ag_features_test.contacting_relationships,
 		iou_threshold=0.5,
-		constraint='semi', semithreshold=0.9)
+		constraint='semi', semi_threshold=0.9)
 	
 	return ag_features_test, dataloader_test, with_constraint_evaluator, no_constraint_evaluator, semi_constraint_evaluator, gpu_device, conf

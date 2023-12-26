@@ -63,8 +63,8 @@ def test_forecasting():
 			pred = model(entry, context, future)
 			all_time.append(time() - start_time)
 			
-			if (start + context + 1 > len(entry["im_idx"].unique())):
-				while (start + context + 1 != len(entry["im_idx"].unique()) and context > 1):
+			if start + context + 1 > len(entry["im_idx"].unique()):
+				while start + context + 1 != len(entry["im_idx"].unique()) and context > 1:
 					context -= 1
 				future = 1
 			
@@ -72,7 +72,7 @@ def test_forecasting():
 					entry["im_idx"].unique())):
 				future = len(entry["im_idx"].unique()) - (start + context)
 			
-			while (start + context + 1 <= len(entry["im_idx"].unique())):
+			while start + context + 1 <= len(entry["im_idx"].unique()):
 				future_frame_start_id = entry["im_idx"].unique()[context]
 				if (start + context + future > len(entry["im_idx"].unique()) and start + context < len(
 						entry["im_idx"].unique())):
@@ -105,7 +105,7 @@ def test_forecasting():
 				if start + context + future > len(entry["im_idx"].unique()):
 					break
 	
-	print('Averge inference time', np.mean(all_time))
+	print('Average inference time', np.mean(all_time))
 	print(f'------------------------- for future = {future}--------------------------')
 	print('-------------------------with constraint-------------------------------')
 	with_constraint_evaluator.print_stats()

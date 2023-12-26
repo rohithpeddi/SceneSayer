@@ -8,9 +8,19 @@ import pdb
 
 
 class BasicSceneGraphEvaluator:
-	def __init__(self, mode, AG_object_classes, AG_all_predicates, AG_attention_predicates, AG_spatial_predicates,
-	             AG_contacting_predicates,
-	             iou_threshold=0.5, save_file="tmp", constraint=False, semithreshold=None):
+	def __init__(
+			self,
+			mode,
+			AG_object_classes,
+			AG_all_predicates,
+			AG_attention_predicates,
+			AG_spatial_predicates,
+			AG_contacting_predicates,
+			iou_threshold=0.5,
+			save_file="tmp",
+			constraint=False,
+			semi_threshold=None
+	):
 		self.result_dict = {}
 		self.mode = mode
 		self.num_rel = len(AG_all_predicates)
@@ -26,7 +36,7 @@ class BasicSceneGraphEvaluator:
 		self.AG_attention_predicates = AG_attention_predicates
 		self.AG_spatial_predicates = AG_spatial_predicates
 		self.AG_contacting_predicates = AG_contacting_predicates
-		self.semithreshold = semithreshold
+		self.semi_threshold = semi_threshold
 		self.save_file = save_file
 		with open(self.save_file, "w") as f:
 			f.write("Begin training\n")
@@ -92,7 +102,7 @@ class BasicSceneGraphEvaluator:
 			# first part for attention and contact, second for spatial
 			rels_i = np.concatenate((pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy(),  # attention
 			                         pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy()[:, ::-1],  # spatial
-                                     pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy()),
+			                         pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy()),
 			                        axis=0)  # contacting
 			
 			pred_scores_1 = np.concatenate((pred['attention_distribution'][pred['im_idx'] == idx].cpu().numpy(),
@@ -129,7 +139,7 @@ class BasicSceneGraphEvaluator:
 				}
 			
 			evaluate_from_dict(gt_entry, pred_entry, self.mode, self.result_dict,
-			                   iou_thresh=self.iou_threshold, method=self.constraint, threshold=self.semithreshold,
+			                   iou_thresh=self.iou_threshold, method=self.constraint, threshold=self.semi_threshold,
 			                   num_rel=self.num_rel)
 
 
@@ -263,7 +273,7 @@ def evaluate_recall(gt_rels, gt_boxes, gt_classes,
 	if not np.all(scores_overall[1:] <= scores_overall[:-1] + 1e-5):
 		print("Somehow the relations weren't sorted properly: \n{}".format(scores_overall))
 		pdb.set_trace()
-		# raise ValueError("Somehow the relations werent sorted properly")
+	# raise ValueError("Somehow the relations werent sorted properly")
 	
 	# Compute recall. It's most efficient to match once and then do recall after
 	pred_to_gt = _compute_pred_matches(

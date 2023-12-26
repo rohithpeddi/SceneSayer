@@ -9,7 +9,6 @@ from constants import Constants as const
 from tqdm import tqdm
 from lib.supervised.biased.dsgdetr.track import get_sequence
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-
 from test_base import fetch_test_basic_config
 
 

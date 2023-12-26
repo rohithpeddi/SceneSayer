@@ -26,9 +26,15 @@ conda develop draw_rectangles/
 ### Install required libraries
 
 ```
-conda create -n sga python=3.9 pip
+conda create -n sga python=3.7 pip
+```
+```
 conda activate sga
-pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu116
+```
+```
+pip install torch==1.10.1+cu111 torchvision==0.11.2+cu111 torchaudio==0.10.1 -f https://download.pytorch.org/whl/cu111/torch_stable.html
+```
+```
 pip install -r sga_requirements.txt
 ```
 

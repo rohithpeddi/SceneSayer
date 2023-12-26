@@ -12,8 +12,6 @@ from lib.object_detector import detector
 from lib.supervised.biased.sga.forecasting import STTran
 
 
-# TODO: SceneGraphEvaluator is from evaluation_forecast should be changed
-
 def test_forecasting():
 	object_detector = detector(
 		train=False,
@@ -91,12 +89,15 @@ def test_forecasting():
 				gt_future = gt_annotation[start + context:start + context + future]
 				vid_no = gt_annotation[0][0]["frame"].split('.')[0]
 				# pickle.dump(pred,open('/home/cse/msr/csy227518/Dsg_masked_output/sgdet/test'+'/'+vid_no+'.pkl','wb'))
-				with_constraint_evaluator.evaluate_scene_graph(gt_future, pred, context_end_idx, future_end_idx,
-				                                               future_idx, count)
-				no_constraint_evaluator.evaluate_scene_graph(gt_future, pred, context_end_idx, future_end_idx,
-				                                             future_idx, count)
-				semi_constraint_evaluator.evaluate_scene_graph(gt_future, pred, context_end_idx, future_end_idx,
-				                                               future_idx, count)
+				with_constraint_evaluator.evaluate_scene_graph_forecasting(gt_future, pred, context_end_idx,
+				                                                           future_end_idx,
+				                                                           future_idx, count)
+				no_constraint_evaluator.evaluate_scene_graph_forecasting(gt_future, pred, context_end_idx,
+				                                                         future_end_idx,
+				                                                         future_idx, count)
+				semi_constraint_evaluator.evaluate_scene_graph_forecasting(gt_future, pred, context_end_idx,
+				                                                           future_end_idx,
+				                                                           future_idx, count)
 				
 				# evaluator.print_stats()
 				count += 1

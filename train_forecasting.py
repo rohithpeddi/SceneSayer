@@ -7,7 +7,7 @@ import os
 import pandas as pd
 import copy
 from lib.object_detector import detector
-from lib.supervised.evaluation_forecast import BasicSceneGraphEvaluator
+from lib.supervised.evaluation_recall import BasicSceneGraphEvaluator
 from lib.supervised.biased.sga.forecasting import STTran
 from lib.supervised.biased.dsgdetr.track import get_sequence
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
@@ -33,15 +33,15 @@ def train_forecasting():
 		ckpt = torch.load(conf.ckpt, map_location=gpu_device)
 		model.load_state_dict(ckpt['state_dict'], strict=False)
 	
-	evaluator_forecasting = BasicSceneGraphEvaluator(mode=conf.mode,
-	                                                 AG_object_classes=ag_features_train.object_classes,
-	                                                 AG_all_predicates=ag_features_train.relationship_classes,
-	                                                 AG_attention_predicates=ag_features_train.attention_relationships,
-	                                                 AG_spatial_predicates=ag_features_train.spatial_relationships,
-	                                                 AG_contacting_predicates=ag_features_train.contacting_relationships,
-	                                                 iou_threshold=0.5,
-	                                                 save_file=os.path.join(conf.save_path, "progress.txt"),
-	                                                 constraint='with')
+	evaluator = BasicSceneGraphEvaluator(mode=conf.mode,
+	                                     AG_object_classes=ag_features_train.object_classes,
+	                                     AG_all_predicates=ag_features_train.relationship_classes,
+	                                     AG_attention_predicates=ag_features_train.attention_relationships,
+	                                     AG_spatial_predicates=ag_features_train.spatial_relationships,
+	                                     AG_contacting_predicates=ag_features_train.contacting_relationships,
+	                                     iou_threshold=0.5,
+	                                     save_file=os.path.join(conf.save_path, "progress.txt"),
+	                                     constraint='with')
 	
 	optimizer, scheduler = prepare_optimizer(conf, model)
 	
@@ -159,7 +159,7 @@ def train_forecasting():
 				context += 1
 				count += 1
 				
-				if (start + context + future > len(entry["im_idx"].unique())):
+				if start + context + future > len(entry["im_idx"].unique()):
 					break
 			
 			losses["attention_relation_loss"] = losses["attention_relation_loss"] / count
@@ -187,7 +187,7 @@ def train_forecasting():
 		torch.save({"state_dict": model.state_dict()}, os.path.join(conf.save_path, "forecast_{}.tar".format(epoch)))
 		print("*" * 40)
 		print("save the checkpoint after {} epochs".format(epoch))
-		with open(evaluator_forecasting.save_file, "a") as f:
+		with open(evaluator.save_file, "a") as f:
 			f.write("save the checkpoint after {} epochs\n".format(epoch))
 		model.eval()
 		object_detector.is_train = False
@@ -238,18 +238,18 @@ def train_forecasting():
 					
 					vid_no = gt_annotation[0][0]["frame"].split('.')[0]
 					# pickle.dump(pred,open('/home/cse/msr/csy227518/Dsg_masked_output/sgdet/test'+'/'+vid_no+'.pkl','wb'))
-					evaluator_forecasting.evaluate_scene_graph(gt_future, pred, context_end_idx, future_end_idx, future_idx, count)
+					evaluator.evaluate_scene_graph_forecasting(gt_future, pred, context_end_idx, future_end_idx, future_idx, count)
 					# evaluator.print_stats()
 					count += 1
 					context += 1
 					
-					if (start + context + future > len(entry["im_idx"].unique())):
+					if start + context + future > len(entry["im_idx"].unique()):
 						break
 			
 			print('-----------', flush=True)
-		score = np.mean(evaluator_forecasting.result_dict[conf.mode + "_recall"][20])
-		evaluator_forecasting.print_stats()
-		evaluator_forecasting.reset_result()
+		score = np.mean(evaluator.result_dict[conf.mode + "_recall"][20])
+		evaluator.print_stats()
+		evaluator.reset_result()
 		scheduler.step(score)
 
 

@@ -141,6 +141,114 @@ class BasicSceneGraphEvaluator:
 			evaluate_from_dict(gt_entry, pred_entry, self.mode, self.result_dict,
 			                   iou_thresh=self.iou_threshold, method=self.constraint, threshold=self.semi_threshold,
 			                   num_rel=self.num_rel)
+	
+	def evaluate_scene_graph_forecasting(self, gt, pred, end, future_end, future_frame_idx, count):
+		"""collect the groundtruth and prediction"""
+		try:
+			pred["output"][count]['attention_distribution'] = nn.functional.softmax(
+				pred["output"][count]['attention_distribution'], dim=1)
+		except KeyError:
+			print("key attention")
+			pdb.set_trace()
+		
+		future_frame = future_frame_idx.unique()
+		for idx, frame_gt in enumerate(gt):
+			# generate the ground truth
+			try:
+				f_idx = int(future_frame[idx])
+			except IndexError:
+				print("f_idx")
+				pdb.set_trace()
+			gt_boxes = np.zeros([len(frame_gt), 4])  # now there is no person box! we assume that person box index == 0
+			gt_classes = np.zeros(len(frame_gt))
+			gt_relations = []
+			human_idx = 0
+			gt_classes[human_idx] = 1
+			gt_boxes[human_idx] = frame_gt[0]['person_bbox']
+			for m, n in enumerate(frame_gt[1:]):
+				# each pair
+				gt_boxes[m + 1, :] = n['bbox']
+				gt_classes[m + 1] = n['class']
+				gt_relations.append([human_idx, m + 1, self.AG_all_predicates.index(self.AG_attention_predicates[n[
+					'attention_relationship']])])  # for attention triplet <human-object-predicate>_
+				# spatial and contacting relationship could be multiple
+				for spatial in n['spatial_relationship'].numpy().tolist():
+					gt_relations.append([m + 1, human_idx, self.AG_all_predicates.index(
+						self.AG_spatial_predicates[spatial])])  # for spatial triplet <object-human-predicate>
+				for contact in n['contacting_relationship'].numpy().tolist():
+					gt_relations.append([human_idx, m + 1, self.AG_all_predicates.index(
+						self.AG_contacting_predicates[contact])])  # for contact triplet <human-object-predicate>
+			
+			gt_entry = {
+				'gt_classes': gt_classes,
+				'gt_relations': np.array(gt_relations),
+				'gt_boxes': gt_boxes,
+			}
+			
+			# first part for attention and contact, second for spatial
+			rels_i = np.concatenate(
+				(pred['pair_idx'][end:future_end][future_frame_idx == f_idx].cpu().clone().numpy(),  # attention
+				 pred['pair_idx'][end:future_end][future_frame_idx == f_idx].cpu().clone().numpy()[:, ::-1],  # spatial
+				 pred['pair_idx'][end:future_end][future_frame_idx == f_idx].cpu().clone().numpy()),
+				axis=0)  # contacting
+			try:
+				pred_scores_1 = np.concatenate(
+					(pred["output"][count]['attention_distribution'][future_frame_idx == f_idx].cpu().numpy(),
+					 np.zeros([pred['pair_idx'][end:future_end][future_frame_idx == f_idx].shape[0],
+					           pred["output"][count]['spatial_distribution'].shape[1]]),
+					 np.zeros([pred['pair_idx'][end:future_end][future_frame_idx == f_idx].shape[0],
+					           pred["output"][count]['contacting_distribution'].shape[1]])), axis=1)
+			except IndexError:
+				print("pred_score_1")
+				pdb.set_trace()
+			pred_scores_2 = np.concatenate((np.zeros(
+				[pred['pair_idx'][end:future_end][future_frame_idx == f_idx].shape[0],
+				 pred["output"][count]['attention_distribution'].shape[1]]),
+			                                pred["output"][count]['spatial_distribution'][
+				                                future_frame_idx == f_idx].cpu().numpy(),
+			                                np.zeros(
+				                                [pred['pair_idx'][end:future_end][future_frame_idx == f_idx].shape[0],
+				                                 pred["output"][count]['contacting_distribution'].shape[1]])), axis=1)
+			pred_scores_3 = np.concatenate((np.zeros(
+				[pred['pair_idx'][end:future_end][future_frame_idx == f_idx].shape[0],
+				 pred["output"][count]['attention_distribution'].shape[1]]),
+			                                np.zeros(
+				                                [pred['pair_idx'][end:future_end][future_frame_idx == f_idx].shape[0],
+				                                 pred["output"][count]['spatial_distribution'].shape[1]]),
+			                                pred["output"][count]['contacting_distribution'][
+				                                future_frame_idx == f_idx].cpu().numpy()), axis=1)
+			
+			boxes_start = future_frame[0]
+			boxes_end = future_frame[-1]
+			pred_start = int(torch.where(pred["boxes"][:, 0] == boxes_start)[0][0])
+			pred_end = int(torch.where(pred["boxes"][:, 0] == boxes_end)[0][-1])
+			
+			if self.mode == 'predcls':
+				pred_entry = {
+					'pred_boxes': pred['boxes'][
+						              (pred["boxes"][:, 0] >= boxes_start) & (pred["boxes"][:, 0] <= boxes_end)][:,
+					              1:].cpu().clone().numpy(),
+					'pred_classes': pred['labels'][pred_start:pred_end + 1].cpu().clone().numpy(),
+					# 'pred_classes': pred['labels'].cpu().clone().numpy(),
+					'pred_rel_inds': rels_i - rels_i.min(),
+					'obj_scores': pred['scores'][pred_start:pred_end + 1].cpu().clone().numpy(),
+					'rel_scores': np.concatenate((pred_scores_1, pred_scores_2, pred_scores_3), axis=0)
+				}
+			else:
+				pred_entry = {
+					'pred_boxes': pred['boxes'][
+						              (pred["boxes"][:, 0] >= boxes_start) & (pred["boxes"][:, 0] <= boxes_end)][:,
+					              1:].cpu().clone().numpy(),
+					'pred_classes': pred['labels'][pred_start:pred_end + 1].cpu().clone().numpy(),
+					# 'pred_classes': pred['labels'].cpu().clone().numpy(),
+					'pred_rel_inds': rels_i - rels_i.min(),
+					'obj_scores': pred['pred_scores'][pred_start:pred_end + 1].cpu().clone().numpy(),
+					'rel_scores': np.concatenate((pred_scores_1, pred_scores_2, pred_scores_3), axis=0)
+				}
+			# pdb.set_trace()
+			evaluate_from_dict(gt_entry, pred_entry, self.mode, self.result_dict,
+			                   iou_thresh=self.iou_threshold, method=self.constraint, threshold=self.semi_threshold,
+			                   num_rel=self.num_rel)
 
 
 def evaluate_from_dict(gt_entry, pred_entry, mode, result_dict, method=None, threshold=0.9, num_rel=26, **kwargs):
@@ -254,7 +362,12 @@ def evaluate_recall(gt_rels, gt_boxes, gt_classes,
 	                                            gt_classes,
 	                                            gt_boxes)
 	num_boxes = pred_boxes.shape[0]
-	assert pred_rels[:, :2].max() < pred_classes.shape[0]
+	
+	try:
+		assert pred_rels[:, :2].max() < pred_classes.shape[0]
+	except AssertionError:
+		print("assert error ")
+		pdb.set_trace()
 	
 	# Exclude self rels
 	# assert np.all(pred_rels[:,0] != pred_rels[:,ĺeftright])
@@ -273,7 +386,7 @@ def evaluate_recall(gt_rels, gt_boxes, gt_classes,
 	if not np.all(scores_overall[1:] <= scores_overall[:-1] + 1e-5):
 		print("Somehow the relations weren't sorted properly: \n{}".format(scores_overall))
 		pdb.set_trace()
-	# raise ValueError("Somehow the relations werent sorted properly")
+		# raise ValueError("Somehow the relations werent sorted properly")
 	
 	# Compute recall. It's most efficient to match once and then do recall after
 	pred_to_gt = _compute_pred_matches(

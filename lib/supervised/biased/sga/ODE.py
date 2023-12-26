@@ -73,7 +73,6 @@ class STTran(nn.Module):
 		self.c_rel_compress = nn.Linear(d_model, self.contact_class_num)
 	
 	def forward(self, entry, testing=False):
-		
 		entry = self.object_classifier(entry)
 		# visual part
 		subj_rep = entry['features'][entry['pair_idx'][:, 0]]

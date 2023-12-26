@@ -33,16 +33,6 @@ def train_forecasting():
 		ckpt = torch.load(conf.ckpt, map_location=gpu_device)
 		model.load_state_dict(ckpt['state_dict'], strict=False)
 	
-	evaluator = BasicSceneGraphEvaluator(mode=conf.mode,
-	                                     AG_object_classes=ag_features_train.object_classes,
-	                                     AG_all_predicates=ag_features_train.relationship_classes,
-	                                     AG_attention_predicates=ag_features_train.attention_relationships,
-	                                     AG_spatial_predicates=ag_features_train.spatial_relationships,
-	                                     AG_contacting_predicates=ag_features_train.contacting_relationships,
-	                                     iou_threshold=0.5,
-	                                     save_file=os.path.join(conf.save_path, "progress.txt"),
-	                                     constraint='with')
-	
 	optimizer, scheduler = prepare_optimizer(conf, model)
 	
 	# some parameters

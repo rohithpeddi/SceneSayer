@@ -24,11 +24,13 @@ class BasicSceneGraphEvaluator:
 		self.result_dict = {}
 		self.mode = mode
 		self.num_rel = len(AG_all_predicates)
-		self.result_dict[self.mode + '_recall'] = {10: [], 20: [], 50: [], 100: []}
-		self.result_dict[self.mode + '_mean_recall_collect'] = {10: [[] for i in range(self.num_rel)],
-		                                                        20: [[] for i in range(self.num_rel)],
-		                                                        50: [[] for i in range(self.num_rel)],
-		                                                        100: [[] for i in range(self.num_rel)]}
+		self.result_dict[self.mode + '_recall'] = {
+			10: [], 20: [], 50: [], 100: []
+		}
+		self.result_dict[self.mode + '_mean_recall_collect'] = {
+			k: [[] for _ in range(self.num_rel)] for k in (10, 20, 50, 100)
+		}
+		
 		self.constraint = constraint  # semi constraint if True
 		self.iou_threshold = iou_threshold
 		self.AG_object_classes = AG_object_classes
@@ -38,35 +40,42 @@ class BasicSceneGraphEvaluator:
 		self.AG_contacting_predicates = AG_contacting_predicates
 		self.semi_threshold = semi_threshold
 		self.save_file = save_file
-		with open(self.save_file, "w") as f:
-			f.write("Begin training\n")
 	
 	def reset_result(self):
 		self.result_dict[self.mode + '_recall'] = {10: [], 20: [], 50: [], 100: []}
-		self.result_dict[self.mode + '_mean_recall_collect'] = {10: [[] for i in range(self.num_rel)],
-		                                                        20: [[] for i in range(self.num_rel)],
-		                                                        50: [[] for i in range(self.num_rel)],
-		                                                        100: [[] for i in range(self.num_rel)]}
+		self.result_dict[self.mode + '_mean_recall_collect'] = {
+			k: [[] for _ in range(self.num_rel)] for k in (10, 20, 50, 100)
+		}
 	
 	def print_stats(self):
-		with open(self.save_file, "a") as f:
-			f.write('======================' + self.mode + '============================\n')
-			print('======================' + self.mode + '============================')
+		def print_and_write(message):
+			print(message)
+			stats_file.write(message + '\n')
+		
+		with open(self.save_file, "a") as stats_file:
+			header = f'======================{self.mode}======================'
+			print_and_write(header)
+			
+			recall_dict = {}
+			mean_recall_dict = {}
+			harmonic_mean_recall_dict = {}
+			
 			for k, v in self.result_dict[self.mode + '_recall'].items():
-				print('R@%i: %f' % (k, np.mean(v)))
-				f.write('R@%i: %f\n' % (k, np.mean(v)))
+				recall_value = np.mean(v)
+				recall_dict[k] = recall_value
+				print_and_write(f'R@{k}: {recall_value:.6f}')
 			
 			for k, v in self.result_dict[self.mode + '_mean_recall_collect'].items():
-				sum_recall = 0
-				for idx in range(self.num_rel):
-					if len(v[idx]) == 0:
-						tmp_recall = 0.0
-					else:
-						tmp_recall = np.mean(v[idx])
-					sum_recall += tmp_recall
-				
-				print('R@%i: %f' % (k, sum_recall / float(self.num_rel)))
-				f.write('R@%i: %f\n' % (k, sum_recall / float(self.num_rel)))
+				sum_recall = np.sum([np.mean(vi) if vi else 0.0 for vi in v])
+				mean_recall_value = sum_recall / float(self.num_rel)
+				mean_recall_dict[k] = mean_recall_value
+				print_and_write(f'mR@{k}: {mean_recall_value:.6f}')
+			
+			for k, recall_value in recall_dict.items():
+				mean_recall_value = mean_recall_dict[k]
+				harmonic_mean = 2 * mean_recall_value * recall_value / (mean_recall_value + recall_value)
+				harmonic_mean_recall_dict[k] = harmonic_mean
+				print_and_write(f'hR@{k}: {harmonic_mean:.6f}')
 	
 	def evaluate_scene_graph(self, gt, pred):
 		"""collect the ground truth and prediction"""
@@ -143,7 +152,7 @@ class BasicSceneGraphEvaluator:
 			                   num_rel=self.num_rel)
 	
 	def evaluate_scene_graph_forecasting(self, gt, pred, end, future_end, future_frame_idx, count):
-		"""collect the groundtruth and prediction"""
+		"""collect the ground truth and prediction"""
 		try:
 			pred["output"][count]['attention_distribution'] = nn.functional.softmax(
 				pred["output"][count]['attention_distribution'], dim=1)
@@ -254,6 +263,10 @@ class BasicSceneGraphEvaluator:
 def evaluate_from_dict(gt_entry, pred_entry, mode, result_dict, method=None, threshold=0.9, num_rel=26, **kwargs):
 	"""
     Shortcut to doing evaluate_recall from dict
+    :param mode:
+    :param num_rel:
+    :param threshold:
+    :param method:
     :param gt_entry: Dictionary containing gt_relations, gt_boxes, gt_classes
     :param pred_entry: Dictionary containing pred_rels, pred_boxes (if detection), pred_classes
     :param result_dict:
@@ -298,7 +311,6 @@ def evaluate_from_dict(gt_entry, pred_entry, mode, result_dict, method=None, thr
 		score_inds = argsort_desc(overall_scores)[:100]
 		pred_rels = np.column_stack((pred_rel_inds[score_inds[:, 0]], score_inds[:, 1]))
 		predicate_scores = rel_scores[score_inds[:, 0], score_inds[:, 1]]
-	
 	else:
 		pred_rels = np.column_stack(
 			(pred_rel_inds, rel_scores.argmax(1)))  # 1+  dont add 1 because no dummy 'no relations'
@@ -333,11 +345,24 @@ def evaluate_from_dict(gt_entry, pred_entry, mode, result_dict, method=None, thr
 
 
 ###########################
-def evaluate_recall(gt_rels, gt_boxes, gt_classes,
-                    pred_rels, pred_boxes, pred_classes, rel_scores=None, cls_scores=None,
-                    iou_thresh=0.5, phrdet=False):
+def evaluate_recall(
+		gt_rels,
+		gt_boxes,
+		gt_classes,
+		pred_rels,
+		pred_boxes,
+		pred_classes,
+		rel_scores=None,
+		cls_scores=None,
+		iou_thresh=0.5,
+		phrdet=False
+):
 	"""
     Evaluates the recall
+    :param cls_scores:
+    :param rel_scores:
+    :param iou_thresh:
+    :param phrdet:
     :param gt_rels: [#gt_rel, 3] array of GT relations
     :param gt_boxes: [#gt_box, 4] array of GT boxes
     :param gt_classes: [#gt_box] array of GT classes
@@ -407,8 +432,14 @@ def evaluate_recall(gt_rels, gt_boxes, gt_classes,
 	return pred_to_gt, pred_5ples, relation_scores
 
 
-def _triplet(predicates, relations, classes, boxes,
-             predicate_scores=None, class_scores=None):
+def _triplet(
+		predicates,
+		relations,
+		classes,
+		boxes,
+		predicate_scores=None,
+		class_scores=None
+):
 	"""
     format predictions into triplets
     :param predicates: A 1d numpy array of num_boxes*(num_boxes-ĺeftright) predicates, corresponding to
@@ -440,8 +471,14 @@ def _triplet(predicates, relations, classes, boxes,
 	return triplets, triplet_boxes, triplet_scores
 
 
-def _compute_pred_matches(gt_triplets, pred_triplets,
-                          gt_boxes, pred_boxes, iou_thresh, phrdet=False):
+def _compute_pred_matches(
+		gt_triplets,
+		pred_triplets,
+		gt_boxes,
+		pred_boxes,
+		iou_thresh,
+		phrdet=False
+):
 	"""
     Given a set of predicted triplets, return the list of matching GT's for each of the
     given predictions

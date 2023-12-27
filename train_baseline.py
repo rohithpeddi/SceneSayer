@@ -1,19 +1,16 @@
-import torch
-import numpy as np
-from tqdm import tqdm
-import time
 import os
-import pandas as pd
-import copy
-from lib.supervised.evaluation_recall import BasicSceneGraphEvaluator
-from lib.supervised.biased.sga.baseline import Baseline
-from lib.supervised.biased.dsgdetr.track import get_sequence
-from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions
-from constants import Constants as const
+import time
 
-CONTEXT = 4
-FUTURE = 5
+import numpy as np
+import pandas as pd
+import torch
+from tqdm import tqdm
+
+from constants import Constants as const
+from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
+from lib.supervised.biased.dsgdetr.track import get_sequence
+from lib.supervised.biased.sga.baseline import Baseline
+from train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions
 
 
 def train_baseline():
@@ -29,6 +26,9 @@ def train_baseline():
 		model.load_state_dict(ckpt['state_dict'], strict=False)
 	
 	optimizer, scheduler = prepare_optimizer(conf, model)
+	
+	CONTEXT = conf.baseline_context
+	FUTURE = conf.baseline_future
 	
 	# some parameters
 	tr = []
@@ -88,7 +88,6 @@ def train_baseline():
 				                               dtype=torch.long).to(
 					device=attention_distribution.device).squeeze()
 				if not conf.bce_loss:
-					# multi-label margin loss or adaptive loss
 					spatial_label = -torch.ones([len(pred["spatial_gt"][context_end_idx:future_end_idx]), 6],
 					                            dtype=torch.long).to(device=attention_distribution.device)
 					contact_label = -torch.ones([len(pred["contacting_gt"][context_end_idx:future_end_idx]), 17],
@@ -96,10 +95,8 @@ def train_baseline():
 					for i in range(len(pred["spatial_gt"][context_end_idx:future_end_idx])):
 						spatial_label[i, : len(pred["spatial_gt"][context_end_idx:future_end_idx][i])] = torch.tensor(
 							pred["spatial_gt"][context_end_idx:future_end_idx][i])
-						contact_label[i,
-						: len(pred["contacting_gt"][context_end_idx:future_end_idx][i])] = torch.tensor(
+						contact_label[i, : len(pred["contacting_gt"][context_end_idx:future_end_idx][i])] = torch.tensor(
 							pred["contacting_gt"][context_end_idx:future_end_idx][i])
-				
 				else:
 					spatial_label = torch.zeros([len(pred["spatial_gt"][context_end_idx:future_end_idx]), 6],
 					                            dtype=torch.float32).to(device=attention_distribution.device)
@@ -108,18 +105,14 @@ def train_baseline():
 					for i in range(len(pred["spatial_gt"][context_end_idx:future_end_idx])):
 						spatial_label[i, pred["spatial_gt"][context_end_idx:future_end_idx][i]] = 1
 						contact_label[i, pred["contacting_gt"][context_end_idx:future_end_idx][i]] = 1
-				
-				vid_no = gt_annotation[0][0]["frame"].split('.')[0]
 				try:
 					losses["attention_relation_loss"] += ce_loss(attention_distribution, attention_label)
 				except ValueError:
 					attention_label = attention_label.unsqueeze(0)
 					losses["attention_relation_loss"] += ce_loss(attention_distribution, attention_label)
-				
 				if not conf.bce_loss:
 					losses["spatial_relation_loss"] += mlm_loss(spatial_distribution, spatial_label)
 					losses["contact_relation_loss"] += mlm_loss(contact_distribution, contact_label)
-				
 				else:
 					losses["spatial_relation_loss"] += bce_loss(spatial_distribution, spatial_label)
 					losses["contact_relation_loss"] += bce_loss(contact_distribution, contact_label)
@@ -209,6 +202,5 @@ if __name__ == '__main__':
 	train_baseline()
 
 # python train_try.py -mode sgcls -ckpt /home/cse/msr/csy227518/scratch/DSG/DSG-DETR/sgcls/model_9.tar -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/
-
 
 """ python train_obj_mask.py -mode sgdet -save_path forecasting/sgcls_full_context_f5/ -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ """

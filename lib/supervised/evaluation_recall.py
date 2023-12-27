@@ -238,7 +238,6 @@ class BasicSceneGraphEvaluator:
 						              (pred["boxes"][:, 0] >= boxes_start) & (pred["boxes"][:, 0] <= boxes_end)][:,
 					              1:].cpu().clone().numpy(),
 					'pred_classes': pred['labels'][pred_start:pred_end + 1].cpu().clone().numpy(),
-					# 'pred_classes': pred['labels'].cpu().clone().numpy(),
 					'pred_rel_inds': rels_i - rels_i.min(),
 					'obj_scores': pred['scores'][pred_start:pred_end + 1].cpu().clone().numpy(),
 					'rel_scores': np.concatenate((pred_scores_1, pred_scores_2, pred_scores_3), axis=0)
@@ -246,8 +245,7 @@ class BasicSceneGraphEvaluator:
 			else:
 				pred_entry = {
 					'pred_boxes': pred['boxes'][
-						              (pred["boxes"][:, 0] >= boxes_start) & (pred["boxes"][:, 0] <= boxes_end)][:,
-					              1:].cpu().clone().numpy(),
+						              (pred["boxes"][:, 0] >= boxes_start) & (pred["boxes"][:, 0] <= boxes_end)][:, 1:].cpu().clone().numpy(),
 					'pred_classes': pred['labels'][pred_start:pred_end + 1].cpu().clone().numpy(),
 					# 'pred_classes': pred['labels'].cpu().clone().numpy(),
 					'pred_rel_inds': rels_i - rels_i.min(),
@@ -411,7 +409,7 @@ def evaluate_recall(
 	if not np.all(scores_overall[1:] <= scores_overall[:-1] + 1e-5):
 		print("Somehow the relations weren't sorted properly: \n{}".format(scores_overall))
 		pdb.set_trace()
-		# raise ValueError("Somehow the relations werent sorted properly")
+	# raise ValueError("Somehow the relations werent sorted properly")
 	
 	# Compute recall. It's most efficient to match once and then do recall after
 	pred_to_gt = _compute_pred_matches(

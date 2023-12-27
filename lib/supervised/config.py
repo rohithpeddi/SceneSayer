@@ -29,6 +29,9 @@ class Config(object):
         self.sde_ratio = 1.0
         self.bbox_ratio = 0.1
         
+        self.baseline_context = 3
+        self.baseline_future = 3
+        
         self.parser = self.setup_parser()
         self.args = vars(self.parser.parse_args())
         self.__dict__.update(self.args)
@@ -49,6 +52,8 @@ class Config(object):
         parser.add_argument('-ode_ratio', default=1.0, type=float)
         parser.add_argument('-sde_ratio', default=1.0, type=float)
         parser.add_argument('-bbox_ratio', default=0.1, type=float)
+        parser.add_argument('-baseline_context', default=3, type=int)
+        parser.add_argument('-baseline_future', default=3, type=int)
         parser.add_argument('-data_path', default='/data/rohith/ag', type=str)
         parser.add_argument('-datasize', dest='datasize', help='mini dataset or whole', default='large', type=str)
         parser.add_argument('-ckpt', dest='ckpt', help='checkpoint', default=None, type=str)

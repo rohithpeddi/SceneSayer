@@ -200,110 +200,110 @@ class ODE(nn.Module):
 		self.ant_num = np.zeros((3, 1750))
 		self.ctr = 0
 	
-	def forward(self, entry, testing=False):
-		entry = self.dsgdetr(entry)
-		obj = entry["pair_idx"][:, 1]
-		if not testing:
-			labels_obj = entry["labels"][obj]
-		else:
-			pred_labels_obj = entry["pred_labels"][obj]
-			labels_obj = entry["labels"][obj]
-		# pdb.set_trace()
-		im_idx = entry["im_idx"]
-		pair_idx = entry["pair_idx"]
-		tot = im_idx.size(0)
-		t = torch.tensor(entry["frame_idx"], dtype=torch.int32)
-		indices = torch.reshape((im_idx[: -1] != im_idx[1:]).nonzero(), (-1,)) + 1
-		curr_id = 0
-		t_unique = torch.unique(t).float()
-		n = torch.unique(im_idx).size(0)
-		t_extend = torch.Tensor([t_unique[-1] + i + 1 for i in range(self.max_window)])
-		global_output = entry["global_output"]
-		t_unique = torch.cat((t_unique, t_extend)).to(device=global_output.device)
-		anticipated_vals = torch.zeros(self.max_window, 0, self.d_model, device=global_output.device)
-		# obj_bounding_boxes = torch.zeros(self.max_window, indices[-1], 4, device=global_output.device)
-		rng = torch.cat(
-			(torch.Tensor([0]).to(device=indices.device), indices, torch.Tensor([tot]).to(device=indices.device)))
-		rng = rng.long()
-		# self.gen_num[self.ctr] = tot
-		for i in range(1, self.max_window + 1):
-			mask_curr = torch.tensor([], dtype=torch.long, device=rng.device)
-			mask_gt = torch.tensor([], dtype=torch.long, device=rng.device)
-			gt = entry["gt_annotation"].copy()
-			for j in range(n - i):
-				if testing:
-					a, b = np.array(pred_labels_obj[rng[j]: rng[j + 1]].cpu()), np.array(
-						labels_obj[rng[j + i]: rng[j + i + 1]].cpu())
-				else:
-					a, b = np.array(labels_obj[rng[j]: rng[j + 1]].cpu()), np.array(
-						labels_obj[rng[j + i]: rng[j + i + 1]].cpu())
-				intersection = np.intersect1d(a, b, return_indices=False)
-				ind1 = np.array([])
-				ind2 = np.array([])
-				for element in intersection:
-					tmp1, tmp2 = np.where(a == element)[0], np.where(b == element)[0]
-					mn = min(tmp1.shape[0], tmp2.shape[0])
-					ind1 = np.concatenate((ind1, tmp1[: mn]))
-					ind2 = np.concatenate((ind2, tmp2[: mn]))
-				L = []
-				if testing:
-					ctr = 0
-					for detection in gt[i + j]:
-						if "class" not in detection.keys() or detection["class"] in intersection:
-							L.append(ctr)
-						ctr += 1
-					gt[i + j] = [gt[i + j][ind] for ind in L]
-				ind1 = torch.tensor(ind1, dtype=torch.long, device=rng.device)
-				ind2 = torch.tensor(ind2, dtype=torch.long, device=rng.device)
-				ind1 += rng[j]
-				ind2 += rng[j + i]
-				mask_curr = torch.cat((mask_curr, ind1))
-				mask_gt = torch.cat((mask_gt, ind2))
-			entry["mask_curr_%d" % i] = mask_curr
-			entry["mask_gt_%d" % i] = mask_gt
-			# self.ant_num[i - 1, self.ctr] = mask_curr.size(0)
-			if testing:
-				pair_idx_test = pair_idx[mask_curr]
-				_, inverse_indices = torch.unique(pair_idx_test, sorted=True, return_inverse=True)
-				entry["im_idx_test_%d" % i] = im_idx[mask_curr]
-				entry["pair_idx_test_%d" % i] = inverse_indices
-				if self.mode == "predcls":
-					entry["scores_test_%d" % i] = entry["scores"][_.long()]
-					entry["labels_test_%d" % i] = entry["labels"][_.long()]
-				else:
-					entry["pred_scores_test_%d" % i] = entry["pred_scores"][_.long()]
-					entry["pred_labels_test_%d" % i] = entry["pred_labels"][_.long()]
-				if inverse_indices.size(0) != 0:
-					mx = torch.max(inverse_indices)
-				else:
-					mx = -1
-				boxes_test = torch.zeros(mx + 1, 5, device=entry["boxes"].device)
-				boxes_test[torch.unique_consecutive(inverse_indices[:, 0])] = entry["boxes"][
-					torch.unique_consecutive(pair_idx[mask_gt][:, 0])]
-				boxes_test[inverse_indices[:, 1]] = entry["boxes"][pair_idx[mask_gt][:, 1]]
-				entry["boxes_test_%d" % i] = boxes_test
-				# entry["boxes_test_%d" %i] = entry["boxes"][_.long()]
-				entry["gt_annotation_%d" % i] = gt
-		# self.ctr += 1
-		# anticipated_latent_loss = 0
-		# targets = entry["detached_outputs"]
-		for i in range(n - 1):
-			end = indices[i]
-			batch_y0 = global_output[curr_id: end]
-			batch_times = t_unique[i: i + self.max_window + 1]
-			ret = odeint(self.diff_func, batch_y0, batch_times, method='explicit_adams',
-			             options=dict(max_order=4, step_size=1))[1:]
-			anticipated_vals = torch.cat((anticipated_vals, ret), dim=1)
-			# obj_bounding_boxes[ :, curr_id : end, : ].data.copy_(self.dsgdetr.get_obj_boxes(ret))
-			curr_id = end
-		# for p in self.dsgdetr.get_subj_boxes.parameters():
-		#    p.requires_grad_(False)
-		entry["anticipated_subject_boxes"] = self.dsgdetr.get_subj_boxes(anticipated_vals)
-		# for p in self.dsgdetr.get_subj_boxes.parameters():
-		#    p.requires_grad_(True)
-		entry["anticipated_vals"] = anticipated_vals
-		entry["anticipated_attention_distribution"] = self.dsgdetr.a_rel_compress(anticipated_vals)
-		entry["anticipated_spatial_distribution"] = torch.sigmoid(self.dsgdetr.s_rel_compress(anticipated_vals))
-		entry["anticipated_contacting_distribution"] = torch.sigmoid(self.dsgdetr.c_rel_compress(anticipated_vals))
-		# entry["anticipated_object_boxes"] = obj_bounding_boxes
-		return entry
+    def forward(self, entry, testing = False):
+        entry = self.dsgdetr(entry)
+        obj = entry["pair_idx"][ :, 1]
+        if not testing:
+            labels_obj = entry["labels"][obj]
+        else:
+            pred_labels_obj = entry["pred_labels"][obj]
+            labels_obj = entry["labels"][obj]
+        #pdb.set_trace()
+        im_idx = entry["im_idx"]
+        pair_idx = entry["pair_idx"]
+        tot = im_idx.size(0)
+        t = torch.tensor(entry["frame_idx"], dtype = torch.int32)
+        indices = torch.reshape((im_idx[ : -1] != im_idx[1 : ]).nonzero(), (-1, )) + 1
+        curr_id = 0
+        t_unique = torch.unique(t).float()
+        n = len(entry["gt_annotation"])
+        w = self.max_window
+        if self.max_window == -1:
+            w = n - 1
+        t_extend = torch.Tensor([t_unique[-1] + i + 1 for i in range(w)])
+        global_output = entry["global_output"]
+        anticipated_vals = torch.zeros(w, 0, self.d_model, device=global_output.device)
+        #obj_bounding_boxes = torch.zeros(self.max_window, indices[-1], 4, device=global_output.device)
+        rng = torch.cat((torch.Tensor([0]).to(device=indices.device), indices, torch.Tensor([tot]).to(device=indices.device)))
+        rng = rng.long()
+        entry["times"] = torch.repeat_interleave(t_unique.to(device=global_output.device), rng[1 : ] - rng[ : -1])
+        t_unique = torch.cat((t_unique, t_extend)).to(device=global_output.device)
+        #self.gen_num[self.ctr] = tot
+        for i in range(1, w + 1):
+            mask_curr = torch.tensor([], dtype=torch.long, device=rng.device)
+            mask_gt = torch.tensor([], dtype=torch.long, device=rng.device)
+            gt = entry["gt_annotation"].copy()
+            for j in range(n - i):
+                if testing:
+                    a, b = np.array(pred_labels_obj[rng[j] : rng[j + 1]].cpu()), np.array(labels_obj[rng[j + i] : rng[j + i + 1]].cpu())
+                else:
+                    a, b = np.array(labels_obj[rng[j] : rng[j + 1]].cpu()), np.array(labels_obj[rng[j + i] : rng[j + i + 1]].cpu())
+                intersection = np.intersect1d(a, b,  return_indices = False)
+                ind1 = np.array([])
+                ind2 = np.array([])
+                for element in intersection:
+                    tmp1, tmp2 = np.where(a == element)[0], np.where(b == element)[0]
+                    mn = min(tmp1.shape[0], tmp2.shape[0])
+                    ind1 = np.concatenate((ind1, tmp1[ : mn]))
+                    ind2 = np.concatenate((ind2, tmp2[ : mn]))
+                L = []
+                if testing:
+                    ctr = 0
+                    for detection in gt[i + j]:
+                        if "class" not in detection.keys() or detection["class"] in intersection:
+                            L.append(ctr)
+                        ctr += 1
+                    gt[i + j] = [gt[i + j][ind] for ind in L]
+                ind1 = torch.tensor(ind1, dtype=torch.long, device=rng.device)
+                ind2 = torch.tensor(ind2, dtype=torch.long, device=rng.device)
+                ind1 += rng[j]
+                ind2 += rng[j + i]
+                mask_curr = torch.cat((mask_curr, ind1))
+                mask_gt = torch.cat((mask_gt, ind2))
+            entry["mask_curr_%d" %i] = mask_curr
+            entry["mask_gt_%d" %i] = mask_gt
+            #self.ant_num[i - 1, self.ctr] = mask_curr.size(0)
+            if testing:
+                pair_idx_test = pair_idx[mask_curr]
+                _, inverse_indices = torch.unique(pair_idx_test, sorted=True, return_inverse=True)
+                entry["im_idx_test_%d" %i] = im_idx[mask_curr]
+                entry["pair_idx_test_%d" %i] = inverse_indices
+                if self.mode == "predcls":
+                    entry["scores_test_%d" %i] = entry["scores"][_.long()]
+                    entry["labels_test_%d" %i] = entry["labels"][_.long()]
+                else:
+                    entry["pred_scores_test_%d" %i] = entry["pred_scores"][_.long()]
+                    entry["pred_labels_test_%d" %i] = entry["pred_labels"][_.long()]
+                if inverse_indices.size(0) != 0:
+                    mx = torch.max(inverse_indices)
+                else:
+                    mx = -1
+                boxes_test = torch.zeros(mx + 1, 5, device=entry["boxes"].device)
+                boxes_test[torch.unique_consecutive(inverse_indices[: , 0])] = entry["boxes"][torch.unique_consecutive(pair_idx[mask_gt][: , 0])]
+                boxes_test[inverse_indices[: , 1]] = entry["boxes"][pair_idx[mask_gt][: , 1]]
+                entry["boxes_test_%d" %i] = boxes_test
+                #entry["boxes_test_%d" %i] = entry["boxes"][_.long()]
+                entry["gt_annotation_%d" %i] = gt
+        #self.ctr += 1
+        #anticipated_latent_loss = 0
+        #targets = entry["detached_outputs"] 
+        for i in range(n - 1):
+            end = indices[i]
+            batch_y0 = global_output[curr_id : end]
+            batch_times = t_unique[i : i + w + 1]
+            ret = odeint(self.diff_func, batch_y0, batch_times, method='explicit_adams', options=dict(max_order=4, step_size=1))[1 : ]
+            #ret = odeint(self.diff_func, batch_y0, batch_times, method='dopri5', rtol=1e-2, atol=1e-3)[1 : ]
+            anticipated_vals = torch.cat((anticipated_vals, ret), dim=1)
+            #obj_bounding_boxes[ :, curr_id : end, : ].data.copy_(self.dsgdetr.get_obj_boxes(ret))
+            curr_id = end
+        #for p in self.dsgdetr.get_subj_boxes.parameters():
+        #    p.requires_grad_(False)
+        entry["anticipated_subject_boxes"] = self.dsgdetr.get_subj_boxes(anticipated_vals)
+        #for p in self.dsgdetr.get_subj_boxes.parameters():
+        #    p.requires_grad_(True)
+        entry["anticipated_vals"] = anticipated_vals
+        entry["anticipated_attention_distribution"] = self.dsgdetr.a_rel_compress(anticipated_vals)
+        entry["anticipated_spatial_distribution"] = torch.sigmoid(self.dsgdetr.s_rel_compress(anticipated_vals))
+        entry["anticipated_contacting_distribution"] = torch.sigmoid(self.dsgdetr.c_rel_compress(anticipated_vals))
+        #entry["anticipated_object_boxes"] = obj_bounding_boxes
+        return entry

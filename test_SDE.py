@@ -52,9 +52,17 @@ def test_sde():
 			pred = sde(entry, True)
 			vid_no = gt_annotation[0][0]["frame"].split('.')[0]
 			all_time.append(time() - start)
+			w = max_window
+			if max_window == -1:
+				w = len(pred["gt_annotation"]) - 1
+			global_output = pred["global_output"]
+			times = pred["times"]
+			global_output_mod = global_output.clone().to(global_output.device)
+			denominator = torch.zeros(global_output.size(0)).to(global_output.device) + 1.0
 			for i in range(1, max_window + 1):
 				pred_anticipated = pred.copy()
 				mask_curr = pred["mask_curr_" + str(i)]
+				mask_gt = pred["mask_gt_" + str(i)]
 				pred_anticipated["spatial_distribution"] = pred["anticipated_spatial_distribution"][i - 1][mask_curr]
 				pred_anticipated["contacting_distribution"] = pred["anticipated_contacting_distribution"][i - 1][
 					mask_curr]
@@ -76,17 +84,34 @@ def test_sde():
 				else:
 					with_constraint_evaluator.evaluate_scene_graph(entry["gt_annotation"][i:], pred_anticipated)
 					no_constraint_evaluator.evaluate_scene_graph(entry["gt_annotation"][i:], pred_anticipated)
-	
+				global_output_mod[mask_gt] += pred["anticipated_vals"][i - 1][mask_curr] / torch.reshape((times[mask_gt] - times[mask_curr] + 1), (-1, 1))
+				denominator[mask_gt] += 1 / (times[mask_gt] - times[mask_curr] + 1)
+			global_output_mod = global_output_mod / torch.reshape(denominator, (-1, 1))
+			pred["global_output"] = global_output_mod
+			pred["attention_distribution"] = sde.dsgdetr.a_rel_compress(global_output)
+			pred["spatial_distribution"] = sde.dsgdetr.s_rel_compress(global_output)
+			pred["contacting_distribution"] = sde.dsgdetr.c_rel_compress(global_output)
+			pred["spatial_distribution"] = torch.sigmoid(pred["spatial_distribution"])
+			pred["contacting_distribution"] = torch.sigmoid(pred["contacting_distribution"])
+			with_constraint_evaluator_gen.evaluate_scene_graph(gt_annotation, pred)
+			no_constraint_evaluator_gen.evaluate_scene_graph(gt_annotation, pred)
 	print('Average inference time', np.mean(all_time))
 	
+	print("anticipation evaluation:")
 	print('-------------------------with constraint-------------------------------')
 	with_constraint_evaluator.print_stats()
 	print('-------------------------no constraint-------------------------------')
 	no_constraint_evaluator.print_stats()
+	print("generation evaluation")
+	print('-------------------------with constraint-------------------------------')
+	with_constraint_evaluator_gen.print_stats()
+	print('-------------------------no constraint-------------------------------')
+	no_constraint_evaluator_gen.print_stats()
 
 
 if __name__ == '__main__':
 	ag_features_test, dataloader_test, with_constraint_evaluator, no_constraint_evaluator, semi_constraint_evaluator, gpu_device, conf = fetch_test_basic_config()
+	x, y, with_constraint_evaluator_gen, no_constraint_evaluator_gen, semi_constraint_evaluator_gen, z, w = fetch_test_basic_config() 
 	test_sde()
 
 #  python test_cttran.py -mode sgdet -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ -model_sttran_path cttran/no_temporal/sttran_9.tar -model_cttran_path cttran/no_temporal/cttran_9.tar

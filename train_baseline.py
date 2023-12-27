@@ -140,7 +140,8 @@ def train_baseline():
 				print(mn)
 				start_time = time.time()
 		
-		torch.save({"state_dict": model.state_dict()}, os.path.join(conf.save_path, "forecast_{}.tar".format(epoch)))
+		print("*" * 40)
+		torch.save({"state_dict": model.state_dict()}, os.path.join(conf.save_path, f"{checkpoint_name}_{epoch}.tar"))
 		print("*" * 40)
 		print("save the checkpoint after {} epochs".format(epoch))
 		with open(evaluator.save_file, "a") as f:
@@ -198,6 +199,9 @@ def train_baseline():
 
 if __name__ == '__main__':
 	conf, dataloader_train, dataloader_test, gpu_device, evaluator, ag_features_train, ag_features_test = fetch_train_basic_config()
+	model_name = "baseline_so"
+	checkpoint_name = f"baseline_so_{conf.mode}"
+	evaluator.save_file = os.path.join(os.path.abspath('.'), conf.save_path, "train_baseline_so_{}.txt".format(conf.mode))
 	bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_loss_functions()
 	train_baseline()
 

@@ -22,6 +22,7 @@ class Config(object):
         self.enc_layer = 1
         self.dec_layer = 3
         self.nepoch = 10
+        self.results_path = None
         
         self.max_window = 3
         self.brownian_size = 1
@@ -47,6 +48,7 @@ class Config(object):
         parser.add_argument('-mode', dest='mode', help='predcls/sgcls/sgdet', default='sgdet', type=str)
         parser.add_argument('-save_path', default='data', type=str)
         parser.add_argument('-model_path', default=None, type=str)
+        parser.add_argument('-results_path', default='results', type=str)
         parser.add_argument('-max_window', default=3, type=int)
         parser.add_argument('-brownian_size', default=1, type=int)
         parser.add_argument('-ode_ratio', default=1.0, type=float)

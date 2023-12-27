@@ -369,29 +369,27 @@ class Baseline(nn.Module):
 			if len(k) > 0:
 				sequences.append(k)
 		
-		# If future is -1 then anticipate to end of video
-		
 		""" ################# changes regarding forecasting #################### """
+		
 		start = 0
-		# context = context
-		# future = future
 		error_count = 0
 		count = 0
 		result = {}
-		if start + context + 1 > len(entry["im_idx"].unique()):
-			while start + context + 1 != len(entry["im_idx"].unique()) and context > 1:
+		total_frames = len(entry["im_idx"].unique())
+		if future == -1:
+			future = total_frames - context
+		if start + context + 1 > total_frames:
+			while start + context + 1 != total_frames and context > 1:
 				context -= 1
 			future = 1
-		if (start + context + future > len(entry["im_idx"].unique()) and start + context < len(
-				entry["im_idx"].unique())):
-			future = len(entry["im_idx"].unique()) - (start + context)
+		if start + context + future > total_frames > start + context:
+			future = total_frames - (start + context)
 		
-		while start + context + 1 <= len(entry["im_idx"].unique()):
+		while start + context + 1 <= total_frames:
 			future_frame_start_id = entry["im_idx"].unique()[context]
 			
-			if (start + context + future > len(entry["im_idx"].unique()) and start + context < len(
-					entry["im_idx"].unique())):
-				future = len(entry["im_idx"].unique()) - (start + context)
+			if start + context + future > total_frames > start + context:
+				future = total_frames - (start + context)
 			
 			future_frame_end_id = entry["im_idx"].unique()[context + future - 1]
 			
@@ -404,9 +402,8 @@ class Baseline(nn.Module):
 			future_len = future_idx.shape[0]
 			
 			seq = []
-			
 			for s in sequences:
-				index = s[(s < (context_len))]
+				index = s[(s < context_len)]
 				seq.append(index)
 			
 			future_seq = []
@@ -433,7 +430,6 @@ class Baseline(nn.Module):
 			masks = (1 - pad_sequence([torch.ones(len(index)) for index in seq], batch_first=True)).bool()
 			
 			pos_index = [torch.tensor(seq, dtype=torch.long) for seq in pos_index]
-			# pos_index = pos_index.clone().detach
 			pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
 			sequence_features = self.positional_encoder(sequence_features, pos_index)
 			seq_len = sequence_features.shape[1]
@@ -442,7 +438,6 @@ class Baseline(nn.Module):
 			output = []
 			
 			for i in range(future):
-				# out = self.global_transformer(mask_input,src_key_padding_mask = masks.cuda(),mask = in_mask)
 				out = self.temporal_transformer(mask_input, mask=in_mask)
 				output.append(out[:, -1, :].unsqueeze(1))
 				out_last = [out[:, -1, :]]
@@ -465,7 +460,7 @@ class Baseline(nn.Module):
 			
 			rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
 			rel_flat = torch.tensor(rel_flat1)
-			rel_flat = rel_flat.to('cuda:0')
+			rel_flat = rel_flat.to(rel_features.device)
 			# rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(future_seq,rel_)])
 			indices_flat = torch.cat(future_seq).unsqueeze(1).repeat(1, rel_features.shape[1])
 			# assert len(indices_flat) == len(entry["pair_idx"])
@@ -491,10 +486,5 @@ class Baseline(nn.Module):
 			
 			result[count] = temp
 			count += 1
-			if (start + context + future > len(entry["im_idx"].unique())):
-				break
-		
 		entry["output"] = result
-		
-		# pdb.set_trace()
 		return entry

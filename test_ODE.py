@@ -51,9 +51,10 @@ def test_ode():
 			vid_no = gt_annotation[0][0]["frame"].split('.')[0]
 			all_time.append(time() - start)
 		        w = max_window
+		        n = int(torch.max(pred["im_idx"]) + 1)
 		        if max_window == -1:
-		            w = len(gt_annotation) - 1
-		        w = min(w, len(gt_annotation) - 1)
+		            w = n - 1
+		        w = min(w, n - 1)
 			global_output = pred["global_output"]
 			times = pred["times"]
 			global_output_mod = global_output.clone().to(global_output.device)
@@ -62,11 +63,10 @@ def test_ode():
 				pred_anticipated = pred.copy()
 				mask_curr = pred["mask_curr_" + str(i)]
 				mask_gt = pred["mask_gt_" + str(i)]
-				pred_anticipated["spatial_distribution"] = pred["anticipated_spatial_distribution"][i - 1][mask_curr]
-				pred_anticipated["contacting_distribution"] = pred["anticipated_contacting_distribution"][i - 1][
-					mask_curr]
-				pred_anticipated["attention_distribution"] = pred["anticipated_attention_distribution"][i - 1][
-					mask_curr]
+		            	last = pred["last_" + str(i)]
+		            	pred_anticipated["spatial_distribution"] = pred["anticipated_spatial_distribution"][i - 1, : last]
+		            	pred_anticipated["contacting_distribution"] = pred["anticipated_contacting_distribution"][i - 1, : last]
+		            	pred_anticipated["attention_distribution"] = pred["anticipated_attention_distribution"][i - 1, : last]
 				pred_anticipated["im_idx"] = pred["im_idx_test_" + str(i)]
 				pred_anticipated["pair_idx"] = pred["pair_idx_test_" + str(i)]
 				if conf.mode == "predcls":

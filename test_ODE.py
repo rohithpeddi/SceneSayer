@@ -50,9 +50,10 @@ def test_ode():
 			pred = ode(entry, True)
 			vid_no = gt_annotation[0][0]["frame"].split('.')[0]
 			all_time.append(time() - start)
-			w = max_window
-			if max_window == -1:
-				w = len(gt_annotation) - 1
+		        w = max_window
+		        if max_window == -1:
+		            w = len(gt_annotation) - 1
+		        w = min(w, len(gt_annotation) - 1)
 			global_output = pred["global_output"]
 			times = pred["times"]
 			global_output_mod = global_output.clone().to(global_output.device)

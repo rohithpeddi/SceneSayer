@@ -20,7 +20,7 @@ def get_sequence(entry, task="sgcls"):
             indices.append(torch.where(entry["labels"] == i)[0])
         entry["indices"] = indices
         return
-    
+
     if task == "sgdet" or task == "sgcls":
         # for sgdet, use the predicted object classes, as a special case of
         # the proposed method, comment this out for general coase tracking.
@@ -53,33 +53,33 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
     total_frames = len(entry["im_idx"].unique())
     if conf.mode == 'sgcls' or conf.mode == 'sgdet':
         losses['object_loss'] = ce_loss(pred['distribution'], pred['labels'])
-    
+
     losses["attention_relation_loss"] = 0
     losses["spatial_relation_loss"] = 0
     losses["contact_relation_loss"] = 0
-    
+
     if start + context + 1 > total_frames:
         while start + context + 1 != total_frames and context > 1:
             context -= 1
         future = 1
     if start + context + future > total_frames > start + context:
         future = total_frames - (start + context)
-    
+
     while start + context + 1 <= total_frames:
         future_frame_start_id = entry["im_idx"].unique()[context]
-        
+
         if start + context + future > total_frames > start + context:
             future = total_frames - (start + context)
-        
+
         future_frame_end_id = entry["im_idx"].unique()[context + future - 1]
-        
+
         context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
         future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1]) + 1
-        
+
         attention_distribution = pred["output"][count]["attention_distribution"]
         spatial_distribution = pred["output"][count]["spatial_distribution"]
         contact_distribution = pred["output"][count]["contacting_distribution"]
-        
+
         attention_label = torch.tensor(pred["attention_gt"][context_end_idx:future_end_idx],
                                        dtype=torch.long).to(
             device=attention_distribution.device).squeeze()
@@ -113,7 +113,7 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
         else:
             losses["spatial_relation_loss"] += bce_loss(spatial_distribution, spatial_label)
             losses["contact_relation_loss"] += bce_loss(contact_distribution, contact_label)
-        
+
         context += 1
         count += 1
     losses["attention_relation_loss"] = losses["attention_relation_loss"] / count
@@ -124,19 +124,23 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
     optimizer.step()
-    
+
     num += 1
-    
+
+    if num % 50 == 0:
+        print("epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(epoch, num, len(dataloader_train),
+                                                                   loss.item()))
+
     tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
     if num % 1000 == 0 and num >= 1000:
         time_per_batch = (time.time() - start_time) / 1000
         print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, num, len(dataloader_train),
                                                                             time_per_batch,
                                                                             len(dataloader_train) * time_per_batch / 60))
-        
+
         mn = pd.concat(tr[-1000:], axis=1).mean(1)
         print(mn)
-    
+
     return num
 
 
@@ -153,7 +157,7 @@ def process_test_video(entry, model):
     gt_annotation = entry[const.GT_ANNOTATION]
     get_sequence(entry, conf.mode)
     pred = model(entry, conf.baseline_context, conf.baseline_future)
-    
+
     start = 0
     count = 0
     context = conf.baseline_context
@@ -167,18 +171,18 @@ def process_test_video(entry, model):
         future = total_frames - (start + context)
     while start + context + 1 <= total_frames:
         future_frame_start_id = entry["im_idx"].unique()[context]
-        
+
         if start + context + future > total_frames > start + context:
             future = total_frames - (start + context)
-        
+
         future_frame_end_id = entry["im_idx"].unique()[context + future - 1]
-        
+
         context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
         future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1]) + 1
         future_idx = entry["im_idx"][context_end_idx:future_end_idx]
-        
+
         gt_future = gt_annotation[start + context:start + context + future]
-        
+
         evaluator.evaluate_scene_graph_forecasting(gt_future, pred, context_end_idx, future_end_idx, future_idx, count)
         count += 1
         context += 1
@@ -195,15 +199,28 @@ def train_baseline():
     if conf.ckpt:
         ckpt = torch.load(conf.ckpt, map_location=gpu_device)
         model.load_state_dict(ckpt['state_dict'], strict=False)
-    
+
+    object_detector = None
+    if conf.use_raw_data:
+        object_detector = detector(
+            train=True,
+            object_classes=ag_train_data.object_classes,
+            use_SUPPLY=True,
+            mode=conf.mode
+        ).to(device=gpu_device)
+        object_detector.eval()
+        print("Finished loading object detector", flush=True)
+
     optimizer, scheduler = prepare_optimizer(conf, model)
-    
+
     tr = []
     for epoch in range(10):
         model.train()
         num = 0
         # Train using only features
         if not conf.use_raw_data:
+            print('----------------------------------------------------------', flush=True)
+            print('Training using features', flush=True)
             for entry in tqdm(dataloader_train, position=0, leave=True):
                 num = process_train_video(entry, optimizer, model, epoch, num, tr)
             save_model(model, epoch)
@@ -215,15 +232,10 @@ def train_baseline():
             print('epoch: {}'.format(epoch))
             print('----------------------------------------------------------', flush=True)
         else:
+            print('----------------------------------------------------------', flush=True)
+            print('Training using raw data', flush=True)
             # Train using raw data and object detector instead of features
-            object_detector = detector(
-                train=True,
-                object_classes=ag_train_data.object_classes,
-                use_SUPPLY=True,
-                mode=conf.mode
-            ).to(device=gpu_device)
-            object_detector.eval()
-            
+
             object_detector.is_train = True
             model.train()
             object_detector.train_x = True
@@ -249,7 +261,7 @@ def train_baseline():
                     im_info = copy.deepcopy(data[1].cuda(0))
                     gt_boxes = copy.deepcopy(data[2].cuda(0))
                     num_boxes = copy.deepcopy(data[3].cuda(0))
-                    gt_annotation = ag_train_data.gt_annotations[data[4]]
+                    gt_annotation = ag_test_data.gt_annotations[data[4]]
                     entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
                     process_test_video(entry, model)
         score = np.mean(evaluator.result_dict[conf.mode + "_recall"][20])

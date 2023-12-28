@@ -61,7 +61,7 @@ def test_sde():
 			times = pred["times"]
 			global_output_mod = global_output.clone().to(global_output.device)
 			denominator = torch.zeros(global_output.size(0)).to(global_output.device) + 1.0
-			for i in range(1, max_window + 1):
+			for i in range(1, w + 1):
 				pred_anticipated = pred.copy()
 				mask_curr = pred["mask_curr_" + str(i)]
 				mask_gt = pred["mask_gt_" + str(i)]

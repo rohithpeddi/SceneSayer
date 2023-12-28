@@ -421,7 +421,7 @@ if __name__ == '__main__':
 
     # 	TODO: Add code for saving method specific model
     AG_dataset_train = AG(
-        mode=const.TRAIN,
+        phase=const.TRAIN,
         datasize=conf.datasize,
         data_path=conf.data_path,
         filter_nonperson_box_frame=True,
@@ -437,7 +437,7 @@ if __name__ == '__main__':
     )
 
     AG_dataset_test = AG(
-        mode=const.TEST,
+        phase=const.TEST,
         datasize=conf.datasize,
         data_path=conf.data_path,
         filter_nonperson_box_frame=True,

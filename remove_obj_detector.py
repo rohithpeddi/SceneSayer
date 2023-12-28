@@ -54,7 +54,7 @@ class SupervisedFeatureExtractor:
 
     def _initialize_data_loaders(self):
         self.train_dataset = AG(
-            mode=const.TRAIN,
+            phase=const.TRAIN,
             datasize=self.config.datasize,
             data_path=self.config.data_path,
             filter_nonperson_box_frame=True,
@@ -70,7 +70,7 @@ class SupervisedFeatureExtractor:
         )
 
         self.test_dataset = AG(
-            mode=const.TEST,
+            phase=const.TEST,
             datasize=self.config.datasize,
             data_path=self.config.data_path,
             filter_nonperson_box_frame=True,

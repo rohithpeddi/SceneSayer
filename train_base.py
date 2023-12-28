@@ -6,7 +6,11 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 from constants import Constants as const
-from dataloader.supervised.generation.action_genome.ag_features import AGFeatures, cuda_collate_fn
+from dataloader.supervised.generation.action_genome.ag_features import AGFeatures
+from dataloader.supervised.generation.action_genome.ag_features import cuda_collate_fn as ag_features_cuda_collate_fn
+from dataloader.supervised.generation.action_genome.ag_dataset import AG
+from dataloader.supervised.generation.action_genome.ag_dataset import cuda_collate_fn as ag_data_cuda_collate_fn
+
 from lib.AdamW import AdamW
 from lib.supervised.config import Config
 from lib.supervised.evaluation_recall import BasicSceneGraphEvaluator
@@ -49,53 +53,85 @@ def fetch_train_basic_config():
 	# Set the preferred device
 	device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 	
-	ag_features_train = AGFeatures(
-		mode=conf.mode,
-		data_split=const.TRAIN,
-		device=device,
-		data_path=conf.data_path,
-		is_compiled_together=False,
-		filter_nonperson_box_frame=True,
-		filter_small_box=False if conf.mode == const.PREDCLS else True
-	)
+	if not conf.use_raw_data:
+		ag_train_data = AGFeatures(
+			mode=conf.mode,
+			data_split=const.TRAIN,
+			device=device,
+			data_path=conf.data_path,
+			is_compiled_together=False,
+			filter_nonperson_box_frame=True,
+			filter_small_box=False if conf.mode == const.PREDCLS else True
+		)
+		
+		ag_test_data = AGFeatures(
+			mode=conf.mode,
+			data_split=const.TEST,
+			device=device,
+			data_path=conf.data_path,
+			is_compiled_together=False,
+			filter_nonperson_box_frame=True,
+			filter_small_box=False if conf.mode == const.PREDCLS else True
+		)
+		
+		dataloader_train = DataLoader(
+			ag_train_data,
+			shuffle=True,
+			collate_fn=ag_features_cuda_collate_fn,
+			pin_memory=True,
+			num_workers=0
+		)
+		
+		dataloader_test = DataLoader(
+			ag_test_data,
+			shuffle=False,
+			collate_fn=ag_features_cuda_collate_fn,
+			pin_memory=False
+		)
+	else:
+		ag_train_data = AG(
+			phase="train",
+			datasize=conf.datasize,
+			data_path=conf.data_path,
+			filter_nonperson_box_frame=True,
+			filter_small_box=False if conf.mode == 'predcls' else True
+		)
+		
+		ag_test_data = AG(
+			phase="test",
+			datasize=conf.datasize,
+			data_path=conf.data_path,
+			filter_nonperson_box_frame=True,
+			filter_small_box=False if conf.mode == 'predcls' else True
+		)
 	
-	dataloader_train = DataLoader(
-		ag_features_train,
-		shuffle=True,
-		collate_fn=cuda_collate_fn,
-		pin_memory=True,
-		num_workers=2
-	)
-	
-	ag_features_test = AGFeatures(
-		mode=conf.mode,
-		data_split=const.TEST,
-		device=device,
-		data_path=conf.data_path,
-		is_compiled_together=False,
-		filter_nonperson_box_frame=True,
-		filter_small_box=False if conf.mode == const.PREDCLS else True
-	)
-	
-	dataloader_test = DataLoader(
-		ag_features_test,
-		shuffle=False,
-		collate_fn=cuda_collate_fn,
-		pin_memory=False
-	)
+		dataloader_train = DataLoader(
+			ag_train_data,
+			shuffle=True,
+			collate_fn=ag_data_cuda_collate_fn,
+			pin_memory=True,
+			num_workers=0
+		)
+		
+		dataloader_test = DataLoader(
+			ag_test_data,
+			shuffle=False,
+			collate_fn=ag_data_cuda_collate_fn,
+			pin_memory=False
+		)
 	
 	gpu_device = torch.device("cuda:0")
 	
 	evaluator = BasicSceneGraphEvaluator(
 		mode=conf.mode,
-		AG_object_classes=ag_features_train.object_classes,
-		AG_all_predicates=ag_features_train.relationship_classes,
-		AG_attention_predicates=ag_features_train.attention_relationships,
-		AG_spatial_predicates=ag_features_train.spatial_relationships,
-		AG_contacting_predicates=ag_features_train.contacting_relationships,
+		AG_object_classes=ag_train_data.object_classes,
+		AG_all_predicates=ag_train_data.relationship_classes,
+		AG_attention_predicates=ag_train_data.attention_relationships,
+		AG_spatial_predicates=ag_train_data.spatial_relationships,
+		AG_contacting_predicates=ag_train_data.contacting_relationships,
 		iou_threshold=0.5,
 		save_file=os.path.join(conf.save_path, const.PROGRESS_TEXT_FILE),
 		constraint='with'
 	)
 	
-	return conf, dataloader_train, dataloader_test, gpu_device, evaluator, ag_features_train, ag_features_test
+	return conf, dataloader_train, dataloader_test, gpu_device, evaluator, ag_train_data, ag_test_data

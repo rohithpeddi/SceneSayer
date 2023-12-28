@@ -16,7 +16,7 @@ class AG(Dataset):
 	
 	def __init__(
 			self,
-			mode,
+			phase,
 			datasize,
 			data_path=None,
 			filter_nonperson_box_frame=True,
@@ -97,7 +97,7 @@ class AG(Dataset):
 		video_dict = {}
 		q = []
 		for i in person_bbox.keys():
-			if object_bbox[i][0][const.METADATA][const.SET] == mode:  # train or testing?
+			if object_bbox[i][0][const.METADATA][const.SET] == phase:  # train or testing?
 				video_name, frame_num = i.split('/')
 				q.append(video_name)
 				frame_valid = False

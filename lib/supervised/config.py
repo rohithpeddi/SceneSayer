@@ -33,6 +33,8 @@ class Config(object):
         self.baseline_context = 3
         self.baseline_future = 3
         
+        self.use_raw_data = False
+        
         self.parser = self.setup_parser()
         self.args = vars(self.parser.parse_args())
         self.__dict__.update(self.args)
@@ -56,6 +58,7 @@ class Config(object):
         parser.add_argument('-bbox_ratio', default=0.1, type=float)
         parser.add_argument('-baseline_context', default=3, type=int)
         parser.add_argument('-baseline_future', default=3, type=int)
+        parser.add_argument('-use_raw_data', action='store_true')
         parser.add_argument('-data_path', default='/data/rohith/ag', type=str)
         parser.add_argument('-datasize', dest='datasize', help='mini dataset or whole', default='large', type=str)
         parser.add_argument('-ckpt', dest='ckpt', help='checkpoint', default=None, type=str)

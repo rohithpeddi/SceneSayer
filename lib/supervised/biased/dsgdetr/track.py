@@ -136,7 +136,7 @@ def get_sequence(entry, gt_annotation, matcher, shape, task="sgcls"):
 	
 	if task == "sgdet":
 		# for sgdet, use the predicted object classes, as a special case of
-		# the proposed method, comment this out for general coase tracking.
+		# the proposed method, comment this out for general coarse tracking.
 		indices = [[]]
 		# indices[0] store single-element sequence, to save memory
 		pred_labels = torch.argmax(entry["distribution"], 1)

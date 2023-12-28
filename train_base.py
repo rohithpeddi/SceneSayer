@@ -63,7 +63,8 @@ def fetch_train_basic_config():
 		ag_features_train,
 		shuffle=True,
 		collate_fn=cuda_collate_fn,
-		pin_memory=False
+		pin_memory=True,
+		num_workers=2
 	)
 	
 	ag_features_test = AGFeatures(

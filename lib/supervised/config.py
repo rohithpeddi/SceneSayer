@@ -46,7 +46,7 @@ class Config(object):
         parser.add_argument('-method', dest='method', help='Method dsg_detr/sttran/tempura', default='dsg_detr',
                             type=str)
         parser.add_argument('-mode', dest='mode', help='predcls/sgcls/sgdet', default='sgdet', type=str)
-        parser.add_argument('-save_path', default='data', type=str)
+        parser.add_argument('-save_path', default='/data/rohith/ag/checkpoints', type=str)
         parser.add_argument('-model_path', default=None, type=str)
         parser.add_argument('-results_path', default='results', type=str)
         parser.add_argument('-max_window', default=3, type=int)

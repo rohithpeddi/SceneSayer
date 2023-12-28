@@ -231,6 +231,7 @@ class SDE(nn.Module):
 		w = self.max_window
 		if self.max_window == -1:
 			w = n - 1
+		w = min(w, n - 1)
 		t_extend = torch.Tensor([t_unique[-1] + i + 1 for i in range(w)])
 		global_output = entry["global_output"]
 		anticipated_vals = torch.zeros(w, 0, self.d_model, device=global_output.device)
@@ -274,27 +275,36 @@ class SDE(nn.Module):
 			entry["mask_curr_%d" %i] = mask_curr
 			entry["mask_gt_%d" %i] = mask_gt
 			#self.ant_num[i - 1, self.ctr] = mask_curr.size(0)
-			if testing:
-				pair_idx_test = pair_idx[mask_curr]
-				_, inverse_indices = torch.unique(pair_idx_test, sorted=True, return_inverse=True)
-				entry["im_idx_test_%d" %i] = im_idx[mask_curr]
-				entry["pair_idx_test_%d" %i] = inverse_indices
-				if self.mode == "predcls":
-					entry["scores_test_%d" %i] = entry["scores"][_.long()]
-					entry["labels_test_%d" %i] = entry["labels"][_.long()]
-				else:
-					entry["pred_scores_test_%d" %i] = entry["pred_scores"][_.long()]
-					entry["pred_labels_test_%d" %i] = entry["pred_labels"][_.long()]
-				if inverse_indices.size(0) != 0:
-					mx = torch.max(inverse_indices)
-				else:
-					mx = -1
-				boxes_test = torch.zeros(mx + 1, 5, device=entry["boxes"].device)
-				boxes_test[torch.unique_consecutive(inverse_indices[: , 0])] = entry["boxes"][torch.unique_consecutive(pair_idx[mask_gt][: , 0])]
-				boxes_test[inverse_indices[: , 1]] = entry["boxes"][pair_idx[mask_gt][: , 1]]
-				entry["boxes_test_%d" %i] = boxes_test
-				#entry["boxes_test_%d" %i] = entry["boxes"][_.long()]
-				entry["gt_annotation_%d" %i] = gt
+	            	if testing:
+		                """pair_idx_test = pair_idx[mask_curr]
+		                _, inverse_indices = torch.unique(pair_idx_test, sorted=True, return_inverse=True)
+		                entry["im_idx_test_%d" %i] = im_idx[mask_curr]
+		                entry["pair_idx_test_%d" %i] = inverse_indices
+		                if self.mode == "predcls":
+		                    entry["scores_test_%d" %i] = entry["scores"][_.long()]
+		                    entry["labels_test_%d" %i] = entry["labels"][_.long()]
+		                else:
+		                    entry["pred_scores_test_%d" %i] = entry["pred_scores"][_.long()]
+		                    entry["pred_labels_test_%d" %i] = entry["pred_labels"][_.long()]
+		                if inverse_indices.size(0) != 0:
+		                    mx = torch.max(inverse_indices)
+		                else:
+		                    mx = -1
+		                boxes_test = torch.zeros(mx + 1, 5, device=entry["boxes"].device)
+		                boxes_test[torch.unique_consecutive(inverse_indices[: , 0])] = entry["boxes"][torch.unique_consecutive(pair_idx[mask_gt][: , 0])]
+		                boxes_test[inverse_indices[: , 1]] = entry["boxes"][pair_idx[mask_gt][: , 1]]
+		                entry["boxes_test_%d" %i] = boxes_test"""
+		                #entry["boxes_test_%d" %i] = entry["boxes"][_.long()]
+		                entry["im_idx_test_%d" %i] = entry["im_idx"][ : rng[-(i + 1)]]
+		                entry["pair_idx_test_%d" %i] = entry["pair_idx"][ : rng[-(i + 1)]]
+		                if self.mode == "predcls":
+		                    entry["scores_test_%d" %i] = entry["scores"][ : rng[-(i + 1)]]
+		                    entry["labels_test_%d" %i] = entry["labels"][ : rng[-(i + 1)]]
+		                else:
+		                    entry["pred_scores_test_%d" %i] = entry["pred_scores"][ : rng[-(i + 1)]]
+		                    entry["pred_labels_test_%d" %i] = entry["pred_labels"][ : rng[-(i + 1)]]
+		                entry["boxes_test_%d" %i] = torch.zeros(rng[-(i + 1)], 5).to(device=im_idx.device)
+		                entry["gt_annotation_%d" %i] = gt
 		#self.ctr += 1
 		#anticipated_latent_loss = 0
 		#targets = entry["detached_outputs"]    

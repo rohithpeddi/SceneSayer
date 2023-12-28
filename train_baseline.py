@@ -20,7 +20,7 @@ def get_sequence(entry, task="sgcls"):
             indices.append(torch.where(entry["labels"] == i)[0])
         entry["indices"] = indices
         return
-    
+
     if task == "sgdet" or task == "sgcls":
         # for sgdet, use the predicted object classes, as a special case of
         # the proposed method, comment this out for general coase tracking.
@@ -53,33 +53,33 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
     total_frames = len(entry["im_idx"].unique())
     if conf.mode == 'sgcls' or conf.mode == 'sgdet':
         losses['object_loss'] = ce_loss(pred['distribution'], pred['labels'])
-    
+
     losses["attention_relation_loss"] = 0
     losses["spatial_relation_loss"] = 0
     losses["contact_relation_loss"] = 0
-    
+
     if start + context + 1 > total_frames:
         while start + context + 1 != total_frames and context > 1:
             context -= 1
         future = 1
     if start + context + future > total_frames > start + context:
         future = total_frames - (start + context)
-    
+
     while start + context + 1 <= total_frames:
         future_frame_start_id = entry["im_idx"].unique()[context]
-        
+
         if start + context + future > total_frames > start + context:
             future = total_frames - (start + context)
-        
+
         future_frame_end_id = entry["im_idx"].unique()[context + future - 1]
-        
+
         context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
         future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1]) + 1
-        
+
         attention_distribution = pred["output"][count]["attention_distribution"]
         spatial_distribution = pred["output"][count]["spatial_distribution"]
         contact_distribution = pred["output"][count]["contacting_distribution"]
-        
+
         attention_label = torch.tensor(pred["attention_gt"][context_end_idx:future_end_idx],
                                        dtype=torch.long).to(
             device=attention_distribution.device).squeeze()
@@ -113,7 +113,7 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
         else:
             losses["spatial_relation_loss"] += bce_loss(spatial_distribution, spatial_label)
             losses["contact_relation_loss"] += bce_loss(contact_distribution, contact_label)
-        
+
         context += 1
         count += 1
     losses["attention_relation_loss"] = losses["attention_relation_loss"] / count
@@ -124,23 +124,23 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
     optimizer.step()
-    
+
     num += 1
-    
+
     if num % 50 == 0:
         print("epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(epoch, num, len(dataloader_train),
                                                                    loss.item()))
-    
+
     tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
     if num % 1000 == 0 and num >= 1000:
         time_per_batch = (time.time() - start_time) / 1000
         print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, num, len(dataloader_train),
                                                                             time_per_batch,
                                                                             len(dataloader_train) * time_per_batch / 60))
-        
+
         mn = pd.concat(tr[-1000:], axis=1).mean(1)
         print(mn)
-    
+
     return num
 
 
@@ -156,7 +156,7 @@ def save_model(model, epoch):
 def process_test_video(entry, model, gt_annotation):
     get_sequence(entry, conf.mode)
     pred = model(entry, conf.baseline_context, conf.baseline_future)
-    
+
     start = 0
     count = 0
     context = conf.baseline_context
@@ -170,18 +170,18 @@ def process_test_video(entry, model, gt_annotation):
         future = total_frames - (start + context)
     while start + context + 1 <= total_frames:
         future_frame_start_id = entry["im_idx"].unique()[context]
-        
+
         if start + context + future > total_frames > start + context:
             future = total_frames - (start + context)
-        
+
         future_frame_end_id = entry["im_idx"].unique()[context + future - 1]
-        
+
         context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
         future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1]) + 1
         future_idx = entry["im_idx"][context_end_idx:future_end_idx]
-        
+
         gt_future = gt_annotation[start + context:start + context + future]
-        
+
         evaluator.evaluate_scene_graph_forecasting(gt_future, pred, context_end_idx, future_end_idx, future_idx, count)
         count += 1
         context += 1
@@ -198,20 +198,23 @@ def train_baseline():
     if conf.ckpt:
         ckpt = torch.load(conf.ckpt, map_location=gpu_device)
         model.load_state_dict(ckpt['state_dict'], strict=False)
-    
-    # Load latest model from checkpoint directory and train further
     num_epochs = conf.nepoch
-    if len(os.listdir(checkpoint_save_file_path)) > 0:
-        available_models = os.listdir(checkpoint_save_file_path)
-        latest_model_name = sorted(available_models, key=lambda x: int(x.split('_')[-1][:-4]))[-1]
-        latest_model_path = os.path.join(checkpoint_save_file_path, latest_model_name)
-        ckpt = torch.load(latest_model_path, map_location=gpu_device)
-        model.load_state_dict(ckpt['state_dict'], strict=False)
-        num_epochs = 10 - int(latest_model_name.split('_')[-1][:-4])
-        print(f"Loaded model from {latest_model_path} and training for {num_epochs} epochs")
-    else:
-        print("No models found in checkpoint directory, training from scratch")
-    
+    last_epoch = -1
+    if conf.ckpt is None:
+        # Load latest model from checkpoint directory and train further
+        if len(os.listdir(checkpoint_save_file_path)) > 0:
+            available_models = [stored_checkpoint for stored_checkpoint in os.listdir(checkpoint_save_file_path) if
+                                checkpoint_name in stored_checkpoint]
+            latest_model_name = sorted(available_models, key=lambda x: int(x.split('_')[-1][:-4]))[-1]
+            latest_model_path = os.path.join(checkpoint_save_file_path, latest_model_name)
+            ckpt = torch.load(latest_model_path, map_location=gpu_device)
+            model.load_state_dict(ckpt['state_dict'], strict=False)
+            last_epoch = int(latest_model_name.split('_')[-1][:-4])
+            num_epochs = 10 - last_epoch - 1
+            print(f"Loaded model from {latest_model_path} and training for {num_epochs} more epochs")
+        else:
+            print("No models found in checkpoint directory, training from scratch")
+
     object_detector = None
     if conf.use_raw_data:
         object_detector = detector(
@@ -222,11 +225,12 @@ def train_baseline():
         ).to(device=gpu_device)
         object_detector.eval()
         print("Finished loading object detector", flush=True)
-    
+
     optimizer, scheduler = prepare_optimizer(conf, model)
-    
+
     tr = []
-    for epoch in range(num_epochs):
+    for epoch in range(last_epoch + 1, num_epochs):
+        print("Begin epoch {:d}".format(epoch))
         model.train()
         num = 0
         # Train using only features
@@ -240,7 +244,8 @@ def train_baseline():
                 model.eval()
                 with torch.no_grad():
                     for entry in tqdm(dataloader_test, position=0, leave=True):
-                        process_test_video(entry, model)
+                        gt_annotation = entry[const.GT_ANNOTATION]
+                        process_test_video(entry, model, gt_annotation)
             print('----------------------------------------------------------', flush=True)
             print('epoch: {}'.format(epoch))
             print('----------------------------------------------------------', flush=True)
@@ -248,12 +253,11 @@ def train_baseline():
             print('----------------------------------------------------------', flush=True)
             print('Training using raw data', flush=True)
             # Train using raw data and object detector instead of features
-            
+            train_iter = iter(dataloader_train)
+            test_iter = iter(dataloader_test)
             object_detector.is_train = True
             model.train()
             object_detector.train_x = True
-            train_iter = iter(dataloader_train)
-            test_iter = iter(dataloader_test)
             num = 0
             for b in range(len(dataloader_train)):
                 data = next(train_iter)
@@ -265,7 +269,9 @@ def train_baseline():
                 with torch.no_grad():
                     entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
                 num = process_train_video(entry, optimizer, model, epoch, num, tr)
+            print(f"Finished training an epoch {epoch}")
             save_model(model, epoch)
+            print(f"Saving model after epoch {epoch}")
             if epoch % 3 == 0:
                 model.eval()
                 object_detector.is_train = False
@@ -279,6 +285,8 @@ def train_baseline():
                         gt_annotation = ag_test_data.gt_annotations[data[4]]
                         entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
                         process_test_video(entry, model, gt_annotation)
+                        if b % 50 == 0:
+                            print(f"Finished processing {b} of {len(dataloader_test)} batches")
         score = np.mean(evaluator.result_dict[conf.mode + "_recall"][20])
         evaluator.print_stats()
         evaluator.reset_result()

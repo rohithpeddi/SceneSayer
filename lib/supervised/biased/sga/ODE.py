@@ -216,11 +216,11 @@ class ODE(nn.Module):
 		indices = torch.reshape((im_idx[ : -1] != im_idx[1 : ]).nonzero(), (-1, )) + 1
 		curr_id = 0
 		t_unique = torch.unique(t).float()
-		n = len(entry["gt_annotation"])
-		w = self.max_window
-		if self.max_window == -1:
-			w = n - 1
-		w = min(w, n - 1)
+	        n = int(torch.max(im_idx) + 1)
+	        w = self.max_window
+	        if self.max_window == -1:
+	            w = n - 1
+	        w = min(w, n - 1)
 		t_extend = torch.Tensor([t_unique[-1] + i + 1 for i in range(w)])
 		global_output = entry["global_output"]
 		anticipated_vals = torch.zeros(w, 0, self.d_model, device=global_output.device)
@@ -284,15 +284,17 @@ class ODE(nn.Module):
 		                boxes_test[inverse_indices[: , 1]] = entry["boxes"][pair_idx[mask_gt][: , 1]]
 		                entry["boxes_test_%d" %i] = boxes_test"""
 		                #entry["boxes_test_%d" %i] = entry["boxes"][_.long()]
+		                entry["last_%d" %i] = rng[-(i + 1)]
+		                mx = torch.max(pair_idx[ : rng[-(i + 1)]]) + 1
 		                entry["im_idx_test_%d" %i] = entry["im_idx"][ : rng[-(i + 1)]]
 		                entry["pair_idx_test_%d" %i] = entry["pair_idx"][ : rng[-(i + 1)]]
 		                if self.mode == "predcls":
-		                    entry["scores_test_%d" %i] = entry["scores"][ : rng[-(i + 1)]]
-		                    entry["labels_test_%d" %i] = entry["labels"][ : rng[-(i + 1)]]
+		                    entry["scores_test_%d" %i] = entry["scores"][ : mx]
+		                    entry["labels_test_%d" %i] = entry["labels"][ : mx]
 		                else:
-		                    entry["pred_scores_test_%d" %i] = entry["pred_scores"][ : rng[-(i + 1)]]
-		                    entry["pred_labels_test_%d" %i] = entry["pred_labels"][ : rng[-(i + 1)]]
-		                entry["boxes_test_%d" %i] = torch.zeros(rng[-(i + 1)], 5).to(device=im_idx.device)
+		                    entry["pred_scores_test_%d" %i] = entry["pred_scores"][ : mx]
+		                    entry["pred_labels_test_%d" %i] = entry["pred_labels"][ : mx]
+		                entry["boxes_test_%d" %i] = torch.ones(mx, 5).to(device=im_idx.device) / 2
 		                entry["gt_annotation_%d" %i] = gt
 		#self.ctr += 1
 		#anticipated_latent_loss = 0

@@ -1,8 +1,6 @@
 import numpy as np
 import torch
 import torch.nn as nn
-
-np.set_printoptions(precision=3)
 import time
 import os
 import pandas as pd

@@ -443,8 +443,7 @@ class Baseline(nn.Module):
 				out_last = [out[:, -1, :]]
 				pred = torch.stack(out_last, dim=1)
 				mask_input = torch.cat([mask_input, pred], 1)
-				in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(
-					torch.bool)
+				in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(torch.bool)
 				in_mask = in_mask.cuda()
 			
 			output = torch.cat(output, dim=1)

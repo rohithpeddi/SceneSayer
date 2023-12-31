@@ -146,7 +146,7 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
 
 def save_model(model, epoch):
     torch.save({"state_dict": model.state_dict()},
-               os.path.join(checkpoint_save_file_path, f"{checkpoint_name}_{epoch}.tar"))
+               os.path.join(checkpoint_save_file_path, f"{checkpoint_name}_epoch_{epoch}.tar"))
     print("*" * 40)
     print("save the checkpoint after {} epochs".format(epoch))
     with open(evaluator.save_file, "a") as f:
@@ -205,13 +205,16 @@ def train_baseline():
         if len(os.listdir(checkpoint_save_file_path)) > 0:
             available_models = [stored_checkpoint for stored_checkpoint in os.listdir(checkpoint_save_file_path) if
                                 checkpoint_name in stored_checkpoint]
-            latest_model_name = sorted(available_models, key=lambda x: int(x.split('_')[-1][:-4]))[-1]
-            latest_model_path = os.path.join(checkpoint_save_file_path, latest_model_name)
-            ckpt = torch.load(latest_model_path, map_location=gpu_device)
-            model.load_state_dict(ckpt['state_dict'], strict=False)
-            last_epoch = int(latest_model_name.split('_')[-1][:-4])
-            num_epochs = 10 - last_epoch - 1
-            print(f"Loaded model from {latest_model_path} and training for {num_epochs} more epochs")
+            if len(available_models) > 0:
+                latest_model_name = sorted(available_models, key=lambda x: int(x.split('_')[-1][:-4]))[-1]
+                latest_model_path = os.path.join(checkpoint_save_file_path, latest_model_name)
+                ckpt = torch.load(latest_model_path, map_location=gpu_device)
+                model.load_state_dict(ckpt['state_dict'], strict=False)
+                last_epoch = int(latest_model_name.split('_')[-1][:-4])
+                num_epochs = 10 - last_epoch - 1
+                print(f"Loaded model from {latest_model_path} and training for {num_epochs} more epochs")
+            else:
+                print("No models found in checkpoint directory, training from scratch")
         else:
             print("No models found in checkpoint directory, training from scratch")
 
@@ -298,11 +301,11 @@ if __name__ == '__main__':
     conf, dataloader_train, dataloader_test, gpu_device, evaluator, ag_train_data, ag_test_data = fetch_train_basic_config()
     bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_loss_functions()
     model_name = "baseline_so"
-    checkpoint_name = f"baseline_so_{conf.mode}"
+    checkpoint_name = f"baseline_so_{conf.mode}_future_{conf.baseline_future}"
     checkpoint_save_file_path = os.path.join(conf.save_path, model_name)
     os.makedirs(checkpoint_save_file_path, exist_ok=True)
     evaluator_save_file_path = os.path.join(os.path.abspath('.'), conf.results_path, model_name,
-                                            f"train_{model_name}_{conf.mode}.txt")
+                                            f"train_{model_name}_{conf.mode}_{conf.baseline_future}.txt")
     os.makedirs(os.path.dirname(evaluator_save_file_path), exist_ok=True)
     evaluator.save_file = evaluator_save_file_path
     train_baseline()

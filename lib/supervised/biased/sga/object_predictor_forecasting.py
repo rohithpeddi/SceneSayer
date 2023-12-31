@@ -257,7 +257,6 @@ class STTran(nn.Module):
 			
 			# pdb.set_trace()
 			return dec_out, entry, vr, vr_out
-		
 		else:
 			count = dec_out.keys()
 			length = 0

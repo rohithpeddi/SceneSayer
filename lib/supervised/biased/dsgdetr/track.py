@@ -1,14 +1,8 @@
-from lib.supervised.biased.dsgdetr.matcher import *
-from fasterRCNN.lib.model.roi_layers import nms
+import numpy as np
 import torch.nn.functional as F
 
-import pickle
-import torch
-import os
-import numpy as np
-from fasterRCNN.lib.model.roi_layers import ROIAlign, nms
-
-import numpy as np
+from fasterRCNN.lib.model.roi_layers import nms
+from lib.supervised.biased.dsgdetr.matcher import *
 
 
 def all_nms(dets, thresh):

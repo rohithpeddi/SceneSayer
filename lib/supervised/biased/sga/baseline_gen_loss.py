@@ -316,13 +316,20 @@ class Baseline(nn.Module):
 		spatial_encoder = EncoderLayer(d_model=d_model, dim_feedforward=2048, nhead=8, batch_first=True)
 		self.spatial_transformer = Encoder(spatial_encoder, num_layers=1)
 		
-		# temporal encoder
-		temporal_encoder = EncoderLayer(d_model=d_model, dim_feedforward=2048, nhead=8, batch_first=True)
-		self.temporal_transformer = Encoder(temporal_encoder, num_layers=3)
+		# generation temporal encode
+		gen_temporal_encoder = EncoderLayer(d_model=d_model, dim_feedforward=2048, nhead=8, batch_first=True)
+		self.gen_temporal_transformer = Encoder(gen_temporal_encoder, num_layers=3)
+		# anticipation temporal encoder
+		anti_temporal_encoder = EncoderLayer(d_model=d_model, dim_feedforward=2048, nhead=8, batch_first=True)
+		self.anti_temporal_transformer = Encoder(anti_temporal_encoder, num_layers=1)
 		
 		self.a_rel_compress = nn.Linear(d_model, self.attention_class_num)
 		self.s_rel_compress = nn.Linear(d_model, self.spatial_class_num)
 		self.c_rel_compress = nn.Linear(d_model, self.contact_class_num)
+		
+		self.gen_a_rel_compress = nn.Linear(d_model, self.attention_class_num)
+		self.gen_s_rel_compress = nn.Linear(d_model, self.spatial_class_num)
+		self.gen_c_rel_compress = nn.Linear(d_model, self.contact_class_num)
 	
 	def forward(self, entry, context, future):
 		"""
@@ -433,22 +440,35 @@ class Baseline(nn.Module):
 			pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
 			sequence_features = self.positional_encoder(sequence_features, pos_index)
 			seq_len = sequence_features.shape[1]
-			mask_input = sequence_features
+			
+			gen_rel_ = self.gen_temporal_transformer(sequence_features, mask=in_mask)
+			mask_input = self.positional_encoder(gen_rel_, pos_index)
 			
 			output = []
 			for i in range(future):
-				out = self.temporal_transformer(mask_input, mask=in_mask)
+				out = self.anti_temporal_transformer(mask_input, mask=in_mask)
 				output.append(out[:, -1, :].unsqueeze(1))
 				out_last = [out[:, -1, :]]
 				pred = torch.stack(out_last, dim=1)
 				mask_input = torch.cat([mask_input, pred], 1)
-				in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(torch.bool)
+				in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(
+					torch.bool)
 				in_mask = in_mask.cuda()
 			
 			output = torch.cat(output, dim=1)
 			rel_ = output
 			rel_ = rel_.cuda()
 			rel_flat1 = []
+			
+			gen_rel_flat = []
+			for index, rel in zip(seq, gen_rel_):
+				if len(index) == 0:
+					continue
+				for i in range(len(index)):
+					gen_rel_flat.extend(rel)
+					gen_rel_flat = [tensor.tolist() for tensor in gen_rel_flat]
+					gen_rel_flat = torch.tensor(gen_rel_flat)
+					gen_rel_flat = gen_rel_flat.to(rel_features.device)
 			
 			for index, rel in zip(future_seq, rel_):
 				if len(index) == 0:
@@ -463,24 +483,31 @@ class Baseline(nn.Module):
 			indices_flat = torch.cat(future_seq).unsqueeze(1).repeat(1, rel_features.shape[1])
 			# assert len(indices_flat) == len(entry["pair_idx"])
 			
+			gen_indices_flat = torch.cat(seq).unsqueeze(1).repeat(1, rel_features.shape[1])
+			
 			global_output = torch.zeros_like(rel_features).to(rel_features.device)
+			generation_output = torch.zeros_like(rel_features).to(rel_features.device)
+			
+			generation_output.scatter_(0, gen_indices_flat, gen_rel_flat)
+			
 			try:
 				global_output.scatter_(0, indices_flat, rel_flat)
 			except RuntimeError:
 				error_count += 1
 				print("global_scatter : ", error_count)
 			
+			gen_output = generation_output[:context_len]
 			gb_output = global_output[context_len:context_len + future_len]
 			context += 1
 			
-			temp = {"attention_distribution": self.a_rel_compress(gb_output)}
-			spatial_distribution = self.s_rel_compress(gb_output)
-			contacting_distribution = self.c_rel_compress(gb_output)
-			
-			temp["spatial_distribution"] = torch.sigmoid(spatial_distribution)
-			temp["contacting_distribution"] = torch.sigmoid(contacting_distribution)
-			temp["global_output"] = gb_output
-			temp["original"] = global_output
+			temp = {
+				"gen_attention_distribution": self.gen_a_rel_compress(gen_output),
+				"gen_spatial_distribution": torch.sigmoid(self.gen_s_rel_compress(gen_output)),
+				"gen_contacting_distribution": torch.sigmoid(self.gen_c_rel_compress(gen_output)),
+				"attention_distribution": self.a_rel_compress(gb_output),
+				"spatial_distribution": torch.sigmoid(self.s_rel_compress(gb_output)),
+				"contacting_distribution": torch.sigmoid(self.c_rel_compress(gb_output)),
+			}
 			
 			result[count] = temp
 			count += 1

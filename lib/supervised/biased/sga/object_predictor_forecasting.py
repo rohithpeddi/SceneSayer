@@ -8,7 +8,8 @@ import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
 
-from lib.supervised.biased.sga.blocks import EncoderLayer, Encoder, PositionalEncoding, ObjectClassifier, PositionalEncodingLearn, TransformerDecoderLayer, TransformerDecoder
+from lib.supervised.biased.sga.blocks import EncoderLayer, Encoder, PositionalEncoding, ObjectClassifier, \
+	PositionalEncodingLearn, TransformerDecoderLayer, TransformerDecoder
 from lib.word_vectors import obj_edge_vectors
 
 
@@ -38,6 +39,7 @@ class obj_decoder(nn.Module):
 		self.linear_box2 = nn.Linear(512, 4).cuda()
 	
 	def forward(self, entry, context, future):
+		# 1. Construct Tracklet for each context
 		
 		entry = self.object_classifier(entry)
 		""" ################# changes regarding forecasting #################### """
@@ -50,6 +52,15 @@ class obj_decoder(nn.Module):
 				context -= 1
 		
 		while (start + context + 1 <= len(entry["im_idx"].unique())):
+			# 1. Iteration - Tracklet for each context
+			# a. Object distribution
+			# b. New Tracklet for new object - Noisy bbox - Predicted bbox + Latent + Predicted Category
+			# c. Old Tracklet - Updated latent + Predicted BBOX
+			# 2. For next iteration -
+			# a. Object distribution
+			# b. Update weighted sum for latent
+			# c. Update all tracklets with new objects
+			
 			res = {}
 			future_frame_start_id = entry["im_idx"].unique()[context]
 			
@@ -176,6 +187,8 @@ class STTran(nn.Module):
 			minus = torch.where(entry["boxes"][:, 0] == context)[0][0]
 			subj_rep = features[entry['pair_idx'][pair_start:, 0] - minus]
 			subj_rep = self.subj_fc(subj_rep)
+			obj_rep = features[entry['pair_idx'][pair_start:, 1] - minus]
+			obj_rep = self.obj_fc(obj_rep)
 			obj = entry["features"][entry['pair_idx'][pair_start:, 0] - minus]
 			subj = entry["features"][entry['pair_idx'][pair_start:, 0] - minus]
 			with torch.no_grad():
@@ -185,8 +198,6 @@ class STTran(nn.Module):
 			vr_temp = torch.cat((subj, obj), dim=1)
 			vr_out = self.vr_lin2(self.relu(self.vr_lin1(vr_temp)))
 			
-			obj_rep = features[entry['pair_idx'][pair_start:, 1] - minus]
-			obj_rep = self.obj_fc(obj_rep)
 			vr = self.union_func1(entry['union_feat'][pair_start:]) + self.conv(entry['spatial_masks'][pair_start:])
 			vr = self.vr_fc(vr.view(-1, 256 * 7 * 7))
 			x_visual = torch.cat((subj_rep, obj_rep, vr), 1)

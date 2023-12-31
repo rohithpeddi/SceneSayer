@@ -1,10 +1,11 @@
+from functools import reduce
+
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-from functools import reduce
-from lib.pytorch_misc import intersect_2d, argsort_desc
 from lib.fpn.box_intersections_cpu.bbox import bbox_overlaps
-import pdb
+
+from lib.pytorch_misc import intersect_2d, argsort_desc
 
 
 class BasicSceneGraphEvaluator:

@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from constants import Constants as const
 from lib.object_detector import detector
-from lib.supervised.biased.sga.baseline import Baseline
+from lib.supervised.biased.sga.baseline_gen_loss import BaselineWithGenLoss
 from train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions
 
 
@@ -244,8 +244,8 @@ def process_test_video(entry, model, gt_annotation):
 		context += 1
 
 
-def train_baseline():
-	model = Baseline(mode=conf.mode,
+def train_baseline_with_gen_loss():
+	model = BaselineWithGenLoss(mode=conf.mode,
 	                 attention_class_num=len(ag_train_data.attention_relationships),
 	                 spatial_class_num=len(ag_train_data.spatial_relationships),
 	                 contact_class_num=len(ag_train_data.contacting_relationships),
@@ -362,7 +362,7 @@ if __name__ == '__main__':
 	                                        f"train_{model_name}_{conf.mode}_{conf.baseline_future}.txt")
 	os.makedirs(os.path.dirname(evaluator_save_file_path), exist_ok=True)
 	evaluator.save_file = evaluator_save_file_path
-	train_baseline()
+	train_baseline_with_gen_loss()
 
 # python train_try.py -mode sgcls -ckpt /home/cse/msr/csy227518/scratch/DSG/DSG-DETR/sgcls/model_9.tar -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/
 

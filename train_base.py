@@ -78,7 +78,7 @@ def fetch_train_basic_config():
 			ag_train_data,
 			shuffle=True,
 			collate_fn=ag_features_cuda_collate_fn,
-			pin_memory=True,
+			pin_memory=False,
 			num_workers=0
 		)
 		

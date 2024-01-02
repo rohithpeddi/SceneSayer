@@ -1,12 +1,8 @@
-import pdb
-
 import torch
 import torch.nn as nn
-from torch.nn.utils.rnn import pad_sequence
 
-from lib.supervised.biased.sga.blocks import EncoderLayer, Encoder, PositionalEncoding, ObjectClassifier, \
+from lib.supervised.biased.sga.blocks import ObjectClassifier, \
 	PositionalEncodingLearn, TransformerDecoderLayer, TransformerDecoder
-from lib.word_vectors import obj_edge_vectors
 
 
 class obj_decoder(nn.Module):

@@ -218,7 +218,9 @@ class ODE(nn.Module):
 		t_unique = torch.unique(t).float()
 		n = int(torch.max(im_idx) + 1)
 		w = self.max_window
-		if self.max_window == -1:
+		if testing:
+			w = 5
+		if w == -1:
 			w = n - 1
 		w = min(w, n - 1)
 		t_extend = torch.Tensor([t_unique[-1] + i + 1 for i in range(w)])

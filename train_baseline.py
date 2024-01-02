@@ -297,7 +297,6 @@ def train_baseline():
 
 
 if __name__ == '__main__':
-    torch.multiprocessing.set_start_method('spawn', force=True)
     conf, dataloader_train, dataloader_test, gpu_device, evaluator, ag_train_data, ag_test_data = fetch_train_basic_config()
     bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_loss_functions()
     model_name = "baseline_so"

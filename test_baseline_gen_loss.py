@@ -5,7 +5,7 @@ import torch
 
 from lib.object_detector import detector
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.biased.sga.baseline import Baseline
+from lib.supervised.biased.sga.baseline_gen_loss import BaselineWithGenLoss
 from test_base import fetch_transformer_test_basic_config
 
 
@@ -65,7 +65,7 @@ def evaluate_baseline(model, entry, gt_annotation, context, future_frames):
 		context += 1
 
 
-def test_baseline():
+def test_baseline_with_gen_loss():
 	object_detector = detector(
 		train=False,
 		object_classes=ag_test_data.object_classes,
@@ -74,13 +74,13 @@ def test_baseline():
 	).to(device=gpu_device)
 	object_detector.eval()
 	
-	model = Baseline(mode=conf.mode,
-	                 attention_class_num=len(ag_test_data.attention_relationships),
-	                 spatial_class_num=len(ag_test_data.spatial_relationships),
-	                 contact_class_num=len(ag_test_data.contacting_relationships),
-	                 obj_classes=ag_test_data.object_classes,
-	                 enc_layer_num=conf.enc_layer,
-	                 dec_layer_num=conf.dec_layer).to(device=gpu_device)
+	model = BaselineWithGenLoss(mode=conf.mode,
+	                            attention_class_num=len(ag_test_data.attention_relationships),
+	                            spatial_class_num=len(ag_test_data.spatial_relationships),
+	                            contact_class_num=len(ag_test_data.contacting_relationships),
+	                            obj_classes=ag_test_data.object_classes,
+	                            enc_layer_num=conf.enc_layer,
+	                            dec_layer_num=conf.dec_layer).to(device=gpu_device)
 	model.eval()
 	
 	ckpt = torch.load(conf.model_path, map_location=gpu_device)
@@ -103,23 +103,24 @@ def test_baseline():
 				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
 				get_sequence(entry, conf.mode)
 				evaluate_baseline(model, entry, gt_annotation, conf.baseline_context, future_frames)
-				
-	# TODO: Add code to save the results to a CSV file
-	
-	# print('Average inference time', np.mean(all_time))
-	# print(f'------------------------- for future = {future}--------------------------')
-	# print('-------------------------with constraint-------------------------------')
-	# with_constraint_evaluator.print_stats()
-	# print('-------------------------semi constraint-------------------------------')
-	# semi_constraint_evaluator.print_stats()
-	# print('-------------------------no constraint-------------------------------')
-	# no_constraint_evaluator.print_stats()
+
+
+# TODO: Add code to save the results to a CSV file
+
+# print('Average inference time', np.mean(all_time))
+# print(f'------------------------- for future = {future}--------------------------')
+# print('-------------------------with constraint-------------------------------')
+# with_constraint_evaluator.print_stats()
+# print('-------------------------semi constraint-------------------------------')
+# semi_constraint_evaluator.print_stats()
+# print('-------------------------no constraint-------------------------------')
+# no_constraint_evaluator.print_stats()
 
 
 if __name__ == '__main__':
 	ag_test_data, dataloader_test, gen_evaluators, future_evaluators, future_evaluators_modified_gt, percentage_evaluators, percentage_evaluators_modified_gt, gpu_device, conf = fetch_transformer_test_basic_config()
 	model_name = os.path.basename(conf.model_path).split('.')[0]
 	evaluator_save_file_dir = os.path.join(os.path.abspath('.'), conf.results_path, model_name)
-	test_baseline()
+	test_baseline_with_gen_loss()
 
 """ python test_forecasting.py -mode sgdet -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ -model_path forecasting/sgdet_full_context_f3/DSG_masked_9.tar """

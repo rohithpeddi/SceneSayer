@@ -90,8 +90,10 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
 		spatial_distribution = pred["output"][count]["spatial_distribution"]
 		contact_distribution = pred["output"][count]["contacting_distribution"]
 		
-		attention_label = torch.tensor(pred["attention_gt"][context_end_idx:future_end_idx], dtype=torch.long).to(device=attention_distribution.device).squeeze()
-		gen_attention_label = torch.tensor(pred["attention_gt"][:context_len], dtype=torch.long).to(device=attention_distribution.device).squeeze()
+		attention_label = torch.tensor(pred["attention_gt"][context_end_idx:future_end_idx], dtype=torch.long).to(
+			device=attention_distribution.device).squeeze()
+		gen_attention_label = torch.tensor(pred["attention_gt"][:context_len], dtype=torch.long).to(
+			device=attention_distribution.device).squeeze()
 		if not conf.bce_loss:
 			spatial_label = -torch.ones([len(pred["spatial_gt"][context_end_idx:future_end_idx]), 6],
 			                            dtype=torch.long).to(device=attention_distribution.device)
@@ -138,7 +140,8 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
 	gen_spatial_out = torch.cat(gen_spatial_out, dim=0)
 	gen_contacting_out = torch.cat(gen_contacting_out, dim=0)
 	
-	gen_attention_label = torch.tensor(pred["attention_gt"][:-future_len], dtype=torch.long).to(device=attention_distribution.device).squeeze()
+	gen_attention_label = torch.tensor(pred["attention_gt"][:-future_len], dtype=torch.long).to(
+		device=attention_distribution.device).squeeze()
 	if not conf.bce_loss:
 		# multi-label margin loss or adaptive loss
 		gen_spatial_label = -torch.ones([len(pred["spatial_gt"][:-future_len]), 6], dtype=torch.long).to(
@@ -246,12 +249,12 @@ def process_test_video(entry, model, gt_annotation):
 
 def train_baseline_with_gen_loss():
 	model = BaselineWithGenLoss(mode=conf.mode,
-	                 attention_class_num=len(ag_train_data.attention_relationships),
-	                 spatial_class_num=len(ag_train_data.spatial_relationships),
-	                 contact_class_num=len(ag_train_data.contacting_relationships),
-	                 obj_classes=ag_train_data.object_classes,
-	                 enc_layer_num=conf.enc_layer,
-	                 dec_layer_num=conf.dec_layer).to(device=gpu_device)
+	                            attention_class_num=len(ag_train_data.attention_relationships),
+	                            spatial_class_num=len(ag_train_data.spatial_relationships),
+	                            contact_class_num=len(ag_train_data.contacting_relationships),
+	                            obj_classes=ag_train_data.object_classes,
+	                            enc_layer_num=conf.enc_layer,
+	                            dec_layer_num=conf.dec_layer).to(device=gpu_device)
 	if conf.ckpt:
 		ckpt = torch.load(conf.ckpt, map_location=gpu_device)
 		model.load_state_dict(ckpt['state_dict'], strict=False)
@@ -351,7 +354,6 @@ def train_baseline_with_gen_loss():
 
 
 if __name__ == '__main__':
-	torch.multiprocessing.set_start_method('spawn', force=True)
 	conf, dataloader_train, dataloader_test, gpu_device, evaluator, ag_train_data, ag_test_data = fetch_train_basic_config()
 	bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_loss_functions()
 	model_name = "baseline_so_gen_loss"

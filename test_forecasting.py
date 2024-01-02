@@ -4,7 +4,6 @@ from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 from lib.supervised.biased.dsgdetr.track import get_sequence
 from test_base import fetch_test_basic_config
 
-np.set_printoptions(precision=4)
 import copy
 import torch
 from time import time

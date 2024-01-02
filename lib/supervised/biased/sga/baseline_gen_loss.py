@@ -262,7 +262,7 @@ class ObjectClassifier(nn.Module):
 			return entry
 
 
-class Baseline(nn.Module):
+class BaselineWithGenLoss(nn.Module):
 	
 	def __init__(
 			self,
@@ -275,7 +275,7 @@ class Baseline(nn.Module):
 			enc_layer_num=None,
 			dec_layer_num=None
 	):
-		super(Baseline, self).__init__()
+		super(BaselineWithGenLoss, self).__init__()
 		
 		self.obj_classes = obj_classes
 		self.rel_classes = rel_classes
@@ -466,9 +466,10 @@ class Baseline(nn.Module):
 					continue
 				for i in range(len(index)):
 					gen_rel_flat.extend(rel)
-					gen_rel_flat = [tensor.tolist() for tensor in gen_rel_flat]
-					gen_rel_flat = torch.tensor(gen_rel_flat)
-					gen_rel_flat = gen_rel_flat.to(rel_features.device)
+
+			gen_rel_flat = [tensor.tolist() for tensor in gen_rel_flat]
+			gen_rel_flat = torch.tensor(gen_rel_flat)
+			gen_rel_flat = gen_rel_flat.to(rel_features.device)
 			
 			for index, rel in zip(future_seq, rel_):
 				if len(index) == 0:

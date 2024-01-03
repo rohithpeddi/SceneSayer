@@ -48,6 +48,33 @@ class BasicSceneGraphEvaluator:
 			k: [[] for _ in range(self.num_rel)] for k in (10, 20, 50, 100)
 		}
 	
+	def fetch_stats_json(self):
+		recall_dict = {}
+		mean_recall_dict = {}
+		harmonic_mean_recall_dict = {}
+		
+		for k, v in self.result_dict[self.mode + '_recall'].items():
+			recall_value = np.mean(v)
+			recall_dict[k] = recall_value
+		
+		for k, v in self.result_dict[self.mode + '_mean_recall_collect'].items():
+			sum_recall = np.sum([np.mean(vi) if vi else 0.0 for vi in v])
+			mean_recall_value = sum_recall / float(self.num_rel)
+			mean_recall_dict[k] = mean_recall_value
+		
+		for k, recall_value in recall_dict.items():
+			mean_recall_value = mean_recall_dict[k]
+			harmonic_mean = 2 * mean_recall_value * recall_value / (mean_recall_value + recall_value)
+			harmonic_mean_recall_dict[k] = harmonic_mean
+		
+		results = {
+			"recall": recall_dict,
+			"mean_recall": mean_recall_dict,
+			"harmonic_mean_recall": harmonic_mean_recall_dict
+		}
+		
+		return results
+	
 	def print_stats(self):
 		def print_and_write(message):
 			print(message)

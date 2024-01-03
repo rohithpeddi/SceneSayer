@@ -1,3 +1,6 @@
+import os
+import csv
+
 import numpy as np
 import torch
 from time import time
@@ -7,7 +10,7 @@ from constants import Constants as const
 from tqdm import tqdm
 from lib.supervised.biased.dsgdetr.track import get_sequence
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from test_base import fetch_diffeq_test_basic_config
+from test_base import fetch_diffeq_test_basic_config, write_future_evaluators_stats
 
 
 def evaluate_anticipated_future_frame_scene_graph(gt, pred, future_frame_count, is_modified_gt):
@@ -106,28 +109,44 @@ def test_ode():
 			gen_evaluators[1].evaluate_scene_graph(gt_annotation, pred)
 			gen_evaluators[2].evaluate_scene_graph(gt_annotation, pred)
 	print('Average inference time', np.mean(all_time))
+	# Write future and gen evaluators stats
+	write_future_evaluators_stats(mode, future_frame_loss_num, method_name, future_evaluators)
 	
-	# TODO: Write percentage evaluators
-	# TODO: Write csv file generation logic
-	# print("anticipation evaluation:")
-	# print('-------------------------with constraint-------------------------------')
-	# with_constraint_evaluator.print_stats()
-	# print('-------------------------no constraint-------------------------------')
-	# no_constraint_evaluator.print_stats()
-	# print("generation evaluation")
-	# print('-------------------------with constraint-------------------------------')
-	# with_constraint_evaluator_gen.print_stats()
-	# print('-------------------------no constraint-------------------------------')
-	# no_constraint_evaluator_gen.print_stats()
+	# Context Fraction Evaluation
+	with torch.no_grad():
+		for context_fraction in [0.3, 0.5, 0.7, 0.9]:
+			for entry in tqdm(dataloader_test, position=0, leave=True):
+				gt_annotation = entry[const.GT_ANNOTATION]
+				frame_size = entry[const.FRAME_SIZE]
+				get_sequence(entry, gt_annotation, matcher, frame_size, conf.mode)
+				pred = ode(context_fraction=context_fraction, entry=entry)
+				percentage_evaluators[context_fraction][0].evaluate_scene_graph(gt_annotation, pred)
+				percentage_evaluators[context_fraction][1].evaluate_scene_graph(gt_annotation, pred)
+				percentage_evaluators[context_fraction][2].evaluate_scene_graph(gt_annotation, pred)
+				
+				# end = pred["output"][0]["end"]
+				# future_end = pred["output"][0]["future_end"]
+				# future_frame_idx = pred["output"][0]["future_frame_idx"]
+				# percentage_evaluators[context_fraction][0].evaluate_scene_graph_forecasting(gt_annotation, pred, end,
+				#                                                                             future_end,
+				#                                                                             future_frame_idx, count=0)
+				# percentage_evaluators[context_fraction][1].evaluate_scene_graph_forecasting(gt_annotation, pred, end,
+				#                                                                             future_end,
+				#                                                                             future_frame_idx, count=0)
+				# percentage_evaluators[context_fraction][2].evaluate_scene_graph_forecasting(gt_annotation, pred, end,
+				#                                                                             future_end,
+				#                                                                             future_frame_idx, count=0)
 
 
-# if __name__ == '__main__':
-#     ag_features_test, dataloader_test, with_constraint_evaluator, no_constraint_evaluator, semi_constraint_evaluator, gpu_device, conf = fetch_test_basic_config()
-#     x, y, with_constraint_evaluator_gen, no_constraint_evaluator_gen, semi_constraint_evaluator_gen, z, w = fetch_test_basic_config()
-#     test_ode()
+# Write percentage evaluation stats
+
 
 if __name__ == '__main__':
 	ag_features_test, dataloader_test, gen_evaluators, future_evaluators, future_evaluators_modified_gt, percentage_evaluators, percentage_evaluators_modified_gt, gpu_device, conf = fetch_diffeq_test_basic_config()
+	model_name = os.path.basename(conf.model_path).split('.')[0]
+	future_frame_loss_num = model_name.split('_')[-3]
+	mode = model_name.split('_')[-5]
+	method_name = "Neural ODE"
 	test_ode()
 
 #  python test_cttran.py -mode sgdet -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ -model_sttran_path cttran/no_temporal/sttran_9.tar -model_cttran_path cttran/no_temporal/cttran_9.tar

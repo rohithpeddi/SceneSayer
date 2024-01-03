@@ -1,3 +1,4 @@
+import csv
 import os
 import torch
 from torch.utils.data import DataLoader
@@ -172,3 +173,94 @@ def fetch_transformer_test_basic_config():
 	 percentage_evaluators_modified_gt) = generate_required_test_evaluators(conf, ag_test_data)
 	
 	return ag_test_data, dataloader_test, gen_evaluators, future_evaluators, future_evaluators_modified_gt, percentage_evaluators, percentage_evaluators_modified_gt, gpu_device, conf
+
+
+def collate_evaluation_stats(with_constraint_evaluator_stats, no_constraint_evaluator_stats,
+                             semi_constraint_evaluator_stats):
+	collated_stats = [
+		with_constraint_evaluator_stats["recall"][10],
+		with_constraint_evaluator_stats["recall"][20],
+		with_constraint_evaluator_stats["recall"][50],
+		with_constraint_evaluator_stats["mean_recall"][10],
+		with_constraint_evaluator_stats["mean_recall"][20],
+		with_constraint_evaluator_stats["mean_recall"][50],
+		with_constraint_evaluator_stats["harmonic_mean_recall"][10],
+		with_constraint_evaluator_stats["harmonic_mean_recall"][20],
+		with_constraint_evaluator_stats["harmonic_mean_recall"][50],
+		no_constraint_evaluator_stats["recall"][10],
+		no_constraint_evaluator_stats["recall"][20],
+		no_constraint_evaluator_stats["recall"][50],
+		no_constraint_evaluator_stats["mean_recall"][10],
+		no_constraint_evaluator_stats["mean_recall"][20],
+		no_constraint_evaluator_stats["mean_recall"][50],
+		no_constraint_evaluator_stats["harmonic_mean_recall"][10],
+		no_constraint_evaluator_stats["harmonic_mean_recall"][20],
+		no_constraint_evaluator_stats["harmonic_mean_recall"][50],
+		semi_constraint_evaluator_stats["recall"][10],
+		semi_constraint_evaluator_stats["recall"][20],
+		semi_constraint_evaluator_stats["recall"][50],
+		semi_constraint_evaluator_stats["mean_recall"][10],
+		semi_constraint_evaluator_stats["mean_recall"][20],
+		semi_constraint_evaluator_stats["mean_recall"][50],
+		semi_constraint_evaluator_stats["harmonic_mean_recall"][10],
+		semi_constraint_evaluator_stats["harmonic_mean_recall"][20],
+		semi_constraint_evaluator_stats["harmonic_mean_recall"][50]
+	]
+	
+	return collated_stats
+
+
+def write_future_evaluators_stats(mode, future_frame_loss_num, method_name, future_evaluators):
+	results_dir = os.path.join(os.getcwd(), 'results')
+	mode_results_dir = os.path.join(results_dir, mode)
+	os.makedirs(mode_results_dir, exist_ok=True)
+	
+	num_future_frame_evaluations = [1, 2, 3, 4, 5]
+	for future_frame_evaluation in num_future_frame_evaluations:
+		results_file_path = os.path.join(mode_results_dir,
+		                                 f'{mode}_train_{future_frame_loss_num}_evaluation_{future_frame_evaluation}.csv')
+		with_constraint_evaluator_stats = future_evaluators[future_frame_evaluation][0].fetch_stats_json()
+		no_constraint_evaluator_stats = future_evaluators[future_frame_evaluation][1].fetch_stats_json()
+		semi_constraint_evaluator_stats = future_evaluators[future_frame_evaluation][2].fetch_stats_json()
+		collated_stats = [method_name]
+		collated_stats.extend(collate_evaluation_stats(with_constraint_evaluator_stats, no_constraint_evaluator_stats,
+		                                               semi_constraint_evaluator_stats))
+		
+		does_file_exist = os.path.isfile(results_file_path)
+		
+		with open(results_file_path, "w", newline='') as activity_idx_step_idx_annotation_csv_file:
+			writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
+			if not does_file_exist:
+				writer.writerow([
+					"Method Name", "R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
+					"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
+					"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50"])
+			writer.writerow(collated_stats)
+
+
+def write_gen_evaluators_stats(mode, future_frame_loss_num, method_name, future_evaluators):
+	results_dir = os.path.join(os.getcwd(), 'results')
+	mode_results_dir = os.path.join(results_dir, mode)
+	os.makedirs(mode_results_dir, exist_ok=True)
+	
+	num_future_frame_evaluations = [1, 2, 3, 4, 5]
+	for future_frame_evaluation in num_future_frame_evaluations:
+		results_file_path = os.path.join(mode_results_dir,
+		                                 f'{mode}_train_{future_frame_loss_num}_evaluation_{future_frame_evaluation}.csv')
+		with_constraint_evaluator_stats = future_evaluators[future_frame_evaluation][0].fetch_stats_json()
+		no_constraint_evaluator_stats = future_evaluators[future_frame_evaluation][1].fetch_stats_json()
+		semi_constraint_evaluator_stats = future_evaluators[future_frame_evaluation][2].fetch_stats_json()
+		collated_stats = [method_name]
+		collated_stats.extend(collate_evaluation_stats(with_constraint_evaluator_stats, no_constraint_evaluator_stats,
+		                                               semi_constraint_evaluator_stats))
+		
+		does_file_exist = os.path.isfile(results_file_path)
+		
+		with open(results_file_path, "w", newline='') as activity_idx_step_idx_annotation_csv_file:
+			writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
+			if not does_file_exist:
+				writer.writerow([
+					"Method Name", "R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
+					"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
+					"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50"])
+			writer.writerow(collated_stats)

@@ -175,6 +175,24 @@ def fetch_transformer_test_basic_config():
 	return ag_test_data, dataloader_test, gen_evaluators, future_evaluators, future_evaluators_modified_gt, percentage_evaluators, percentage_evaluators_modified_gt, gpu_device, conf
 
 
+def evaluate_anticipated_future_frame_scene_graph(gt, pred, future_frame_count, is_modified_gt, future_evaluators, future_evaluators_modified_gt):
+	future_frame_count_list = [1, 2, 3, 4, 5]
+	if is_modified_gt:
+		for reference_frame_count in future_frame_count_list:
+			if reference_frame_count >= future_frame_count:
+				evaluators = future_evaluators_modified_gt[reference_frame_count]
+				evaluators[0].evaluate_scene_graph(gt, pred)
+				evaluators[1].evaluate_scene_graph(gt, pred)
+				evaluators[2].evaluate_scene_graph(gt, pred)
+	else:
+		for reference_frame_count in future_frame_count_list:
+			if reference_frame_count >= future_frame_count:
+				evaluators = future_evaluators[reference_frame_count]
+				evaluators[0].evaluate_scene_graph(gt, pred)
+				evaluators[1].evaluate_scene_graph(gt, pred)
+				evaluators[2].evaluate_scene_graph(gt, pred)
+
+
 def collate_evaluation_stats(with_constraint_evaluator_stats, no_constraint_evaluator_stats,
                              semi_constraint_evaluator_stats):
 	collated_stats = [
@@ -226,11 +244,11 @@ def write_future_evaluators_stats(mode, future_frame_loss_num, method_name, futu
 		collated_stats.extend(collate_evaluation_stats(with_constraint_evaluator_stats, no_constraint_evaluator_stats,
 		                                               semi_constraint_evaluator_stats))
 		
-		does_file_exist = os.path.isfile(results_file_path)
+		file_exist = os.path.isfile(results_file_path)
 		
 		with open(results_file_path, "w", newline='') as activity_idx_step_idx_annotation_csv_file:
 			writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
-			if not does_file_exist:
+			if not file_exist:
 				writer.writerow([
 					"Method Name", "R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
 					"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
@@ -238,29 +256,51 @@ def write_future_evaluators_stats(mode, future_frame_loss_num, method_name, futu
 			writer.writerow(collated_stats)
 
 
-def write_gen_evaluators_stats(mode, future_frame_loss_num, method_name, future_evaluators):
+def write_gen_evaluators_stats(mode, future_frame_loss_num, method_name, gen_evaluators):
 	results_dir = os.path.join(os.getcwd(), 'results')
 	mode_results_dir = os.path.join(results_dir, mode)
 	os.makedirs(mode_results_dir, exist_ok=True)
 	
-	num_future_frame_evaluations = [1, 2, 3, 4, 5]
-	for future_frame_evaluation in num_future_frame_evaluations:
-		results_file_path = os.path.join(mode_results_dir,
-		                                 f'{mode}_train_{future_frame_loss_num}_evaluation_{future_frame_evaluation}.csv')
-		with_constraint_evaluator_stats = future_evaluators[future_frame_evaluation][0].fetch_stats_json()
-		no_constraint_evaluator_stats = future_evaluators[future_frame_evaluation][1].fetch_stats_json()
-		semi_constraint_evaluator_stats = future_evaluators[future_frame_evaluation][2].fetch_stats_json()
-		collated_stats = [method_name]
-		collated_stats.extend(collate_evaluation_stats(with_constraint_evaluator_stats, no_constraint_evaluator_stats,
-		                                               semi_constraint_evaluator_stats))
-		
-		does_file_exist = os.path.isfile(results_file_path)
-		
-		with open(results_file_path, "w", newline='') as activity_idx_step_idx_annotation_csv_file:
-			writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
-			if not does_file_exist:
-				writer.writerow([
-					"Method Name", "R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
-					"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
-					"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50"])
-			writer.writerow(collated_stats)
+	results_file_path = os.path.join(mode_results_dir, f'{mode}_train_{future_frame_loss_num}_generation_impact.csv')
+	with_constraint_evaluator_stats = gen_evaluators[0].fetch_stats_json()
+	no_constraint_evaluator_stats = gen_evaluators[1].fetch_stats_json()
+	semi_constraint_evaluator_stats = gen_evaluators[2].fetch_stats_json()
+	collated_stats = [method_name]
+	collated_stats.extend(collate_evaluation_stats(with_constraint_evaluator_stats, no_constraint_evaluator_stats,
+	                                               semi_constraint_evaluator_stats))
+	
+	file_exists = os.path.isfile(results_file_path)
+	
+	with open(results_file_path, "w", newline='') as activity_idx_step_idx_annotation_csv_file:
+		writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
+		if not file_exists:
+			writer.writerow([
+				"Method Name", "R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
+				"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
+				"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50"])
+		writer.writerow(collated_stats)
+
+
+def write_percentage_evaluators_stats(mode, future_frame_loss_num, method_name, percentage_evaluators, context_fraction):
+	results_dir = os.path.join(os.getcwd(), 'results')
+	mode_results_dir = os.path.join(results_dir, mode)
+	os.makedirs(mode_results_dir, exist_ok=True)
+	
+	results_file_path = os.path.join(mode_results_dir, f'{mode}_train_{future_frame_loss_num}_percentage_evaluation_{context_fraction}.csv')
+	with_constraint_evaluator_stats = percentage_evaluators[context_fraction][0].fetch_stats_json()
+	no_constraint_evaluator_stats = percentage_evaluators[context_fraction][1].fetch_stats_json()
+	semi_constraint_evaluator_stats = percentage_evaluators[context_fraction][2].fetch_stats_json()
+	collated_stats = [method_name]
+	collated_stats.extend(collate_evaluation_stats(with_constraint_evaluator_stats, no_constraint_evaluator_stats,
+	                                               semi_constraint_evaluator_stats))
+	
+	file_exists = os.path.isfile(results_file_path)
+	
+	with open(results_file_path, "w", newline='') as activity_idx_step_idx_annotation_csv_file:
+		writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
+		if not file_exists:
+			writer.writerow([
+				"Method Name", "R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
+				"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
+				"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50"])
+		writer.writerow(collated_stats)

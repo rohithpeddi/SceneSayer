@@ -10,25 +10,8 @@ from constants import Constants as const
 from tqdm import tqdm
 from lib.supervised.biased.dsgdetr.track import get_sequence
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from test_base import fetch_diffeq_test_basic_config, write_future_evaluators_stats
-
-
-def evaluate_anticipated_future_frame_scene_graph(gt, pred, future_frame_count, is_modified_gt):
-	future_frame_count_list = [1, 2, 3, 4, 5]
-	if is_modified_gt:
-		for reference_frame_count in future_frame_count_list:
-			if reference_frame_count >= future_frame_count:
-				evaluators = future_evaluators_modified_gt[reference_frame_count]
-				evaluators[0].evaluate_scene_graph(gt, pred)
-				evaluators[1].evaluate_scene_graph(gt, pred)
-				evaluators[2].evaluate_scene_graph(gt, pred)
-	else:
-		for reference_frame_count in future_frame_count_list:
-			if reference_frame_count >= future_frame_count:
-				evaluators = future_evaluators[reference_frame_count]
-				evaluators[0].evaluate_scene_graph(gt, pred)
-				evaluators[1].evaluate_scene_graph(gt, pred)
-				evaluators[2].evaluate_scene_graph(gt, pred)
+from test_base import fetch_diffeq_test_basic_config, write_future_evaluators_stats, write_percentage_evaluators_stats, \
+	write_gen_evaluators_stats, evaluate_anticipated_future_frame_scene_graph
 
 
 def test_ode():
@@ -89,12 +72,22 @@ def test_ode():
 					pred_anticipated["pred_scores"] = pred["pred_scores_test_" + str(i)]
 					pred_anticipated["pred_labels"] = pred["pred_labels_test_" + str(i)]
 				pred_anticipated["boxes"] = pred["boxes_test_" + str(i)]
-				evaluate_anticipated_future_frame_scene_graph(entry["gt_annotation_" + str(i)][i:], pred_anticipated,
-				                                              future_frame_count=i,
-				                                              is_modified_gt=True)
-				evaluate_anticipated_future_frame_scene_graph(entry["gt_annotation"][i:], pred_anticipated,
-				                                              future_frame_count=i,
-				                                              is_modified_gt=False)
+				evaluate_anticipated_future_frame_scene_graph(
+					entry["gt_annotation_" + str(i)][i:],
+					pred_anticipated,
+					future_frame_count=i,
+					is_modified_gt=True,
+					future_evaluators=future_evaluators,
+					future_evaluators_modified_gt=future_evaluators_modified_gt
+				)
+				evaluate_anticipated_future_frame_scene_graph(
+					entry["gt_annotation"][i:],
+					pred_anticipated,
+					future_frame_count=i,
+					is_modified_gt=False,
+					future_evaluators=future_evaluators,
+					future_evaluators_modified_gt=future_evaluators_modified_gt
+				)
 				global_output_mod[mask_gt] += pred["anticipated_vals"][i - 1][mask_curr] / torch.reshape(
 					(times[mask_gt] - times[mask_curr] + 1), (-1, 1))
 				denominator[mask_gt] += 1 / (times[mask_gt] - times[mask_curr] + 1)
@@ -111,6 +104,7 @@ def test_ode():
 	print('Average inference time', np.mean(all_time))
 	# Write future and gen evaluators stats
 	write_future_evaluators_stats(mode, future_frame_loss_num, method_name, future_evaluators)
+	write_gen_evaluators_stats(mode, future_frame_loss_num, method_name, gen_evaluators)
 	
 	# Context Fraction Evaluation
 	with torch.no_grad():
@@ -122,25 +116,11 @@ def test_ode():
 				ind, pred = ode.forward_single_entry(context_fraction=context_fraction, entry=entry)
 				if ind >= len(gt_annotation):
 					continue
-				percentage_evaluators[context_fraction][0].evaluate_scene_graph(gt_annotation[ind : ], pred)
-				percentage_evaluators[context_fraction][1].evaluate_scene_graph(gt_annotation[ind : ], pred)
-				percentage_evaluators[context_fraction][2].evaluate_scene_graph(gt_annotation[ind : ], pred)
-				
-				# end = pred["output"][0]["end"]
-				# future_end = pred["output"][0]["future_end"]
-				# future_frame_idx = pred["output"][0]["future_frame_idx"]
-				# percentage_evaluators[context_fraction][0].evaluate_scene_graph_forecasting(gt_annotation, pred, end,
-				#                                                                             future_end,
-				#                                                                             future_frame_idx, count=0)
-				# percentage_evaluators[context_fraction][1].evaluate_scene_graph_forecasting(gt_annotation, pred, end,
-				#                                                                             future_end,
-				#                                                                             future_frame_idx, count=0)
-				# percentage_evaluators[context_fraction][2].evaluate_scene_graph_forecasting(gt_annotation, pred, end,
-				#                                                                             future_end,
-				#                                                                             future_frame_idx, count=0)
-
-
-# Write percentage evaluation stats
+				percentage_evaluators[context_fraction][0].evaluate_scene_graph(gt_annotation[ind:], pred)
+				percentage_evaluators[context_fraction][1].evaluate_scene_graph(gt_annotation[ind:], pred)
+				percentage_evaluators[context_fraction][2].evaluate_scene_graph(gt_annotation[ind:], pred)
+			# Write percentage evaluation stats
+			write_percentage_evaluators_stats(mode, future_frame_loss_num, method_name, percentage_evaluators, context_fraction)
 
 
 if __name__ == '__main__':
@@ -148,7 +128,7 @@ if __name__ == '__main__':
 	model_name = os.path.basename(conf.model_path).split('.')[0]
 	future_frame_loss_num = model_name.split('_')[-3]
 	mode = model_name.split('_')[-5]
-	method_name = "Neural ODE"
+	method_name = "NeuralODE"
 	test_ode()
 
 #  python test_cttran.py -mode sgdet -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ -model_sttran_path cttran/no_temporal/sttran_9.tar -model_cttran_path cttran/no_temporal/cttran_9.tar

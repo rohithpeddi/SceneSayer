@@ -119,10 +119,12 @@ def test_ode():
 				gt_annotation = entry[const.GT_ANNOTATION]
 				frame_size = entry[const.FRAME_SIZE]
 				get_sequence(entry, gt_annotation, matcher, frame_size, conf.mode)
-				pred = ode(context_fraction=context_fraction, entry=entry)
-				percentage_evaluators[context_fraction][0].evaluate_scene_graph(gt_annotation, pred)
-				percentage_evaluators[context_fraction][1].evaluate_scene_graph(gt_annotation, pred)
-				percentage_evaluators[context_fraction][2].evaluate_scene_graph(gt_annotation, pred)
+				ind, pred = ode.forward_single_entry(context_fraction=context_fraction, entry=entry)
+				if ind >= len(gt_annotation):
+					continue
+				percentage_evaluators[context_fraction][0].evaluate_scene_graph(gt_annotation[ind : ], pred)
+				percentage_evaluators[context_fraction][1].evaluate_scene_graph(gt_annotation[ind : ], pred)
+				percentage_evaluators[context_fraction][2].evaluate_scene_graph(gt_annotation[ind : ], pred)
 				
 				# end = pred["output"][0]["end"]
 				# future_end = pred["output"][0]["future_end"]

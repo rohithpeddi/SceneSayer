@@ -354,10 +354,10 @@ class SDE(nn.Module):
         add["end"] = np.ceil(n * context_fraction) - 1
         end = add["end"]
         add["future_end"] = n
-        add["future_frame_idx"] = [i for i in range(end + 1, n)]
         indices = torch.reshape((im_idx[ : -1] != im_idx[1 : ]).nonzero(), (-1, )) + 1
         rng = torch.cat((torch.Tensor([0]).to(device=indices.device), indices, torch.Tensor([tot]).to(device=indices.device))).long()
-        ret = sdeint(self.diff_func, entry["global_output"][rng[end] : rng[end + 1]], times[end : ], method='reversible_heun', adjoint_method='adjoint_reversible_heun', dt=1)[1 : ]
+        add["future_frame_idx"] = [i for i in range(end + 1, n) for j in range(rng[end + 1] - rng[end])]
+	ret = sdeint(self.diff_func, entry["global_output"][rng[end] : rng[end + 1]], times[end : ], method='reversible_heun', adjoint_method='adjoint_reversible_heun', dt=1)[1 : ]
         add["attention_distribution"] = torch.flatten(self.dsgdetr.a_rel_compress(ret), start_dim=0, end_dim=1)
         add["spatial_distribution"] = torch.flatten(torch.sigmoid(self.dsgdetr.s_rel_compress(ret)), start_dim=0, end_dim=1)
         add["contact_distribution"] = torch.flatten(torch.sigmoid(self.dsgdetr.c_rel_compress(ret)), start_dim=0, end_dim=1)

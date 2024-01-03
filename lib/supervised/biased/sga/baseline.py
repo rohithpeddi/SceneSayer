@@ -1,3 +1,6 @@
+import math
+
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -486,3 +489,160 @@ class Baseline(nn.Module):
 			count += 1
 		entry["output"] = result
 		return entry
+	
+	def forward_single_entry(self, context_percentage, entry):
+		# [0.3, 0.5, 0.7, 0.9]
+		# end = 39
+		# future_end = 140
+		# future_frame_idx = [40, 41, .............139]
+		# Take each entry and extrapolate it to the future
+		# evaluation_recall.evaluate_scene_graph_forecasting(self, gt, pred, end, future_end, future_frame_idx, count=0)
+		# entry["output"][0] = {pred_scores, pred_labels, attention_distribution, spatial_distribution, contact_distribution}
+		
+		"""
+		Forward method for the baseline
+		:param entry: Dictionary from object classifier
+		:param context: Frame idx for context
+		:param future: Number of next frames to anticipate
+		:return:
+		"""
+		entry = self.object_classifier(entry)
+		
+		# visual part
+		subj_rep = entry['features'][entry['pair_idx'][:, 0]]
+		subj_rep = self.subj_fc(subj_rep)
+		obj_rep = entry['features'][entry['pair_idx'][:, 1]]
+		obj_rep = self.obj_fc(obj_rep)
+		vr = self.union_func1(entry['union_feat']) + self.conv(entry['spatial_masks'])
+		vr = self.vr_fc(vr.view(-1, 256 * 7 * 7))
+		x_visual = torch.cat((subj_rep, obj_rep, vr), 1)
+		
+		# semantic part
+		subj_class = entry['pred_labels'][entry['pair_idx'][:, 0]]
+		obj_class = entry['pred_labels'][entry['pair_idx'][:, 1]]
+		subj_emb = self.obj_embed(subj_class)
+		obj_emb = self.obj_embed2(obj_class)
+		x_semantic = torch.cat((subj_emb, obj_emb), 1)
+		rel_features = torch.cat((x_visual, x_semantic), dim=1)
+		
+		# Spatial-Temporal Transformer
+		# spatial message passing
+		# im_indices -> centre coordinate of all objects in a video
+		frames = []
+		im_indices = entry["boxes"][entry["pair_idx"][:, 1], 0]
+		for l in im_indices.unique():
+			frames.append(torch.where(im_indices == l)[0])
+		frame_features = pad_sequence([rel_features[index] for index in frames], batch_first=True)
+		masks = (1 - pad_sequence([torch.ones(len(index)) for index in frames], batch_first=True)).bool()
+		rel_ = self.spatial_transformer(frame_features, src_key_padding_mask=masks.cuda())
+		rel_features = torch.cat([rel_[i, :len(index)] for i, index in enumerate(frames)])
+		# temporal message passing
+		sequences = []
+		for l in obj_class.unique():
+			k = torch.where(obj_class.view(-1) == l)[0]
+			if len(k) > 0:
+				sequences.append(k)
+		
+		""" ################# changes regarding forecasting #################### """
+		
+		start = 0
+		error_count = 0
+		count = 0
+		result = {}
+		total_frames = len(entry["im_idx"].unique())
+		context = int(math.ceil(context_percentage * total_frames))
+		future = total_frames - context
+		
+		future_frame_start_id = entry["im_idx"].unique()[context]
+		future_frame_end_id = entry["im_idx"].unique()[context + future - 1]
+		
+		context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
+		context_idx = entry["im_idx"][:context_end_idx]
+		context_len = context_idx.shape[0]
+		
+		future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1]) + 1
+		future_idx = entry["im_idx"][context_end_idx:future_end_idx]
+		future_len = future_idx.shape[0]
+		
+		seq = []
+		for s in sequences:
+			index = s[(s < context_len)]
+			seq.append(index)
+		
+		future_seq = []
+		for s in sequences:
+			index = s[(s >= context_len) & (s < (context_len + future_len))]
+			future_seq.append(index)
+		
+		pos_index = []
+		for index in seq:
+			im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True, sorted=True)
+			counts = counts.tolist()
+			if im_idx.numel() == 0:
+				pos = torch.tensor(
+					[torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
+			else:
+				pos = torch.cat([torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
+			pos_index.append(pos)
+		
+		# pdb.set_trace()
+		sequence_features = pad_sequence([rel_features[index] for index in seq], batch_first=True)
+		in_mask = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
+		                          diagonal=0)).type(torch.bool)
+		in_mask = in_mask.cuda()
+		masks = (1 - pad_sequence([torch.ones(len(index)) for index in seq], batch_first=True)).bool()
+		
+		pos_index = [torch.tensor(seq, dtype=torch.long) for seq in pos_index]
+		pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
+		sequence_features = self.positional_encoder(sequence_features, pos_index)
+		seq_len = sequence_features.shape[1]
+		mask_input = sequence_features
+		
+		output = []
+		for i in range(future):
+			out = self.temporal_transformer(mask_input, mask=in_mask)
+			output.append(out[:, -1, :].unsqueeze(1))
+			out_last = [out[:, -1, :]]
+			pred = torch.stack(out_last, dim=1)
+			mask_input = torch.cat([mask_input, pred], 1)
+			in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(
+				torch.bool)
+			in_mask = in_mask.cuda()
+		
+		output = torch.cat(output, dim=1)
+		rel_ = output
+		rel_ = rel_.cuda()
+		rel_flat1 = []
+		
+		for index, rel in zip(future_seq, rel_):
+			if len(index) == 0:
+				continue
+			for i in range(len(index)):
+				rel_flat1.extend(rel)
+		
+		rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
+		rel_flat = torch.tensor(rel_flat1)
+		rel_flat = rel_flat.to(rel_features.device)
+		# rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(future_seq,rel_)])
+		indices_flat = torch.cat(future_seq).unsqueeze(1).repeat(1, rel_features.shape[1])
+		# assert len(indices_flat) == len(entry["pair_idx"])
+		
+		global_output = torch.zeros_like(rel_features).to(rel_features.device)
+		try:
+			global_output.scatter_(0, indices_flat, rel_flat)
+		except RuntimeError:
+			error_count += 1
+			print("global_scatter : ", error_count)
+		
+		gb_output = global_output[context_len:context_len + future_len]
+		
+		temp = {
+			"attention_distribution": self.a_rel_compress(gb_output),
+			"spatial_distribution": torch.sigmoid(self.s_rel_compress(gb_output)),
+			"contacting_distribution": torch.sigmoid(self.c_rel_compress(gb_output)),
+			"global_output": gb_output,
+			"original": global_output
+		}
+		
+		result[count] = temp
+		entry["output"] = result

@@ -325,3 +325,14 @@ class ODE(nn.Module):
 		entry["anticipated_contacting_distribution"] = torch.sigmoid(self.dsgdetr.c_rel_compress(anticipated_vals))
 		# entry["anticipated_object_boxes"] = obj_bounding_boxes
 		return entry
+	
+	def forward_single_entry(self, context_percentage, entry):
+		# [0.3, 0.5, 0.7, 0.9]
+		# end = 39
+		# future_end = 140
+		# future_frame_idx = [40, 41, .............139]
+		# Take each entry and extrapolate it to the future
+		# evaluation_recall.evaluate_scene_graph_forecasting(self, gt, pred, end, future_end, future_frame_idx, count=0)
+		# entry["output"][0] = {pred_scores, pred_labels, attention_distribution, spatial_distribution, contact_distribution}
+		pass
+		

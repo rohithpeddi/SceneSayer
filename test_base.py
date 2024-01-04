@@ -246,7 +246,7 @@ def write_future_evaluators_stats(mode, future_frame_loss_num, method_name, futu
 		
 		file_exist = os.path.isfile(results_file_path)
 		
-		with open(results_file_path, "w", newline='') as activity_idx_step_idx_annotation_csv_file:
+		with open(results_file_path, "a", newline='') as activity_idx_step_idx_annotation_csv_file:
 			writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
 			if not file_exist:
 				writer.writerow([
@@ -271,7 +271,7 @@ def write_gen_evaluators_stats(mode, future_frame_loss_num, method_name, gen_eva
 	
 	file_exists = os.path.isfile(results_file_path)
 	
-	with open(results_file_path, "w", newline='') as activity_idx_step_idx_annotation_csv_file:
+	with open(results_file_path, "a", newline='') as activity_idx_step_idx_annotation_csv_file:
 		writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
 		if not file_exists:
 			writer.writerow([
@@ -296,7 +296,7 @@ def write_percentage_evaluators_stats(mode, future_frame_loss_num, method_name, 
 	
 	file_exists = os.path.isfile(results_file_path)
 	
-	with open(results_file_path, "w", newline='') as activity_idx_step_idx_annotation_csv_file:
+	with open(results_file_path, "a", newline='') as activity_idx_step_idx_annotation_csv_file:
 		writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
 		if not file_exists:
 			writer.writerow([

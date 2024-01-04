@@ -372,27 +372,25 @@ class Baseline(nn.Module):
 			if len(k) > 0:
 				sequences.append(k)
 		
-		""" ################# changes regarding forecasting #################### """
+		# ----------------------------------------------------------------------------------------
+		# Changes regarding forecasting
+		# ----------------------------------------------------------------------------------------
 		
-		start = 0
 		error_count = 0
 		count = 0
 		result = {}
 		total_frames = len(entry["im_idx"].unique())
 		if future == -1:
 			future = total_frames - context
-		if start + context + 1 > total_frames:
-			while start + context + 1 != total_frames and context > 1:
-				context -= 1
-			future = 1
-		if start + context + future > total_frames > start + context:
-			future = total_frames - (start + context)
 		
-		while start + context + 1 <= total_frames:
+		context = min(context, total_frames - 1)
+		future = min(future, total_frames - context)
+		
+		while context + 1 <= total_frames:
 			future_frame_start_id = entry["im_idx"].unique()[context]
 			
-			if start + context + future > total_frames > start + context:
-				future = total_frames - (start + context)
+			if context + future > total_frames > context:
+				future = total_frames - context
 			
 			future_frame_end_id = entry["im_idx"].unique()[context + future - 1]
 			
@@ -445,7 +443,8 @@ class Baseline(nn.Module):
 				out_last = [out[:, -1, :]]
 				pred = torch.stack(out_last, dim=1)
 				mask_input = torch.cat([mask_input, pred], 1)
-				in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(torch.bool)
+				in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(
+					torch.bool)
 				in_mask = in_mask.cuda()
 			
 			output = torch.cat(output, dim=1)
@@ -490,20 +489,11 @@ class Baseline(nn.Module):
 		entry["output"] = result
 		return entry
 	
-	def forward_single_entry(self, context_percentage, entry):
-		# [0.3, 0.5, 0.7, 0.9]
-		# end = 39
-		# future_end = 140
-		# future_frame_idx = [40, 41, .............139]
-		# Take each entry and extrapolate it to the future
-		# evaluation_recall.evaluate_scene_graph_forecasting(self, gt, pred, end, future_end, future_frame_idx, count=0)
-		# entry["output"][0] = {pred_scores, pred_labels, attention_distribution, spatial_distribution, contact_distribution}
-		
+	def forward_single_entry(self, context_fraction, entry):
 		"""
 		Forward method for the baseline
+		:param context_fraction:
 		:param entry: Dictionary from object classifier
-		:param context: Frame idx for context
-		:param future: Number of next frames to anticipate
 		:return:
 		"""
 		entry = self.object_classifier(entry)
@@ -550,7 +540,7 @@ class Baseline(nn.Module):
 		count = 0
 		result = {}
 		total_frames = len(entry["im_idx"].unique())
-		context = int(math.ceil(context_percentage * total_frames))
+		context = int(math.ceil(context_fraction * total_frames))
 		future = total_frames - context
 		
 		future_frame_start_id = entry["im_idx"].unique()[context]

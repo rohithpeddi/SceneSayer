@@ -146,58 +146,58 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
             con_loss = bce_loss(contact_distribution, contact_label)
             losses["contact_relation_loss"] += (con_loss * weight).mean()
         
-        gen_attention_out.append(
-            pred["output"][count]["gen_attention_distribution"][-(context_len - prev_context_len):])
-        gen_spatial_out.append(pred["output"][count]["gen_spatial_distribution"][-(context_len - prev_context_len):])
-        gen_contacting_out.append(
-            pred["output"][count]["gen_contacting_distribution"][-(context_len - prev_context_len):])
-        
-        prev_context_len = context_len
+        # gen_attention_out.append(
+        #     pred["output"][count]["gen_attention_distribution"][-(context_len - prev_context_len):])
+        # gen_spatial_out.append(pred["output"][count]["gen_spatial_distribution"][-(context_len - prev_context_len):])
+        # gen_contacting_out.append(
+        #     pred["output"][count]["gen_contacting_distribution"][-(context_len - prev_context_len):])
+        #
+        #prev_context_len = context_len
         
         context += 1
         count += 1
     
-    gen_attention_out = torch.cat(gen_attention_out, dim=0)
-    gen_spatial_out = torch.cat(gen_spatial_out, dim=0)
-    gen_contacting_out = torch.cat(gen_contacting_out, dim=0)
-    
-    gen_attention_label = torch.tensor(pred["attention_gt"][:-future_len], dtype=torch.long).to(
-        device=attention_distribution.device).squeeze()
-    if not conf.bce_loss:
-        # multi-label margin loss or adaptive loss
-        gen_spatial_label = -torch.ones([len(pred["spatial_gt"][:-future_len]), 6], dtype=torch.long).to(
-            device=attention_distribution.device)
-        gen_contact_label = -torch.ones([len(pred["contacting_gt"][:-future_len]), 17], dtype=torch.long).to(
-            device=attention_distribution.device)
-        for i in range(len(pred["spatial_gt"][:-future_len])):
-            gen_spatial_label[i, : len(pred["spatial_gt"][:-future_len][i])] = torch.tensor(
-                pred["spatial_gt"][:-future_len][i])
-            gen_contact_label[i, : len(pred["contacting_gt"][:-future_len][i])] = torch.tensor(
-                pred["contacting_gt"][:-future_len][i])
-    
-    else:
-        # bce loss
-        gen_spatial_label = torch.zeros([len(pred["spatial_gt"][:-future_len]), 6], dtype=torch.float32).to(
-            device=attention_distribution.device)
-        gen_contact_label = torch.zeros([len(pred["contacting_gt"][:-future_len]), 17], dtype=torch.float32).to(
-            device=attention_distribution.device)
-        for i in range(len(pred["spatial_gt"][:-future_len])):
-            gen_spatial_label[i, pred["spatial_gt"][:-future_len][i]] = 1
-            gen_contact_label[i, pred["contacting_gt"][:-future_len][i]] = 1
-    
-    try:
-        losses["gen_attention_relation_loss"] = ce_loss(gen_attention_out, gen_attention_label).mean()
-    except ValueError:
-        gen_attention_label = attention_label.unsqueeze(0)
-        losses["gen_attention_relation_loss"] = ce_loss(gen_attention_out, gen_attention_label).mean()
-    
-    if not conf.bce_loss:
-        losses["gen_spatial_relation_loss"] = mlm_loss(gen_spatial_out, gen_spatial_label).mean()
-        losses["gen_contact_relation_loss"] = mlm_loss(gen_contacting_out, gen_contact_label).mean()
-    
-    else:
-        losses["gen_spatial_relation_loss"] = bce_loss(gen_spatial_out, gen_spatial_label).mean()
-        losses["gen_contact_relation_loss"] = bce_loss(gen_contacting_out, gen_contact_label).mean()
+    # gen_attention_out = torch.cat(gen_attention_out, dim=0)
+    # gen_spatial_out = torch.cat(gen_spatial_out, dim=0)
+    # gen_contacting_out = torch.cat(gen_contacting_out, dim=0)
+    #
+    # gen_attention_label = torch.tensor(pred["attention_gt"][:-future_len], dtype=torch.long).to(
+    #     device=attention_distribution.device).squeeze()
+    # if not conf.bce_loss:
+    #     # multi-label margin loss or adaptive loss
+    #     gen_spatial_label = -torch.ones([len(pred["spatial_gt"][:-future_len]), 6], dtype=torch.long).to(
+    #         device=attention_distribution.device)
+    #     gen_contact_label = -torch.ones([len(pred["contacting_gt"][:-future_len]), 17], dtype=torch.long).to(
+    #         device=attention_distribution.device)
+    #     for i in range(len(pred["spatial_gt"][:-future_len])):
+    #         gen_spatial_label[i, : len(pred["spatial_gt"][:-future_len][i])] = torch.tensor(
+    #             pred["spatial_gt"][:-future_len][i])
+    #         gen_contact_label[i, : len(pred["contacting_gt"][:-future_len][i])] = torch.tensor(
+    #             pred["contacting_gt"][:-future_len][i])
+    #
+    # else:
+    #     # bce loss
+    #     gen_spatial_label = torch.zeros([len(pred["spatial_gt"][:-future_len]), 6], dtype=torch.float32).to(
+    #         device=attention_distribution.device)
+    #     gen_contact_label = torch.zeros([len(pred["contacting_gt"][:-future_len]), 17], dtype=torch.float32).to(
+    #         device=attention_distribution.device)
+    #     for i in range(len(pred["spatial_gt"][:-future_len])):
+    #         gen_spatial_label[i, pred["spatial_gt"][:-future_len][i]] = 1
+    #         gen_contact_label[i, pred["contacting_gt"][:-future_len][i]] = 1
+    #
+    # try:
+    #     losses["gen_attention_relation_loss"] = ce_loss(gen_attention_out, gen_attention_label).mean()
+    # except ValueError:
+    #     gen_attention_label = attention_label.unsqueeze(0)
+    #     losses["gen_attention_relation_loss"] = ce_loss(gen_attention_out, gen_attention_label).mean()
+    #
+    # if not conf.bce_loss:
+    #     losses["gen_spatial_relation_loss"] = mlm_loss(gen_spatial_out, gen_spatial_label).mean()
+    #     losses["gen_contact_relation_loss"] = mlm_loss(gen_contacting_out, gen_contact_label).mean()
+    #
+    # else:
+    #     losses["gen_spatial_relation_loss"] = bce_loss(gen_spatial_out, gen_spatial_label).mean()
+    #     losses["gen_contact_relation_loss"] = bce_loss(gen_contacting_out, gen_contact_label).mean()
     
     losses["attention_relation_loss"] = losses["attention_relation_loss"] / count
     losses["spatial_relation_loss"] = losses["spatial_relation_loss"] / count

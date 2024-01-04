@@ -44,10 +44,10 @@ def generate_test_dataset_metadata(conf, device):
 	return ag_test_data, dataloader_test
 
 
-def generate_evaluator_set(conf, dataset):
+def generate_evaluator_set_unlocalized(conf, dataset):
 	# Evaluators order - [With Constraint, No Constraint, Semi Constraint]
 	evaluators = []
-	
+	iou_threshold = 0.0
 	with_constraint_evaluator = BasicSceneGraphEvaluator(
 		mode=conf.mode,
 		AG_object_classes=dataset.object_classes,
@@ -55,7 +55,7 @@ def generate_evaluator_set(conf, dataset):
 		AG_attention_predicates=dataset.attention_relationships,
 		AG_spatial_predicates=dataset.spatial_relationships,
 		AG_contacting_predicates=dataset.contacting_relationships,
-		iou_threshold=0.5,
+		iou_threshold=iou_threshold,
 		constraint='with')
 	
 	no_constraint_evaluator = BasicSceneGraphEvaluator(
@@ -65,7 +65,7 @@ def generate_evaluator_set(conf, dataset):
 		AG_attention_predicates=dataset.attention_relationships,
 		AG_spatial_predicates=dataset.spatial_relationships,
 		AG_contacting_predicates=dataset.contacting_relationships,
-		iou_threshold=0.5,
+		iou_threshold=iou_threshold,
 		constraint='no')
 	
 	semi_constraint_evaluator = BasicSceneGraphEvaluator(
@@ -75,7 +75,7 @@ def generate_evaluator_set(conf, dataset):
 		AG_attention_predicates=dataset.attention_relationships,
 		AG_spatial_predicates=dataset.spatial_relationships,
 		AG_contacting_predicates=dataset.contacting_relationships,
-		iou_threshold=0.5,
+		iou_threshold=iou_threshold,
 		constraint='semi', semi_threshold=0.9)
 	
 	evaluators.append(with_constraint_evaluator)
@@ -90,31 +90,31 @@ def fetch_test_basic_config():
 	
 	ag_features_test, dataloader_test = generate_test_dataset_metadata(conf, device)
 	
-	evaluators = generate_evaluator_set(conf, ag_features_test)
+	evaluators = generate_evaluator_set_unlocalized(conf, ag_features_test)
 	
 	return ag_features_test, dataloader_test, evaluators[0], evaluators[1], evaluators[2], gpu_device, conf
 
 
 def generate_required_test_evaluators(conf, ag_test_data):
-	gen_evaluators = generate_evaluator_set(conf, ag_test_data)
+	gen_evaluators = generate_evaluator_set_unlocalized(conf, ag_test_data)
 	
 	future_frame_count_list = [1, 2, 3, 4, 5]
 	future_evaluators = {}
 	for future_frame_count in future_frame_count_list:
-		future_evaluators[future_frame_count] = generate_evaluator_set(conf, ag_test_data)
+		future_evaluators[future_frame_count] = generate_evaluator_set_unlocalized(conf, ag_test_data)
 	
 	future_evaluators_modified_gt = {}
 	for future_frame_count in future_frame_count_list:
-		future_evaluators_modified_gt[future_frame_count] = generate_evaluator_set(conf, ag_test_data)
+		future_evaluators_modified_gt[future_frame_count] = generate_evaluator_set_unlocalized(conf, ag_test_data)
 	
 	percentage_count_list = [0.3, 0.5, 0.7, 0.9]
 	percentage_evaluators = {}
 	for percentage_count in percentage_count_list:
-		percentage_evaluators[percentage_count] = generate_evaluator_set(conf, ag_test_data)
+		percentage_evaluators[percentage_count] = generate_evaluator_set_unlocalized(conf, ag_test_data)
 	
 	percentage_evaluators_modified_gt = {}
 	for percentage_count in percentage_count_list:
-		percentage_evaluators_modified_gt[percentage_count] = generate_evaluator_set(conf, ag_test_data)
+		percentage_evaluators_modified_gt[percentage_count] = generate_evaluator_set_unlocalized(conf, ag_test_data)
 	
 	return gen_evaluators, future_evaluators, future_evaluators_modified_gt, percentage_evaluators, percentage_evaluators_modified_gt
 

@@ -358,6 +358,6 @@ class ODE(nn.Module):
 	            pred["pred_labels"] = entry["pred_labels"][torch.min(pair_idx[rng[end] : rng[end + 1]]) : torch.max(pair_idx[rng[end] : rng[end + 1]]) + 1].repeat(n - end - 1)
 	        pred["im_idx"]  = torch.tensor([i for i in range(n - end - 1) for j in range(rng[end + 1] - rng[end])], dtype=torch.int32).to(device=indices.device)
 	        mx = torch.max(pair_idx[rng[end] : rng[end + 1]]) - torch.min(pair_idx[rng[end] : rng[end + 1]]) + 1
-	        pred["pair_idx"] = (pair_idx[rng[end] : rng[end + 1]] - torch.min(pair_idx[rng[end] : rng[end + 1]])).repeat(n - end - 1) + mx * torch.reshape(pred["im_idx"], (-1, 1))
+	        pred["pair_idx"] = (pair_idx[rng[end] : rng[end + 1]] - torch.min(pair_idx[rng[end] : rng[end + 1]])).repeat(n - end - 1, 1) + mx * torch.reshape(pred["im_idx"], (-1, 1))
 	        pred["boxes"] = torch.ones(mx * (n - end - 1), 5).to(device=im_idx.device) / 2
 	        return end + 1, pred

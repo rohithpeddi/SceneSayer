@@ -135,3 +135,10 @@ def fetch_train_basic_config():
 	)
 	
 	return conf, dataloader_train, dataloader_test, gpu_device, evaluator, ag_train_data, ag_test_data
+
+
+def save_model(model, epoch, checkpoint_save_file_path, checkpoint_name, model_name):
+	torch.save({f"{model_name}_state_dict": model.state_dict()},
+	           os.path.join(checkpoint_save_file_path, f"{checkpoint_name}_epoch_{epoch}.tar"))
+	print("*" * 40)
+	print("Saved the checkpoint after {} epochs".format(epoch))

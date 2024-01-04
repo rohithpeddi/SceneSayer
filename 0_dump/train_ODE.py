@@ -3,8 +3,6 @@ import sys
 import numpy as np
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-
-np.set_printoptions(precision=3)
 import time
 import os
 import pandas as pd

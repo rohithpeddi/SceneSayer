@@ -1,5 +1,4 @@
 import os
-import csv
 
 import numpy as np
 import torch
@@ -10,41 +9,20 @@ from constants import Constants as const
 from tqdm import tqdm
 from lib.supervised.biased.dsgdetr.track import get_sequence
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
+from lib.supervised.biased.sga.SDE import SDE
 from test_base import fetch_diffeq_test_basic_config, write_future_evaluators_stats, write_percentage_evaluators_stats, \
 	write_gen_evaluators_stats, evaluate_anticipated_future_frame_scene_graph
 
 
-def test_ode():
-	max_window = conf.max_window
-	
-	ode = ODE(mode=conf.mode,
-	          attention_class_num=len(ag_test_data.attention_relationships),
-	          spatial_class_num=len(ag_test_data.spatial_relationships),
-	          contact_class_num=len(ag_test_data.contacting_relationships),
-	          obj_classes=ag_test_data.object_classes,
-	          enc_layer_num=conf.enc_layer,
-	          dec_layer_num=conf.dec_layer,
-	          max_window=max_window).to(device=gpu_device)
-	
-	ode.eval()
-	
-	ckpt = torch.load(conf.model_path, map_location=gpu_device)
-	ode.load_state_dict(ckpt['ode_state_dict'], strict=False)
-	
-	print('*' * 50)
-	print('CKPT {} is loaded'.format(conf.model_path))
-	
-	matcher = HungarianMatcher(0.5, 1, 1, 0.5)
-	matcher.eval()
+def process_data(matcher, model, max_window):
 	all_time = []
-	
 	with torch.no_grad():
 		for entry in tqdm(dataloader_test, position=0, leave=True):
 			start = time()
 			gt_annotation = entry[const.GT_ANNOTATION]
 			frame_size = entry[const.FRAME_SIZE]
 			get_sequence(entry, gt_annotation, matcher, frame_size, conf.mode)
-			pred = ode(entry, True)
+			pred = model(entry, True)
 			global_output = pred["global_output"]
 			times = pred["times"]
 			global_output_mod = global_output.clone().to(global_output.device)
@@ -93,9 +71,9 @@ def test_ode():
 				denominator[mask_gt] += 1 / (times[mask_gt] - times[mask_curr] + 1)
 			global_output_mod = global_output_mod / torch.reshape(denominator, (-1, 1))
 			pred["global_output"] = global_output_mod
-			pred["attention_distribution"] = ode.dsgdetr.a_rel_compress(global_output)
-			pred["spatial_distribution"] = ode.dsgdetr.s_rel_compress(global_output)
-			pred["contacting_distribution"] = ode.dsgdetr.c_rel_compress(global_output)
+			pred["attention_distribution"] = model.dsgdetr.a_rel_compress(global_output)
+			pred["spatial_distribution"] = model.dsgdetr.s_rel_compress(global_output)
+			pred["contacting_distribution"] = model.dsgdetr.c_rel_compress(global_output)
 			pred["spatial_distribution"] = torch.sigmoid(pred["spatial_distribution"])
 			pred["contacting_distribution"] = torch.sigmoid(pred["contacting_distribution"])
 			gen_evaluators[0].evaluate_scene_graph(gt_annotation, pred)
@@ -106,29 +84,96 @@ def test_ode():
 	write_future_evaluators_stats(mode, future_frame_loss_num, method_name, future_evaluators)
 	write_gen_evaluators_stats(mode, future_frame_loss_num, method_name, gen_evaluators)
 	
-	#Context Fraction Evaluation
+	# Context Fraction Evaluation
 	with torch.no_grad():
 		for context_fraction in [0.3, 0.5, 0.7, 0.9]:
 			for entry in tqdm(dataloader_test, position=0, leave=True):
 				gt_annotation = entry[const.GT_ANNOTATION]
 				frame_size = entry[const.FRAME_SIZE]
 				get_sequence(entry, gt_annotation, matcher, frame_size, conf.mode)
-				ind, pred = ode.forward_single_entry(context_fraction=context_fraction, entry=entry)
+				ind, pred = model.forward_single_entry(context_fraction=context_fraction, entry=entry)
 				if ind >= len(gt_annotation):
 					continue
 				percentage_evaluators[context_fraction][0].evaluate_scene_graph(gt_annotation[ind:], pred)
 				percentage_evaluators[context_fraction][1].evaluate_scene_graph(gt_annotation[ind:], pred)
 				percentage_evaluators[context_fraction][2].evaluate_scene_graph(gt_annotation[ind:], pred)
 			# Write percentage evaluation stats
-			write_percentage_evaluators_stats(mode, future_frame_loss_num, method_name, percentage_evaluators, context_fraction)
+			write_percentage_evaluators_stats(mode, future_frame_loss_num, method_name, percentage_evaluators,
+			                                  context_fraction)
+
+
+def load_ode(max_window):
+	ode = ODE(mode=conf.mode,
+	          attention_class_num=len(ag_test_data.attention_relationships),
+	          spatial_class_num=len(ag_test_data.spatial_relationships),
+	          contact_class_num=len(ag_test_data.contacting_relationships),
+	          obj_classes=ag_test_data.object_classes,
+	          enc_layer_num=conf.enc_layer,
+	          dec_layer_num=conf.dec_layer,
+	          max_window=max_window).to(device=gpu_device)
+	
+	ode.eval()
+	
+	ckpt = torch.load(conf.model_path, map_location=gpu_device)
+	ode.load_state_dict(ckpt['ode_state_dict'], strict=False)
+	
+	print('*' * 50)
+	print('CKPT {} is loaded'.format(conf.model_path))
+	
+	return ode
+
+
+def load_sde(max_window):
+	brownian_size = conf.brownian_size
+	sde = SDE(mode=conf.mode,
+	          attention_class_num=len(ag_test_data.attention_relationships),
+	          spatial_class_num=len(ag_test_data.spatial_relationships),
+	          contact_class_num=len(ag_test_data.contacting_relationships),
+	          obj_classes=ag_test_data.object_classes,
+	          enc_layer_num=conf.enc_layer,
+	          dec_layer_num=conf.dec_layer,
+	          max_window=max_window,
+	          brownian_size=brownian_size).to(device=gpu_device)
+	
+	sde.eval()
+	
+	ckpt = torch.load(conf.model_path, map_location=gpu_device)
+	sde.load_state_dict(ckpt['sde_state_dict'], strict=False)
+	
+	print('*' * 50)
+	print('CKPT {} is loaded'.format(conf.model_path))
+	
+	return sde
+
+
+def main():
+	max_window = conf.max_window
+	
+	matcher = HungarianMatcher(0.5, 1, 1, 0.5)
+	matcher.eval()
+	
+	model = None
+	if method_name == "NeuralODE":
+		assert train_method == "ode"
+		model = load_ode(max_window)
+	elif method_name == "NeuralSDE":
+		assert train_method == "sde"
+		model = load_sde(max_window)
+		
+	assert model is not None
+	process_data(matcher, model, max_window)
 
 
 if __name__ == '__main__':
 	ag_test_data, dataloader_test, gen_evaluators, future_evaluators, future_evaluators_modified_gt, percentage_evaluators, percentage_evaluators_modified_gt, gpu_device, conf = fetch_diffeq_test_basic_config()
 	model_name = os.path.basename(conf.model_path).split('.')[0]
 	future_frame_loss_num = model_name.split('_')[-3]
+	train_method = model_name.split('_')[1]
 	mode = model_name.split('_')[-5]
-	method_name = "NeuralODE"
-	test_ode()
+	method_name = conf.method_name
+	main()
+	
+	
+# python test_latent_diffeq.py -mode sgcls -method_name NeuralODE -model_path /data/rohith/ag/checkpoints/ode_sgcls_future_3_epoch_9.tar
 
 #  python test_cttran.py -mode sgdet -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ -model_sttran_path cttran/no_temporal/sttran_9.tar -model_cttran_path cttran/no_temporal/cttran_9.tar

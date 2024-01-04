@@ -23,6 +23,7 @@ class Config(object):
         self.dec_layer = 3
         self.nepoch = 10
         self.results_path = None
+        self.method_name = None
         
         self.max_window = 3
         self.brownian_size = 1
@@ -50,6 +51,7 @@ class Config(object):
         parser.add_argument('-mode', dest='mode', help='predcls/sgcls/sgdet', default='sgdet', type=str)
         parser.add_argument('-save_path', default='/data/rohith/ag/checkpoints', type=str)
         parser.add_argument('-model_path', default=None, type=str)
+        parser.add_argument('-method_name', default='NeuralODE', type=str)
         parser.add_argument('-results_path', default='results', type=str)
         parser.add_argument('-max_window', default=3, type=int)
         parser.add_argument('-brownian_size', default=1, type=int)

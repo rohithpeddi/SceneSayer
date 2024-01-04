@@ -41,6 +41,16 @@ def fetch_loss_functions():
 	return bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss
 
 
+def fetch_transformer_loss_functions():
+	bce_loss = nn.BCELoss(reduction='none')
+	ce_loss = nn.CrossEntropyLoss(reduction='none')
+	mlm_loss = nn.MultiLabelMarginLoss(reduction='none')
+	bbox_loss = nn.SmoothL1Loss()
+	abs_loss = nn.L1Loss()
+	mse_loss = nn.MSELoss()
+	return bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss
+
+
 def fetch_train_basic_config():
 	conf = Config()
 	print('The CKPT saved here:', conf.save_path)

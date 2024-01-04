@@ -1,21 +1,18 @@
-import sys
+import os
+import time
 
 import numpy as np
+import pandas as pd
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-import time
-import os
-import pandas as pd
-
 from tqdm import tqdm
+
 from constants import Constants as const
-
-from lib.supervised.biased.dsgdetr.track import get_sequence
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.biased.sga.SDE import SDE
-
-from train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions, save_model
+from lib.supervised.biased.dsgdetr.track import get_sequence
 from lib.supervised.biased.sga.ODE import ODE as ODE
+from lib.supervised.biased.sga.SDE import SDE
+from train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions, save_model
 
 
 def train_model(conf, model, matcher, optimizer, dataloader_train, model_ratio, tr, epoch):

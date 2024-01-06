@@ -12,7 +12,7 @@ from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.biased.dysgg.DyDsgDETR import DyDsgDETR
 from lib.supervised.biased.dysgg.DySTTran import DySTTran
-from train_base import fetch_train_basic_config, fetch_transformer_loss_functions, save_model, get_sequence_no_tracking, \
+from train_base import fetch_train_basic_config, fetch_loss_functions, save_model, get_sequence_no_tracking, \
 	prepare_optimizer
 
 
@@ -51,7 +51,7 @@ def load_DyDsgDETR(conf, ag_train_data, gpu_device):
 
 
 def train_model(conf, model, object_detector, matcher, optimizer, ag_train_data, dataloader_train, tr, epoch, is_tracking_enabled=False):
-	bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_transformer_loss_functions()
+	bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_loss_functions()
 	train_iter = iter(dataloader_train)
 	object_detector.is_train = True
 	model.train()
@@ -208,7 +208,7 @@ def main():
 	
 	object_detector = load_object_detector(conf, gpu_device, ag_train_data)
 	tr = []
-	for epoch in range(conf.num_epochs):
+	for epoch in range(conf.nepoch):
 		train_model(conf, model, object_detector, matcher, optimizer, ag_train_data, dataloader_train, tr, epoch, is_tracking_enabled=is_tracking_enabled)
 		save_model(model, epoch, checkpoint_save_file_path, checkpoint_name, model_name)
 		test_model(model, object_detector, dataloader_test, ag_test_data, evaluator, conf, matcher, is_tracking_enabled=is_tracking_enabled)

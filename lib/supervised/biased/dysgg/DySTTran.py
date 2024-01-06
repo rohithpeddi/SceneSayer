@@ -47,8 +47,8 @@ class DySTTran(nn.Module):
 			nn.ReLU(inplace=True),
 			nn.BatchNorm2d(256, momentum=0.01),
 		)
-		self.subj_fc = nn.Linear(2376, 512)
-		self.obj_fc = nn.Linear(2376, 512)
+		self.subj_fc = nn.Linear(2048, 512)
+		self.obj_fc = nn.Linear(2048, 512)
 		self.vr_fc = nn.Linear(256 * 7 * 7, 512)
 		embed_vecs = obj_edge_vectors(obj_classes, wv_type=const.GLOVE_6B, wv_dir='checkpoints', wv_dim=200)
 		self.obj_embed = nn.Embedding(len(obj_classes), 200)

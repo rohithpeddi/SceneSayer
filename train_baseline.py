@@ -255,8 +255,9 @@ def process_test_video(entry, model, gt_annotation):
 		
 		if conf.mode == 'predcls':
 			scores = scores[box_mask == 1]
+			labels = labels[box_mask == 1]
 		pred_labels = pred_labels[box_mask == 1]
-		labels = labels[box_mask == 1]
+		
 		boxes = boxes[box_mask == 1]
 		if conf.mode != 'predcls':
 			pred_scores = pred_scores[box_mask == 1]
@@ -283,7 +284,7 @@ def process_test_video(entry, model, gt_annotation):
 			             'boxes': boxes,
 			             'pair_idx': new_pair_idx,
 			             'im_idx': im_idx,
-			             'labels': labels,
+			             #'labels': labels,
 			             'pred_labels': pred_labels,
 			             # 'scores':scores,
 			             'pred_scores': pred_scores

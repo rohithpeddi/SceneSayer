@@ -51,9 +51,6 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
 	future = conf.baseline_future
 	count = 0
 	losses = {}
-	gen_attention_out = []
-	gen_spatial_out = []
-	gen_contacting_out = []
 	
 	total_frames = len(entry["im_idx"].unique())
 	if conf.mode == 'sgcls' or conf.mode == 'sgdet':
@@ -92,8 +89,7 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
 		
 		attention_label = torch.tensor(pred["attention_gt"][context_end_idx:future_end_idx], dtype=torch.long).to(
 			device=attention_distribution.device).squeeze()
-		gen_attention_label = torch.tensor(pred["attention_gt"][:context_len], dtype=torch.long).to(
-			device=attention_distribution.device).squeeze()
+		
 		if not conf.bce_loss:
 			spatial_label = -torch.ones([len(pred["spatial_gt"][context_end_idx:future_end_idx]), 6],
 			                            dtype=torch.long).to(device=attention_distribution.device)
@@ -125,20 +121,12 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
 			losses["spatial_relation_loss"] += bce_loss(spatial_distribution, spatial_label)
 			losses["contact_relation_loss"] += bce_loss(contact_distribution, contact_label)
 		
-		gen_attention_out.append(
-			pred["output"][count]["gen_attention_distribution"][-(context_len - prev_context_len):])
-		gen_spatial_out.append(pred["output"][count]["gen_spatial_distribution"][-(context_len - prev_context_len):])
-		gen_contacting_out.append(
-			pred["output"][count]["gen_contacting_distribution"][-(context_len - prev_context_len):])
-		
-		prev_context_len = context_len
-		
 		context += 1
 		count += 1
 	
-	gen_attention_out = torch.cat(gen_attention_out, dim=0)
-	gen_spatial_out = torch.cat(gen_spatial_out, dim=0)
-	gen_contacting_out = torch.cat(gen_contacting_out, dim=0)
+	gen_attention_out = pred["gen_attention_distribution"]
+	gen_spatial_out = pred["gen_spatial_distribution"]
+	gen_contacting_out = pred["gen_contacting_distribution"]
 	
 	gen_attention_label = torch.tensor(pred["attention_gt"][:-future_len], dtype=torch.long).to(
 		device=attention_distribution.device).squeeze()

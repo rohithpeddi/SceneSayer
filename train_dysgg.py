@@ -1,18 +1,19 @@
+import copy
 import os
 import time
 
 import numpy as np
 import pandas as pd
 import torch
-from tqdm import tqdm
-from constants import Constants as const
-from lib.supervised.biased.dysgg.DyDsgDETR import DyDsgDETR
-from lib.supervised.biased.dysgg.DySTTran import DySTTran
 
-from train_base import fetch_train_basic_config, fetch_transformer_loss_functions, save_model, get_sequence_no_tracking, \
-	prepare_optimizer
+from constants import Constants as const
+from lib.object_detector import detector
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
+from lib.supervised.biased.dysgg.DyDsgDETR import DyDsgDETR
+from lib.supervised.biased.dysgg.DySTTran import DySTTran
+from train_base import fetch_train_basic_config, fetch_transformer_loss_functions, save_model, get_sequence_no_tracking, \
+	prepare_optimizer
 
 
 def load_DySTTran(conf, ag_train_data, gpu_device):
@@ -49,22 +50,35 @@ def load_DyDsgDETR(conf, ag_train_data, gpu_device):
 	return model, optimizer, scheduler
 
 
-def train_model(conf, model, matcher, optimizer, dataloader_train, tr, epoch, is_tracking_enabled=False):
+def train_model(conf, model, object_detector, matcher, optimizer, ag_train_data, dataloader_train, tr, epoch, is_tracking_enabled=False):
 	bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_transformer_loss_functions()
-	
+	train_iter = iter(dataloader_train)
+	object_detector.is_train = True
 	model.train()
+	object_detector.train_x = True
 	start = time.time()
-	counter = 0
-	for train_entry in tqdm(dataloader_train):
-		gt_annotation = train_entry[const.GT_ANNOTATION]
-		frame_size = train_entry[const.FRAME_SIZE]
+	for b in range(len(dataloader_train)):
+		data = next(train_iter)
+		im_data = copy.deepcopy(data[0].cuda(0))
+		im_info = copy.deepcopy(data[1].cuda(0))
+		gt_boxes = copy.deepcopy(data[2].cuda(0))
+		num_boxes = copy.deepcopy(data[3].cuda(0))
+		gt_annotation = ag_train_data.gt_annotations[data[4]]
+		with torch.no_grad():
+			entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
 		
 		if is_tracking_enabled:
-			get_sequence_with_tracking(train_entry, gt_annotation, matcher, frame_size, conf.mode)
+			get_sequence_with_tracking(
+				entry,
+				gt_annotation,
+				matcher,
+				(im_info[0][:2] / im_info[0, 2]).cpu().data,
+				conf.mode
+			)
 		else:
-			get_sequence_no_tracking(train_entry, task=conf.mode)
+			get_sequence_no_tracking(entry, task=conf.mode)
 		
-		pred = model(train_entry)
+		pred = model(entry)
 		
 		attention_distribution = pred[const.ATTENTION_DISTRIBUTION]
 		spatial_distribution = pred[const.SPATIAL_DISTRIBUTION]
@@ -110,34 +124,58 @@ def train_model(conf, model, matcher, optimizer, dataloader_train, tr, epoch, is
 		optimizer.step()
 		
 		tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
+		if b % 50 == 0:
+			print("epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(epoch, b, len(dataloader_train),
+			                                                           loss.item()))
 		
-		if counter % 1000 == 0 and counter >= 1000:
+		if b % 1000 == 0 and b >= 1000:
 			time_per_batch = (time.time() - start) / 1000
-			print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, counter, len(dataloader_train),
+			print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, b, len(dataloader_train),
 			                                                                    time_per_batch,
 			                                                                    len(dataloader_train) * time_per_batch / 60))
 			
 			mn = pd.concat(tr[-1000:], axis=1).mean(1)
 			print(mn)
 			start = time.time()
-		counter += 1
 
 
-def test_model(model, dataloader_test, evaluator, conf, matcher, is_tracking_enabled=False):
+def test_model(model, object_detector, dataloader_test, ag_test_data, evaluator, conf, matcher, is_tracking_enabled=False):
 	model.eval()
+	object_detector.is_train = False
+	test_iter = iter(dataloader_test)
 	with torch.no_grad():
-		for test_entry in tqdm(dataloader_test):
-			gt_annotation = test_entry[const.GT_ANNOTATION]
-			frame_size = test_entry[const.FRAME_SIZE]
+		for b in range(len(dataloader_test)):
+			data = next(test_iter)
+			im_data = copy.deepcopy(data[0].cuda(0))
+			im_info = copy.deepcopy(data[1].cuda(0))
+			gt_boxes = copy.deepcopy(data[2].cuda(0))
+			num_boxes = copy.deepcopy(data[3].cuda(0))
+			gt_annotation = ag_test_data.gt_annotations[data[4]]
+			entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
 			
 			if is_tracking_enabled:
-				get_sequence_with_tracking(test_entry, gt_annotation, matcher, frame_size, conf.mode)
+				get_sequence_with_tracking(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
 			else:
-				get_sequence_no_tracking(test_entry, task=conf.mode)
-				
-			pred = model(test_entry)
+				get_sequence_no_tracking(entry, task=conf.mode)
+			
+			pred = model(entry)
 			
 			evaluator.evaluate_scene_graph(gt_annotation, pred)
+			
+			if b % 50 == 0:
+				print(f"Finished processing {b} of {len(dataloader_test)} batches")
+
+
+def load_object_detector(conf, gpu_device, ag_train_data):
+	object_detector = detector(
+		train=True,
+		object_classes=ag_train_data.object_classes,
+		use_SUPPLY=True,
+		mode=conf.mode
+	).to(device=gpu_device)
+	object_detector.eval()
+	print("Finished loading object detector", flush=True)
+	return object_detector
 
 
 def main():
@@ -168,12 +206,12 @@ def main():
 	assert model is not None and optimizer is not None and scheduler is not None
 	assert model_name is not None
 	
+	object_detector = load_object_detector(conf, gpu_device, ag_train_data)
 	tr = []
 	for epoch in range(conf.num_epochs):
-		train_model(conf, model, matcher, optimizer, dataloader_train, tr, epoch,
-		            is_tracking_enabled=is_tracking_enabled)
+		train_model(conf, model, object_detector, matcher, optimizer, ag_train_data, dataloader_train, tr, epoch, is_tracking_enabled=is_tracking_enabled)
 		save_model(model, epoch, checkpoint_save_file_path, checkpoint_name, model_name)
-		test_model(model, dataloader_test, evaluator, conf, matcher, is_tracking_enabled=is_tracking_enabled)
+		test_model(model, object_detector, dataloader_test, ag_test_data, evaluator, conf, matcher, is_tracking_enabled=is_tracking_enabled)
 		score = np.mean(evaluator.result_dict[conf.mode + "_recall"][20])
 		evaluator.print_stats()
 		evaluator.reset_result()
@@ -185,5 +223,4 @@ if __name__ == '__main__':
 	main()
 
 # python train_try.py -mode sgcls -ckpt /home/cse/msr/csy227518/scratch/DSG/DSG-DETR/sgcls/model_9.tar -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/
-
 """ python train_obj_mask.py -mode sgdet -save_path forecasting/sgcls_full_context_f5/ -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ """

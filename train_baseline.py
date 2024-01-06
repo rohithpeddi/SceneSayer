@@ -195,7 +195,7 @@ def process_test_video(entry, model, gt_annotation):
 		future = total_frames - (start + context)
 	while start + context + 1 <= total_frames:
 		future_frame_start_id = entry["im_idx"].unique()[context]
-		
+		prev_con = entry["im_idx"].unique()[context-1]
 		if start + context + future > total_frames > start + context:
 			future = total_frames - (start + context)
 		
@@ -207,9 +207,9 @@ def process_test_video(entry, model, gt_annotation):
 		
 		gt_future = gt_annotation[start + context:start + context + future]
 		
-		ind = torch.where(entry["boxes"][:, 0] == context)[0][0]
-		prev_ind = torch.where(entry["boxes"][:, 0] == context - 1)[0][0]
-		f_ind = torch.where(entry["boxes"][:, 0] == context + future - 1)[0][-1]
+		ind=torch.where(entry["boxes"][:,0]==future_frame_start_id)[0][0]
+		prev_ind = torch.where(entry["boxes"][:,0]==prev_con)[0][0]
+	        f_ind=torch.where(entry["boxes"][:,0]==future_frame_end_id)[0][-1]
 		con = set(pred["pred_labels"][prev_ind:ind].tolist())
 		fut = set(pred["pred_labels"][ind:f_ind + 1].tolist())
 		

@@ -1,7 +1,7 @@
 import numpy as np
 
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.biased.dsgdetr.track import get_sequence
+from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
 from test_base import fetch_test_basic_config
 
 import copy
@@ -50,7 +50,7 @@ def test_forecasting():
 			vid_no = gt_annotation[0][0]["frame"].split('.')[0]
 			
 			entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-			get_sequence(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
+			get_sequence_with_tracking(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
 			
 			count = 0
 			start = 0

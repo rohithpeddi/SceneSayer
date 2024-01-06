@@ -44,7 +44,7 @@ def prepare_optimizer(model):
 
 def train_dsg_detr():
     from lib.supervised.biased.dsgdetr.dsgdetr import DsgDETR
-    from lib.supervised.biased.dsgdetr.track import get_sequence
+    from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
     from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 
     model = DsgDETR(mode=conf.mode,
@@ -84,7 +84,7 @@ def train_dsg_detr():
             # prevent gradients to FasterRCNN
             with torch.no_grad():
                 entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-            get_sequence(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
+            get_sequence_with_tracking(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
             pred = model(entry)
 
             attention_distribution = pred[const.ATTENTION_DISTRIBUTION]
@@ -167,7 +167,7 @@ def train_dsg_detr():
                 num_boxes = copy.deepcopy(data[3].cuda(0))
                 gt_annotation = AG_dataset_test.gt_annotations[data[4]]
                 entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-                get_sequence(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
+                get_sequence_with_tracking(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
                 pred = model(entry)
 
                 vid_no = gt_annotation[0][0][const.FRAME].split('.')[0]

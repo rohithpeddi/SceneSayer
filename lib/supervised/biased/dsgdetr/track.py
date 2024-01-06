@@ -120,7 +120,7 @@ def clean_bbox(entry):
 	return final_boxes, final_feats, final_dists, final_labels, mapping
 
 
-def get_sequence(entry, gt_annotation, matcher, shape, task="sgcls"):
+def get_sequence_with_tracking(entry, gt_annotation, matcher, shape, task="sgcls"):
 	if task == "predcls":
 		indices = []
 		for i in entry["labels"].unique():

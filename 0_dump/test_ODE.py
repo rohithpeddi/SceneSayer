@@ -8,7 +8,7 @@ from lib.supervised.biased.sga.ODE import ODE as ODE
 
 from constants import Constants as const
 from tqdm import tqdm
-from lib.supervised.biased.dsgdetr.track import get_sequence
+from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 from test_base import fetch_diffeq_test_basic_config, write_future_evaluators_stats, write_percentage_evaluators_stats, \
 	write_gen_evaluators_stats, evaluate_anticipated_future_frame_scene_graph
@@ -43,7 +43,7 @@ def test_ode():
 			start = time()
 			gt_annotation = entry[const.GT_ANNOTATION]
 			frame_size = entry[const.FRAME_SIZE]
-			get_sequence(entry, gt_annotation, matcher, frame_size, conf.mode)
+			get_sequence_with_tracking(entry, gt_annotation, matcher, frame_size, conf.mode)
 			pred = ode(entry, True)
 			global_output = pred["global_output"]
 			times = pred["times"]
@@ -112,7 +112,7 @@ def test_ode():
 			for entry in tqdm(dataloader_test, position=0, leave=True):
 				gt_annotation = entry[const.GT_ANNOTATION]
 				frame_size = entry[const.FRAME_SIZE]
-				get_sequence(entry, gt_annotation, matcher, frame_size, conf.mode)
+				get_sequence_with_tracking(entry, gt_annotation, matcher, frame_size, conf.mode)
 				ind, pred = ode.forward_single_entry(context_fraction=context_fraction, entry=entry)
 				if ind >= len(gt_annotation):
 					continue

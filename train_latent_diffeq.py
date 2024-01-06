@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from constants import Constants as const
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.biased.dsgdetr.track import get_sequence
+from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.biased.sga.ODE import ODE as ODE
 from lib.supervised.biased.sga.SDE import SDE
 from train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions, save_model
@@ -23,7 +23,7 @@ def train_model(conf, model, matcher, optimizer, dataloader_train, model_ratio, 
 	for entry in tqdm(dataloader_train, position=0, leave=True):
 		gt_annotation = entry[const.GT_ANNOTATION]
 		frame_size = entry[const.FRAME_SIZE]
-		get_sequence(entry, gt_annotation, matcher, frame_size, conf.mode)
+		get_sequence_with_tracking(entry, gt_annotation, matcher, frame_size, conf.mode)
 		pred = model(entry)
 		global_output = pred["global_output"]
 		spatial_distribution = pred["spatial_distribution"]
@@ -140,7 +140,7 @@ def test_model(model, dataloader_test, evaluator, conf, matcher):
 		for entry in tqdm(dataloader_test, position=0, leave=True):
 			gt_annotation = entry[const.GT_ANNOTATION]
 			frame_size = entry[const.FRAME_SIZE]
-			get_sequence(entry, gt_annotation, matcher, frame_size, conf.mode)
+			get_sequence_with_tracking(entry, gt_annotation, matcher, frame_size, conf.mode)
 			pred = model(entry, True)
 			for i in range(1, conf.max_window + 1):
 				pred_anticipated = pred.copy()

@@ -7,7 +7,7 @@ import pandas as pd
 import copy
 from lib.object_detector import detector
 from lib.supervised.biased.sga.object_predictor_forecasting import STTran
-from lib.supervised.biased.dsgdetr.track import get_sequence
+from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 from train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions
 
@@ -55,7 +55,7 @@ def train_obj_pred_forecasting():
 			# prevent gradients to FasterRCNN
 			with torch.no_grad():
 				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-			get_sequence(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
+			get_sequence_with_tracking(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
 			dec_out, bbox_out, pred, vr, vr_out = model(entry, CONTEXT, FUTURE, epoch)
 			# dec_out,pred,vr,vr_out = model(entry,CONTEXT,FUTURE,epoch)
 			
@@ -208,7 +208,7 @@ def train_obj_pred_forecasting():
 				num_boxes = copy.deepcopy(data[3].cuda(0))
 				gt_annotation = ag_features_test.gt_annotations[data[4]]
 				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-				get_sequence(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
+				get_sequence_with_tracking(entry, gt_annotation, matcher, (im_info[0][:2] / im_info[0, 2]).cpu().data, conf.mode)
 				
 				start = 0
 				context = CONTEXT

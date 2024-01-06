@@ -7,7 +7,7 @@ from lib.supervised.biased.sga.SDE import SDE as SDE
 
 from constants import Constants as const
 from tqdm import tqdm
-from lib.supervised.biased.dsgdetr.track import get_sequence
+from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 
 
@@ -157,7 +157,7 @@ def test_sde():
             start = time()
             gt_annotation = entry[const.GT_ANNOTATION]
             frame_size = entry[const.FRAME_SIZE]
-            get_sequence(entry, gt_annotation, matcher, frame_size, conf.mode)
+            get_sequence_with_tracking(entry, gt_annotation, matcher, frame_size, conf.mode)
             pred = sde(entry, True)
             global_output = pred["global_output"]
             times = pred["times"]

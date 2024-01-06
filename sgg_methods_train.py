@@ -47,7 +47,7 @@ def prepare_optimizer(model):
 
 def train_dsg_detr():
     from lib.supervised.biased.dsgdetr.dsgdetr import DsgDETR
-    from lib.supervised.biased.dsgdetr.track import get_sequence
+    from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
     from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 
     model = DsgDETR(mode=conf.mode,
@@ -76,7 +76,7 @@ def train_dsg_detr():
             gt_annotation = train_entry[const.GT_ANNOTATION]
             frame_size = train_entry[const.FRAME_SIZE]
 
-            get_sequence(train_entry, gt_annotation, matcher, frame_size, conf.mode)
+            get_sequence_with_tracking(train_entry, gt_annotation, matcher, frame_size, conf.mode)
             pred = model(train_entry)
 
             attention_distribution = pred[const.ATTENTION_DISTRIBUTION]
@@ -147,7 +147,7 @@ def train_dsg_detr():
                 gt_annotation = test_entry[const.GT_ANNOTATION]
                 frame_size = test_entry[const.FRAME_SIZE]
 
-                get_sequence(test_entry, gt_annotation, matcher, frame_size, conf.mode)
+                get_sequence_with_tracking(test_entry, gt_annotation, matcher, frame_size, conf.mode)
                 pred = model(test_entry)
 
                 vid_no = gt_annotation[0][0][const.FRAME].split('.')[0]

@@ -10,7 +10,7 @@ import pandas as pd
 from tqdm import tqdm
 from constants import Constants as const
 
-from lib.supervised.biased.dsgdetr.track import get_sequence
+from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 
 from train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions
@@ -51,7 +51,7 @@ def train_ode():
 		for entry in tqdm(dataloader_train, position=0, leave=True):
 			gt_annotation = entry[const.GT_ANNOTATION]
 			frame_size = entry[const.FRAME_SIZE]
-			get_sequence(entry, gt_annotation, matcher, frame_size, conf.mode)
+			get_sequence_with_tracking(entry, gt_annotation, matcher, frame_size, conf.mode)
 			pred = ode(entry)
 			global_output = pred["global_output"]
 			spatial_distribution = pred["spatial_distribution"]
@@ -178,7 +178,7 @@ def train_ode():
 			for entry in tqdm(dataloader_test, position=0, leave=True):
 				gt_annotation = entry[const.GT_ANNOTATION]
 				frame_size = entry[const.FRAME_SIZE]
-				get_sequence(entry, gt_annotation, matcher, frame_size, conf.mode)
+				get_sequence_with_tracking(entry, gt_annotation, matcher, frame_size, conf.mode)
 				pred = ode(entry, True)
 				vid_no = gt_annotation[0][0]["frame"].split('.')[0]
 				for i in range(1, max_window + 1):

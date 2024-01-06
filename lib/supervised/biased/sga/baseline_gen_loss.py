@@ -441,7 +441,8 @@ class BaselineWithGenLoss(nn.Module):
 			sequence_features = self.positional_encoder(sequence_features, pos_index)
 			seq_len = sequence_features.shape[1]
 			
-			gen_rel_ = self.gen_temporal_transformer(sequence_features,src_key_padding_mask = masks.cuda(), mask=in_mask)
+			# gen_rel_ = self.gen_temporal_transformer(sequence_features,src_key_padding_mask = masks.cuda(), mask=in_mask)
+			gen_rel_ = self.gen_temporal_transformer(sequence_features, mask=in_mask)
 			mask_input = self.positional_encoder(gen_rel_, pos_index)
 			
 			output = []

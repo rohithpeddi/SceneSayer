@@ -429,14 +429,24 @@ class BaselineWithGenLoss(nn.Module):
 			future_len = future_idx.shape[0]
 			
 			seq = []
-			for s in sequences:
-				index = s[(s < context_len)]
-				seq.append(index)
+		        prev_seq = []
+		        seq_mask = torch.zeros(len(sequences))
+			for i,s in enumerate(sequences):
+				index = s[ (s<( context_len))]
+				prev_seq.append(index)
+				if len(index)!=0:
+				    seq_mask[i]=1
+				    seq.append(index) 
 			
 			future_seq = []
 			for s in sequences:
 				index = s[(s >= context_len) & (s < (context_len + future_len))]
 				future_seq.append(index)
+
+			new_future_seq =[]
+		    	for i,s in enumerate(future_seq):
+				if seq_mask[i]==1:
+			    		new_future_seq.append(s) 
 			
 			pos_index = []
 			for index in seq:
@@ -464,7 +474,7 @@ class BaselineWithGenLoss(nn.Module):
 			
 			output = []
 			for i in range(future):
-				out = self.anti_temporal_transformer(mask_input, mask=in_mask)
+				out = self.anti_temporal_transformer(mask_input,src_key_padding_mask=masks.cuda(), mask=in_mask)
 				output.append(out[:, -1, :].unsqueeze(1))
 				out_last = [out[:, -1, :]]
 				pred = torch.stack(out_last, dim=1)
@@ -472,6 +482,7 @@ class BaselineWithGenLoss(nn.Module):
 				in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(
 					torch.bool)
 				in_mask = in_mask.cuda()
+				masks = torch.cat([masks, torch.full((masks.shape[0], 1), False, dtype=bool)], dim=1)
 			
 			output = torch.cat(output,dim=1)
 		        rel_ = output
@@ -479,7 +490,7 @@ class BaselineWithGenLoss(nn.Module):
 		        rel_flat1 = []
 		
 		
-		        for index,rel in zip(future_seq,rel_):
+		        for index,rel in zip(new_future_seq,rel_):
 				if len(index)==0:
 		                    continue
 		                for i in range(len(index)):
@@ -489,7 +500,7 @@ class BaselineWithGenLoss(nn.Module):
 		        rel_flat = torch.tensor(rel_flat1)
 		        rel_flat = rel_flat.to('cuda:0')
 		        #rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(future_seq,rel_)])
-		        indices_flat = torch.cat(future_seq).unsqueeze(1).repeat(1,dsg_global_output.shape[1])
+		        indices_flat = torch.cat(new_future_seq).unsqueeze(1).repeat(1,dsg_global_output.shape[1])
 		            
 		        global_output = torch.zeros_like(dsg_global_output).to(dsg_global_output.device)
 			
@@ -504,7 +515,7 @@ class BaselineWithGenLoss(nn.Module):
 		        context +=1
 		
 		                        
-		            temp = {}
+		        temp = {}
 		
 		        temp["attention_distribution"] = self.a_rel_compress(gb_output)
 		        spatial_distribution = self.s_rel_compress(gb_output)

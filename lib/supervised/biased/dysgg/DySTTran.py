@@ -1,11 +1,10 @@
-import torch
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
 
 from constants import Constants as const
-from lib.supervised.biased.dysgg.blocks import ObjectClassifierMLP, PositionalEncoding, EncoderLayer, Encoder
 from lib.word_vectors import obj_edge_vectors
-
+import torch
+from lib.supervised.biased.dysgg.blocks import ObjectClassifierMLP, PositionalEncoding, EncoderLayer, Encoder
 
 class DySTTran(nn.Module):
 	

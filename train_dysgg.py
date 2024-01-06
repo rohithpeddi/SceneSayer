@@ -195,10 +195,10 @@ def main():
 	model_name = None
 	
 	is_tracking_enabled = False
-	if method_name == "DySTTran":
+	if method_name == "dysttran":
 		model, optimizer, scheduler = load_DySTTran(conf, ag_train_data, gpu_device)
 		model_name = "dysttran"
-	elif method_name == "DyDsgDETR":
+	elif method_name == "dydsgdetr":
 		model, optimizer, scheduler = load_DyDsgDETR(conf, ag_train_data, gpu_device)
 		model_name = "dydsgdetr"
 		is_tracking_enabled = True
@@ -221,6 +221,10 @@ def main():
 if __name__ == '__main__':
 	# Should set method_name appropriately
 	main()
+
+
+# python train_dysgg.py -method_name dysttran -use_raw_data -mode sgdet -save_path /home/rxp190007/DATA/ag/checkpoints -datasize large -data_path /home/rxp190007/DATA/ag
+# python train_dysgg.py -method_name dydsgdetr -use_raw_data -mode sgdet -save_path /home/rxp190007/DATA/ag/checkpoints -datasize large -data_path /home/rxp190007/DATA/ag
 
 # python train_try.py -mode sgcls -ckpt /home/cse/msr/csy227518/scratch/DSG/DSG-DETR/sgcls/model_9.tar -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/
 """ python train_obj_mask.py -mode sgdet -save_path forecasting/sgcls_full_context_f5/ -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ """

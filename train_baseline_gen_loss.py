@@ -54,7 +54,7 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
 	
 	total_frames = len(entry["im_idx"].unique())
 	if conf.mode == 'sgcls' or conf.mode == 'sgdet':
-		losses['object_loss'] = ce_loss(pred['distribution'], pred['labels'])
+		losses['object_loss'] = ce_loss(pred['distribution'], pred['labels']).mean()
 	
 	losses["attention_relation_loss"] = 0
 	losses["spatial_relation_loss"] = 0
@@ -109,17 +109,55 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
 			for i in range(len(pred["spatial_gt"][context_end_idx:future_end_idx])):
 				spatial_label[i, pred["spatial_gt"][context_end_idx:future_end_idx][i]] = 1
 				contact_label[i, pred["contacting_gt"][context_end_idx:future_end_idx][i]] = 1
+
+
+		ind=torch.where(entry["boxes"][:,0]==context)[0][0]
+            	prev_ind = torch.where(entry["boxes"][:,0]==context-1)[0][0]
+            	f_ind=torch.where(entry["boxes"][:,0]==context+future-1)[0][-1]
+
+		if conf.mode == 'predcls':
+			con=set(pred["labels"][prev_ind:ind].tolist())
+			fut=set(pred["labels"][ind:f_ind+1].tolist())
+			all_con = set(pred["labels"][:ind].tolist())
+	    	else:
+			con=set(pred["pred_labels"][prev_ind:ind].tolist())
+			fut=set(pred["pred_labels"][ind:f_ind+1].tolist())
+			all_con = set(pred["pred_labels"][:ind].tolist())
+	    	ob1 = fut-con
+	    	ob2 = all_con-con
+	    	objects = ob1.union(ob2)
+	    	objects = list(objects)
+
+		weight = torch.ones(pred["output"][count]["global_output"].shape[0]).cuda()
+            	for obj in objects:
+                	for idx,pair in enumerate(pred["pair_idx"][context_end_idx:future_end_idx]):
+                    		if conf.mode=='predcls':
+                        		if pred["labels"][pair[1]]==obj:
+                            			weight[idx]=0
+                    		else:
+                        		if pred["pred_labels"][pair[1]]==obj:
+                            			weight[idx]=0
+
+		
 		try:
-			losses["attention_relation_loss"] += ce_loss(attention_distribution, attention_label)
+			at_loss = ce_loss(attention_distribution, attention_label)
+                	losses["attention_relation_loss"] += (at_loss*weight).mean()
 		except ValueError:
 			attention_label = attention_label.unsqueeze(0)
-			losses["attention_relation_loss"] += ce_loss(attention_distribution, attention_label)
+                	at_loss = ce_loss(attention_distribution, attention_label)
+                	losses["attention_relation_loss"] += (at_loss*weight).mean()
 		if not conf.bce_loss:
-			losses["spatial_relation_loss"] += mlm_loss(spatial_distribution, spatial_label)
-			losses["contact_relation_loss"] += mlm_loss(contact_distribution, contact_label)
+			sp_loss = mlm_loss(spatial_distribution, spatial_label)
+                	losses["spatial_relation_loss"] += (sp_loss*weight).mean()
+
+			con_loss = mlm_loss(contact_distribution, contact_label)
+	                losses["contact_relation_loss"] += (con_loss*weight).mean()
 		else:
-			losses["spatial_relation_loss"] += bce_loss(spatial_distribution, spatial_label)
-			losses["contact_relation_loss"] += bce_loss(contact_distribution, contact_label)
+			sp_loss = bce_loss(spatial_distribution, spatial_label)
+                	losses["spatial_relation_loss"] += (sp_loss*weight).mean()
+
+			con_loss = bce_loss(contact_distribution, contact_label)
+                	losses["contact_relation_loss"] += (con_loss*weight).mean()
 		
 		context += 1
 		count += 1
@@ -151,18 +189,18 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
 			gen_contact_label[i, pred["contacting_gt"][:-future_len][i]] = 1
 	
 	try:
-		losses["gen_attention_relation_loss"] = ce_loss(gen_attention_out, gen_attention_label)
+		losses["gen_attention_relation_loss"] = ce_loss(gen_attention_out, gen_attention_label).mean()
 	except ValueError:
 		gen_attention_label = attention_label.unsqueeze(0)
-		losses["gen_attention_relation_loss"] = ce_loss(gen_attention_out, gen_attention_label)
+		losses["gen_attention_relation_loss"] = ce_loss(gen_attention_out, gen_attention_label).mean()
 	
 	if not conf.bce_loss:
-		losses["gen_spatial_relation_loss"] = mlm_loss(gen_spatial_out, gen_spatial_label)
-		losses["gen_contact_relation_loss"] = mlm_loss(gen_contacting_out, gen_contact_label)
+		losses["gen_spatial_relation_loss"] = mlm_loss(gen_spatial_out, gen_spatial_label).mean()
+		losses["gen_contact_relation_loss"] = mlm_loss(gen_contacting_out, gen_contact_label).mean()
 	
 	else:
-		losses["gen_spatial_relation_loss"] = bce_loss(gen_spatial_out, gen_spatial_label)
-		losses["gen_contact_relation_loss"] = bce_loss(gen_contacting_out, gen_contact_label)
+		losses["gen_spatial_relation_loss"] = bce_loss(gen_spatial_out, gen_spatial_label).mean()
+		losses["gen_contact_relation_loss"] = bce_loss(gen_contacting_out, gen_contact_label).mean()
 	
 	losses["attention_relation_loss"] = losses["attention_relation_loss"] / count
 	losses["spatial_relation_loss"] = losses["spatial_relation_loss"] / count
@@ -218,7 +256,7 @@ def process_test_video(entry, model, gt_annotation):
 		future = total_frames - (start + context)
 	while start + context + 1 <= total_frames:
 		future_frame_start_id = entry["im_idx"].unique()[context]
-		
+		prev_con = entry["im_idx"].unique()[context-1]
 		if start + context + future > total_frames > start + context:
 			future = total_frames - (start + context)
 		
@@ -230,7 +268,106 @@ def process_test_video(entry, model, gt_annotation):
 		
 		gt_future = gt_annotation[start + context:start + context + future]
 		
-		evaluator.evaluate_scene_graph_forecasting(gt_future, pred, context_end_idx, future_end_idx, future_idx, count)
+		ind=torch.where(entry["boxes"][:,0]==future_frame_start_id)[0][0]
+                prev_ind = torch.where(entry["boxes"][:,0]==prev_con)[0][0]
+                f_ind=torch.where(entry["boxes"][:,0]==future_frame_end_id)[0][-1]
+
+		if conf.mode == 'predcls':
+                        con=set(pred["labels"][prev_ind:ind].tolist())
+                        fut=set(pred["labels"][ind:f_ind+1].tolist())
+                        all_con=set(pred["labels"][:ind].tolist())
+                else:
+                        con=set(pred["pred_labels"][prev_ind:ind].tolist())
+                        fut=set(pred["pred_labels"][ind:f_ind+1].tolist())
+                        all_con=set(pred["pred_labels"][:ind].tolist())
+
+		box_mask = torch.ones(pred["boxes"][ind:f_ind+1].shape[0])
+                frame_mask = torch.ones(future_idx.shape[0])
+
+		im_idx = pred["im_idx"][context_end_idx:future_end_idx]
+                im_idx = im_idx-im_idx.min()
+
+		pair_idx = pred["pair_idx"][context_end_idx:future_end_idx]
+		reshape_pair = pair_idx.view(-1,2)
+		min_value = reshape_pair.min()
+		new_pair = reshape_pair-min_value
+		pair_idx = new_pair.view(pair_idx.size())
+
+		boxes = pred["boxes"][ind:f_ind+1]
+                labels = pred["labels"][ind:f_ind+1]
+                pred_labels = pred["pred_labels"][ind:f_ind+1]
+                scores = pred["scores"][ind:f_ind+1]
+		if conf.mode  != 'predcls':
+                        pred_scores = pred["pred_scores"][ind:f_ind+1]
+
+		ob1 = fut-con
+                ob2 = all_con-con
+                objects = ob1.union(ob2)
+                objects = list(objects)
+		for obj in objects:
+                        for idx,pair in enumerate(pred["pair_idx"][context_end_idx:future_end_idx]):
+                        	if conf.mode == 'predcls':
+                                	if pred["labels"][pair[1]]==obj:
+                                    		frame_mask[idx]=0
+                                    		box_mask[pair_idx[idx,1]]=0
+                            	else:
+                                	if pred["pred_labels"][pair[1]]==obj:
+                                    		frame_mask[idx]=0
+                                    		box_mask[pair_idx[idx,1]]=0
+
+		im_idx = im_idx[frame_mask==1]
+                removed  = pair_idx[frame_mask==0]
+                mask_pair_idx = pair_idx[frame_mask==1]
+
+		flat_pair = mask_pair_idx.view(-1)
+                flat_pair_copy = mask_pair_idx.view(-1).detach().clone()
+                var=1
+                for pair in removed:
+        	        idx = pair[1]
+                        for i,p in enumerate(flat_pair_copy):
+                            	if p>idx:
+                                	flat_pair[i]-=1
+
+		new_pair_idx = flat_pair.view(mask_pair_idx.size())
+
+		if conf.mode  == 'predcls':
+			scores = scores[box_mask==1]
+			labels = labels[box_mask==1]
+                pred_labels = pred_labels[box_mask==1]
+
+		boxes = boxes[box_mask==1]
+                if conf.mode  != 'predcls':
+                        pred_scores = pred_scores[box_mask==1]
+
+		atten = pred["output"][count]['attention_distribution'][frame_mask==1]
+                spatial = pred["output"][count]['spatial_distribution'][frame_mask==1]
+                contact = pred["output"][count]['contacting_distribution'][frame_mask==1]
+
+		if conf.mode  == 'predcls':
+                        pred_dict = {'attention_distribution':atten,
+                                    'spatial_distribution':spatial,
+                                    'contacting_distribution':contact,
+                                    'boxes':boxes,
+                                    'pair_idx':new_pair_idx,
+                                    'im_idx':im_idx,
+                                    'labels':labels,
+                                    'pred_labels':pred_labels,
+                                    'scores':scores
+                                    }
+                else:
+                        pred_dict = {'attention_distribution':atten,
+                                    'spatial_distribution':spatial,
+                                    'contacting_distribution':contact,
+                                    'boxes':boxes,
+                                    'pair_idx':new_pair_idx,
+                                    'im_idx':im_idx,
+                                    #'labels':labels,
+                                    'pred_labels':pred_labels,
+                                    #'scores':scores,
+                                    'pred_scores':pred_scores
+                                    }      
+		
+		evaluator.evaluate_scene_graph(gt_future, pred_dict)
 		count += 1
 		context += 1
 

@@ -174,31 +174,31 @@ def process_test_video(conf, entry, model, gt_annotation, evaluator):
             future = total_frames - context
 
         future_frame_end_id = entry["im_idx"].unique()[context + future - 1]
-
         context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
         future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1]) + 1
-        future_idx = entry["im_idx"][context_end_idx:future_end_idx]
-
+        entry_future_idx = entry["im_idx"][context_end_idx:future_end_idx]
         gt_future = gt_annotation[context:context + future]
 
-        context = torch.where(entry["boxes"][:, 0] == future_frame_start_id)[0][0]
-        context_excluding_last_frame = torch.where(entry["boxes"][:, 0] == prev_con)[0][0]
-        future_boxes_ind = torch.where(entry["boxes"][:, 0] == future_frame_end_id)[0][-1]
+        context_boxes_idx = torch.where(entry["boxes"][:, 0] == future_frame_start_id)[0][0]
+        context_excluding_last_frame_boxes_idx = torch.where(entry["boxes"][:, 0] == prev_con)[0][0]
+        future_boxes_idx = torch.where(entry["boxes"][:, 0] == future_frame_end_id)[0][-1]
 
         if conf.mode == 'predcls':
-            context_last_frame = set(pred["labels"][context_excluding_last_frame:context].tolist())
-            future_labels = set(pred["labels"][context:future_boxes_ind + 1].tolist())
-            context_labels = set(pred["labels"][:context].tolist())
+            context_last_frame_labels = set(
+                pred["labels"][context_excluding_last_frame_boxes_idx:context_boxes_idx].tolist())
+            future_labels = set(pred["labels"][context_boxes_idx:future_boxes_idx + 1].tolist())
+            context_labels = set(pred["labels"][:context_boxes_idx].tolist())
         else:
-            context_last_frame = set(pred["pred_labels"][context_excluding_last_frame:context].tolist())
-            future_labels = set(pred["pred_labels"][context:future_boxes_ind + 1].tolist())
+            context_last_frame_labels = set(
+                pred["pred_labels"][context_excluding_last_frame_boxes_idx:context].tolist())
+            future_labels = set(pred["pred_labels"][context:future_boxes_idx + 1].tolist())
             context_labels = set(pred["pred_labels"][:context].tolist())
 
-        box_mask = torch.ones(pred["boxes"][context:future_boxes_ind + 1].shape[0])
-        frame_mask = torch.ones(future_idx.shape[0])
+        box_mask = torch.ones(pred["boxes"][context_boxes_idx:future_boxes_idx + 1].shape[0])
+        frame_mask = torch.ones(entry_future_idx.shape[0])
 
-        future_im_idx = pred["im_idx"][context_end_idx:future_end_idx]
-        future_im_idx = future_im_idx - future_im_idx.min()
+        pred_future_im_idx = pred["im_idx"][context_end_idx:future_end_idx]
+        pred_future_im_idx = pred_future_im_idx - pred_future_im_idx.min()
 
         pair_idx = pred["pair_idx"][context_end_idx:future_end_idx]
         reshape_pair = pair_idx.view(-1, 2)
@@ -206,29 +206,22 @@ def process_test_video(conf, entry, model, gt_annotation, evaluator):
         new_pair = reshape_pair - min_value
         pair_idx = new_pair.view(pair_idx.size())
 
-        future_boxes = pred["boxes"][context:future_boxes_ind + 1]
-        future_labels = pred["labels"][context:future_boxes_ind + 1]
-        future_pred_labels = pred["pred_labels"][context:future_boxes_ind + 1]
-        future_scores = pred["scores"][context:future_boxes_ind + 1]
-        if conf.mode != 'predcls':
-            future_pred_scores = pred["pred_scores"][context:future_boxes_ind + 1]
-
-        appearing_objects = future_labels - context_last_frame
-        disappearing_objects = context_labels - context_last_frame
-        objects = appearing_objects.union(disappearing_objects)
-        objects = list(objects)
-        for obj in objects:
+        appearing_objects_labels = future_labels - context_last_frame_labels
+        disappearing_objects_labels = context_labels - context_last_frame_labels
+        ignored_objects_labels = appearing_objects_labels.union(disappearing_objects_labels)
+        ignored_objects_labels = list(ignored_objects_labels)
+        for object_label in ignored_objects_labels:
             for idx, pair in enumerate(pred["pair_idx"][context_end_idx:future_end_idx]):
                 if conf.mode == 'predcls':
-                    if pred["labels"][pair[1]] == obj:
+                    if pred["labels"][pair[1]] == object_label:
                         frame_mask[idx] = 0
                         box_mask[pair_idx[idx, 1]] = 0
                 else:
-                    if pred["pred_labels"][pair[1]] == obj:
+                    if pred["pred_labels"][pair[1]] == object_label:
                         frame_mask[idx] = 0
                         box_mask[pair_idx[idx, 1]] = 0
 
-        future_im_idx = future_im_idx[frame_mask == 1]
+        pred_future_im_idx = pred_future_im_idx[frame_mask == 1]
         removed = pair_idx[frame_mask == 0]
         mask_pair_idx = pair_idx[frame_mask == 1]
 
@@ -241,6 +234,13 @@ def process_test_video(conf, entry, model, gt_annotation, evaluator):
                     flat_pair[i] -= 1
 
         future_pair_idx = flat_pair.view(mask_pair_idx.size())
+
+        future_boxes = pred["boxes"][context_boxes_idx:future_boxes_idx + 1]
+        future_labels = pred["labels"][context_boxes_idx:future_boxes_idx + 1]
+        future_pred_labels = pred["pred_labels"][context_boxes_idx:future_boxes_idx + 1]
+        future_scores = pred["scores"][context_boxes_idx:future_boxes_idx + 1]
+        if conf.mode != 'predcls':
+            future_pred_scores = pred["pred_scores"][context_boxes_idx:future_boxes_idx + 1]
 
         if conf.mode == 'predcls':
             future_scores = future_scores[box_mask == 1]
@@ -256,7 +256,7 @@ def process_test_video(conf, entry, model, gt_annotation, evaluator):
             'contacting_distribution': pred["output"][count]['contacting_distribution'][frame_mask == 1],
             'boxes': future_boxes,
             'pair_idx': future_pair_idx,
-            'im_idx': future_im_idx,
+            'im_idx': pred_future_im_idx,
         }
 
         if conf.mode == 'predcls':
@@ -358,6 +358,5 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
 # python train_baseline.py -mode sgdet -method_name baseline_so -use_raw_data -baseline_future 3

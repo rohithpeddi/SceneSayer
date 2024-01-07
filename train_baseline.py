@@ -107,10 +107,18 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
 		ind = torch.where(entry["boxes"][:, 0] == context)[0][0]
 		prev_ind = torch.where(entry["boxes"][:, 0] == context - 1)[0][0]
 		f_ind = torch.where(entry["boxes"][:, 0] == context + future - 1)[0][-1]
-		con = set(pred["pred_labels"][prev_ind:ind].tolist())
-		fut = set(pred["pred_labels"][ind:f_ind + 1].tolist())
-		
-		objects = list(fut - con)
+		if conf.mode == 'predcls':
+	                con=set(pred["labels"][prev_ind:ind].tolist())
+	                fut=set(pred["labels"][ind:f_ind+1].tolist())
+	                all_con = set(pred["labels"][:ind].tolist())
+            	else:
+                	con=set(pred["pred_labels"][prev_ind:ind].tolist())
+                	fut=set(pred["pred_labels"][ind:f_ind+1].tolist())
+                	all_con = set(pred["pred_labels"][:ind].tolist())
+            	ob1 = fut-con
+            	ob2 = all_con-con
+            	objects = ob1.union(ob2)
+            	objects = list(objects)
 		weight = torch.ones(pred["output"][count]["global_output"].shape[0]).cuda()
 		for obj in objects:
 			for idx, pair in enumerate(pred["pair_idx"][context_end_idx:future_end_idx]):
@@ -210,8 +218,18 @@ def process_test_video(entry, model, gt_annotation):
 		ind=torch.where(entry["boxes"][:,0]==future_frame_start_id)[0][0]
 		prev_ind = torch.where(entry["boxes"][:,0]==prev_con)[0][0]
 	        f_ind=torch.where(entry["boxes"][:,0]==future_frame_end_id)[0][-1]
-		con = set(pred["pred_labels"][prev_ind:ind].tolist())
-		fut = set(pred["pred_labels"][ind:f_ind + 1].tolist())
+		if conf.mode == 'predcls':
+                	con=set(pred["labels"][prev_ind:ind].tolist())
+                	fut=set(pred["labels"][ind:f_ind+1].tolist())
+                	all_con = set(pred["labels"][:ind].tolist())
+            	else:
+                	con=set(pred["pred_labels"][prev_ind:ind].tolist())
+                	fut=set(pred["pred_labels"][ind:f_ind+1].tolist())
+                	all_con = set(pred["pred_labels"][:ind].tolist())
+            	ob1 = fut-con
+            	ob2 = all_con-con
+            	objects = ob1.union(ob2)
+            	objects = list(objects)
 		
 		box_mask = torch.ones(pred["boxes"][ind:f_ind + 1].shape[0])
 		frame_mask = torch.ones(future_idx.shape[0])

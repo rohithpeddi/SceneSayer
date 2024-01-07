@@ -5,7 +5,7 @@ import torch
 
 from lib.object_detector import detector
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.biased.sga.baseline import Baseline
+from lib.supervised.biased.sga.baseline_anticipation import BaselineWithAnticipation
 from test_base import fetch_transformer_test_basic_config
 
 
@@ -74,13 +74,13 @@ def test_baseline():
 	).to(device=gpu_device)
 	object_detector.eval()
 	
-	model = Baseline(mode=conf.mode,
-	                 attention_class_num=len(ag_test_data.attention_relationships),
-	                 spatial_class_num=len(ag_test_data.spatial_relationships),
-	                 contact_class_num=len(ag_test_data.contacting_relationships),
-	                 obj_classes=ag_test_data.object_classes,
-	                 enc_layer_num=conf.enc_layer,
-	                 dec_layer_num=conf.dec_layer).to(device=gpu_device)
+	model = BaselineWithAnticipation(mode=conf.mode,
+	                                 attention_class_num=len(ag_test_data.attention_relationships),
+	                                 spatial_class_num=len(ag_test_data.spatial_relationships),
+	                                 contact_class_num=len(ag_test_data.contacting_relationships),
+	                                 obj_classes=ag_test_data.object_classes,
+	                                 enc_layer_num=conf.enc_layer,
+	                                 dec_layer_num=conf.dec_layer).to(device=gpu_device)
 	model.eval()
 	
 	ckpt = torch.load(conf.model_path, map_location=gpu_device)

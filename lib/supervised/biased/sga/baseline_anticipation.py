@@ -9,7 +9,7 @@ from lib.word_vectors import obj_edge_vectors
 from blocks import ObjectClassifierMLP
 
 
-class BaselineWithAnticipationGenLoss(nn.Module):
+class BaselineWithAnticipation(nn.Module):
 	
 	def __init__(
 			self,
@@ -22,7 +22,7 @@ class BaselineWithAnticipationGenLoss(nn.Module):
 			enc_layer_num=None,
 			dec_layer_num=None
 	):
-		super(BaselineWithAnticipationGenLoss, self).__init__()
+		super(BaselineWithAnticipation, self).__init__()
 		
 		self.obj_classes = obj_classes
 		self.rel_classes = rel_classes
@@ -63,20 +63,13 @@ class BaselineWithAnticipationGenLoss(nn.Module):
 		spatial_encoder = EncoderLayer(d_model=d_model, dim_feedforward=2048, nhead=8, batch_first=True)
 		self.spatial_transformer = Encoder(spatial_encoder, num_layers=1)
 		
-		# generation temporal encode
-		gen_temporal_encoder = EncoderLayer(d_model=d_model, dim_feedforward=2048, nhead=8, batch_first=True)
-		self.gen_temporal_transformer = Encoder(gen_temporal_encoder, num_layers=3)
-		# anticipation temporal encoder
-		anti_temporal_encoder = EncoderLayer(d_model=d_model, dim_feedforward=2048, nhead=8, batch_first=True)
-		self.anti_temporal_transformer = Encoder(anti_temporal_encoder, num_layers=1)
+		# temporal encoder
+		temporal_encoder = EncoderLayer(d_model=d_model, dim_feedforward=2048, nhead=8, batch_first=True)
+		self.temporal_transformer = Encoder(temporal_encoder, num_layers=3)
 		
 		self.a_rel_compress = nn.Linear(d_model, self.attention_class_num)
 		self.s_rel_compress = nn.Linear(d_model, self.spatial_class_num)
 		self.c_rel_compress = nn.Linear(d_model, self.contact_class_num)
-		
-		self.gen_a_rel_compress = nn.Linear(d_model, self.attention_class_num)
-		self.gen_s_rel_compress = nn.Linear(d_model, self.spatial_class_num)
-		self.gen_c_rel_compress = nn.Linear(d_model, self.contact_class_num)
 	
 	def process_entry(self, entry):
 		entry = self.object_classifier(entry)
@@ -115,40 +108,19 @@ class BaselineWithAnticipationGenLoss(nn.Module):
 			k = torch.where(obj_class.view(-1) == l)[0]
 			if len(k) > 0:
 				sequences.append(k)
-		
+				
 		return entry, rel_features, sequences
 	
 	def forward(self, entry, context, future):
 		"""
-        Forward method for the baseline
-        :param entry: Dictionary from object classifier
-        :param context: Frame idx for context
-        :param future: Number of next frames to anticipate
-        :return:
-        """
+		Forward method for the baseline
+		:param entry: Dictionary from object classifier
+		:param context: Frame idx for context
+		:param future: Number of next frames to anticipate
+		:return:
+		"""
+		
 		entry, rel_features, sequences = self.process_entry(entry)
-		
-		pos_index = []
-		for index in sequences:
-			im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True, sorted=True)
-			counts = counts.tolist()
-			pos = torch.cat([torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
-			pos_index.append(pos)
-		sequence_features = pad_sequence([rel_features[index] for index in sequences], batch_first=True)
-		in_mask_dsg = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
-		                              diagonal=0)).type(torch.bool)
-		in_mask_dsg = in_mask_dsg.cuda()
-		masks = (1 - pad_sequence([torch.ones(len(index)) for index in sequences], batch_first=True)).bool()
-		pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
-		rel_ = self.global_transformer(self.positional_encoder(sequence_features, pos_index),
-		                               src_key_padding_mask=masks.cuda(), mask=in_mask_dsg)
-		
-		rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(sequences, rel_)])
-		indices_flat = torch.cat(sequences).unsqueeze(1).repeat(1, rel_features.shape[1])
-		
-		assert len(indices_flat) == len(entry["pair_idx"])
-		dsg_global_output = torch.zeros_like(rel_features).to(rel_features.device)
-		dsg_global_output.scatter_(0, indices_flat, rel_flat)
 		
 		""" ################# changes regarding forecasting #################### """
 		
@@ -173,20 +145,16 @@ class BaselineWithAnticipationGenLoss(nn.Module):
 			future_idx = entry["im_idx"][context_end_idx:future_end_idx]
 			future_len = future_idx.shape[0]
 			
-			seq = []
-			prev_seq = []
+			context_seq = []
+			future_seq = []
 			seq_mask = torch.zeros(len(sequences))
 			for i, s in enumerate(sequences):
-				index = s[(s < context_len)]
-				prev_seq.append(index)
-				if len(index) != 0:
+				context_index = s[(s < context_len)]
+				future_index = s[(s >= context_len) & (s < (context_len + future_len))]
+				future_seq.append(future_index)
+				if len(context_index) != 0:
 					seq_mask[i] = 1
-					seq.append(index)
-			
-			future_seq = []
-			for s in sequences:
-				index = s[(s >= context_len) & (s < (context_len + future_len))]
-				future_seq.append(index)
+					context_seq.append(context_index)
 			
 			new_future_seq = []
 			for i, s in enumerate(future_seq):
@@ -194,30 +162,29 @@ class BaselineWithAnticipationGenLoss(nn.Module):
 					new_future_seq.append(s)
 			
 			pos_index = []
-			for index in seq:
-				im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True, sorted=True)
+			for index in context_seq:
+				im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True,
+				                              sorted=True)
 				counts = counts.tolist()
 				if im_idx.numel() == 0:
 					pos = torch.tensor(
 						[torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
 				else:
-					pos = torch.cat([torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
+					pos = torch.cat(
+						[torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
 				pos_index.append(pos)
 			
 			# pdb.set_trace()
-			sequence_features = pad_sequence([dsg_global_output[index] for index in seq], batch_first=True)
+			sequence_features = pad_sequence([rel_features[index] for index in context_seq], batch_first=True)
 			in_mask = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
 			                          diagonal=0)).type(torch.bool)
 			in_mask = in_mask.cuda()
-			masks = (1 - pad_sequence([torch.ones(len(index)) for index in seq], batch_first=True)).bool()
+			masks = (1 - pad_sequence([torch.ones(len(index)) for index in context_seq], batch_first=True)).bool()
 			
 			pos_index = [torch.tensor(seq, dtype=torch.long) for seq in pos_index]
 			pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
 			sequence_features = self.positional_encoder(sequence_features, pos_index)
-			seq_len = sequence_features.shape[1]
-			
 			mask_input = sequence_features
-			
 			output = []
 			for i in range(future):
 				out = self.anti_temporal_transformer(mask_input, src_key_padding_mask=masks.cuda(), mask=in_mask)
@@ -257,9 +224,8 @@ class BaselineWithAnticipationGenLoss(nn.Module):
 			rel_flat = torch.tensor(rel_flat1)
 			rel_flat = rel_flat.to('cuda:0')
 			# rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(future_seq,rel_)])
-			indices_flat = torch.cat(new_future_seq).unsqueeze(1).repeat(1, dsg_global_output.shape[1])
-			
-			global_output = torch.zeros_like(dsg_global_output).to(dsg_global_output.device)
+			indices_flat = torch.cat(new_future_seq).unsqueeze(1).repeat(1, rel_features.shape[1])
+			global_output = torch.zeros_like(rel_features).to(rel_features.device)
 			
 			try:
 				global_output.scatter_(0, indices_flat, rel_flat)
@@ -280,11 +246,7 @@ class BaselineWithAnticipationGenLoss(nn.Module):
 			
 			result[count] = temp
 			count += 1
-		entry["gen_attention_distribution"] = self.gen_a_rel_compress(dsg_global_output)
-		entry["gen_spatial_distribution"] = torch.sigmoid(self.gen_s_rel_compress(dsg_global_output))
-		entry["gen_contacting_distribution"] = torch.sigmoid(self.gen_c_rel_compress(dsg_global_output))
 		entry["output"] = result
-		
 		return entry
 	
 	def forward_single_entry(self, context_fraction, entry):
@@ -297,7 +259,7 @@ class BaselineWithAnticipationGenLoss(nn.Module):
 		entry, rel_features, sequences = self.process_entry(entry)
 		
 		""" ################# changes regarding forecasting #################### """
-		
+	
 		total_frames = len(entry["im_idx"].unique())
 		context = int(math.ceil(context_fraction * total_frames))
 		future = total_frames - context

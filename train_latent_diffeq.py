@@ -141,8 +141,10 @@ def test_model(model, dataloader_test, evaluator, conf, matcher):
 			gt_annotation = entry[const.GT_ANNOTATION]
 			frame_size = entry[const.FRAME_SIZE]
 			get_sequence_with_tracking(entry, gt_annotation, matcher, frame_size, conf.mode)
+			w = max_window
+		        w = min(w, n - 1)
 			pred = model(entry, True)
-			for i in range(1, conf.max_window + 1):
+			for i in range(1, w + 1):
 				pred_anticipated = pred.copy()
 				mask_curr = pred["mask_curr_" + str(i)]
 				pred_anticipated["spatial_distribution"] = pred["anticipated_spatial_distribution"][i - 1][

@@ -29,7 +29,7 @@ def process_data(matcher, model, max_window):
     #         denominator = torch.zeros(global_output.size(0)).to(global_output.device) + 1.0
     #         all_time.append(time() - start)
     #         w = max_window
-    #         n = int(torch.max(pred["im_idx"]) + 1)
+    #         n = len(gt_annotation)
     #         if max_window == -1:
     #             w = n - 1
     #         w = min(w, n - 1)
@@ -93,6 +93,7 @@ def process_data(matcher, model, max_window):
                 gt_annotation = entry[const.GT_ANNOTATION]
                 frame_size = entry[const.FRAME_SIZE]
                 get_sequence_with_tracking(entry, gt_annotation, matcher, frame_size, conf.mode)
+                entry = ode(entry, True)
                 ind, pred = model.forward_single_entry(context_fraction=context_fraction, entry=entry)
                 if ind >= len(gt_annotation):
                     continue

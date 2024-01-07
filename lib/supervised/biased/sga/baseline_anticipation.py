@@ -216,8 +216,7 @@ class BaselineWithAnticipation(nn.Module):
 			for index, rel in zip(new_future_seq, rel_):
 				if len(index) == 0:
 					continue
-				for i in range(len(index)):
-					rel_flat1.extend(rel)
+				rel_flat1.extend(rel[:len(index)])
 			
 			rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
 			rel_flat = torch.tensor(rel_flat1)
@@ -350,8 +349,7 @@ class BaselineWithAnticipation(nn.Module):
 		for index, rel in zip(new_future_seq, rel_):
 			if len(index) == 0:
 				continue
-			for i in range(len(index)):
-				rel_flat1.extend(rel)
+			rel_flat1.extend(rel[:len(index)])
 		
 		rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
 		rel_flat = torch.tensor(rel_flat1)

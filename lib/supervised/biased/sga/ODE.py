@@ -213,7 +213,7 @@ class ODE(nn.Module):
         pair_idx = entry["pair_idx"]
         gt_annotation = entry["gt_annotation"]
         tot = im_idx.size(0)
-        t = torch.tensor(entry["frame_idx"], dtype = torch.int32)
+        t = torch.tensor(entry["frame_idx"], dtype = torch.float32)
         indices = torch.reshape((im_idx[ : -1] != im_idx[1 : ]).nonzero(), (-1, )) + 1
         curr_id = 0
         t_unique = torch.unique(t).float()

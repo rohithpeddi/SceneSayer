@@ -76,34 +76,34 @@ def process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_devic
                 spatial_label[i, pred["spatial_gt"][context_end_idx:future_end_idx][i]] = 1
                 contact_label[i, pred["contacting_gt"][context_end_idx:future_end_idx][i]] = 1
         
-        context = torch.where(entry["boxes"][:, 0] == context)[0][0]
-        context_excluding_last_frame = torch.where(entry["boxes"][:, 0] == context - 1)[0][0]
-        future_boxes_ind = torch.where(entry["boxes"][:, 0] == context + future - 1)[0][-1]
+        context_boxes_idx = torch.where(entry["boxes"][:, 0] == context)[0][0]
+        context_excluding_last_frame_boxes_idx = torch.where(entry["boxes"][:, 0] == context - 1)[0][0]
+        future_boxes_idx = torch.where(entry["boxes"][:, 0] == context + future - 1)[0][-1]
         
         if conf.mode == 'predcls':
-            context_last_frame = set(pred["labels"][context_excluding_last_frame:context].tolist())
-            future_labels = set(pred["labels"][context:future_boxes_ind + 1].tolist())
-            context_labels = set(pred["labels"][:context].tolist())
+            context_last_frame_labels = set(pred["labels"][context_excluding_last_frame_boxes_idx:context_boxes_idx].tolist())
+            future_labels = set(pred["labels"][context_boxes_idx:future_boxes_idx + 1].tolist())
+            context_labels = set(pred["labels"][:context_boxes_idx].tolist())
         else:
-            context_last_frame = set(pred["pred_labels"][context_excluding_last_frame:context].tolist())
-            future_labels = set(pred["pred_labels"][context:future_boxes_ind + 1].tolist())
-            context_labels = set(pred["pred_labels"][:context].tolist())
+            context_last_frame_labels = set(pred["pred_labels"][context_excluding_last_frame_boxes_idx:context_boxes_idx].tolist())
+            future_labels = set(pred["pred_labels"][context_boxes_idx:future_boxes_idx + 1].tolist())
+            context_labels = set(pred["pred_labels"][:context_boxes_idx].tolist())
         
-        appearing_objects = future_labels - context_last_frame
-        disappearing_objects = context_labels - context_last_frame
-        objects = appearing_objects.union(disappearing_objects)
-        objects = list(objects)
+        appearing_object_labels = future_labels - context_last_frame_labels
+        disappearing_object_labels = context_labels - context_last_frame_labels
+        ignored_object_labels = appearing_object_labels.union(disappearing_object_labels)
+        ignored_object_labels = list(ignored_object_labels)
         
         # Weighting loss based on appearance or disappearance of objects
         # We only consider loss on objects that are present in the last frame of the context
         weight = torch.ones(pred["output"][count]["global_output"].shape[0]).cuda()
-        for obj in objects:
+        for object_label in ignored_object_labels:
             for idx, pair in enumerate(pred["pair_idx"][context_end_idx:future_end_idx]):
                 if conf.mode == 'predcls':
-                    if pred["labels"][pair[1]] == obj:
+                    if pred["labels"][pair[1]] == object_label:
                         weight[idx] = 0
                 else:
-                    if pred["pred_labels"][pair[1]] == obj:
+                    if pred["pred_labels"][pair[1]] == object_label:
                         weight[idx] = 0
         try:
             at_loss = ce_loss(attention_distribution, attention_label)
@@ -154,7 +154,6 @@ def process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_devic
     if not conf.bce_loss:
         losses["gen_spatial_relation_loss"] = mlm_loss(gen_spatial_out, gen_spatial_label).mean()
         losses["gen_contact_relation_loss"] = mlm_loss(gen_contacting_out, gen_contact_label).mean()
-    
     else:
         losses["gen_spatial_relation_loss"] = bce_loss(gen_spatial_out, gen_spatial_label).mean()
         losses["gen_contact_relation_loss"] = bce_loss(gen_contacting_out, gen_contact_label).mean()
@@ -356,7 +355,7 @@ def main():
             gt_annotation = ag_train_data.gt_annotations[data[4]]
             with torch.no_grad():
                 entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-            num = process_train_video(conf, entry, optimizer, model, epoch, num, tr)
+            num = process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_device, dataloader_train)
         print(f"Finished training an epoch {epoch}")
         save_model(model, epoch, checkpoint_save_file_path, checkpoint_name, model_name)
         print(f"Saving model after epoch {epoch}")
@@ -372,7 +371,7 @@ def main():
                 num_boxes = copy.deepcopy(data[3].cuda(0))
                 gt_annotation = ag_test_data.gt_annotations[data[4]]
                 entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-                process_test_video(conf, entry, model, gt_annotation)
+                process_test_video(conf, entry, model, gt_annotation, evaluator)
                 if b % 50 == 0:
                     print(f"Finished processing {b} of {len(dataloader_test)} batches")
         score = np.mean(evaluator.result_dict[conf.mode + "_recall"][20])

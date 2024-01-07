@@ -128,24 +128,24 @@ def get_sequence_with_tracking(entry, gt_annotation, matcher, shape, task="sgcls
 		entry["indices"] = indices
 		return
 	
-	if task == "sgdet":
-		# for sgdet, use the predicted object classes, as a special case of
-		# the proposed method, comment this out for general coarse tracking.
-		indices = [[]]
-		# indices[0] store single-element sequence, to save memory
-		pred_labels = torch.argmax(entry["distribution"], 1)
-		for i in pred_labels.unique():
-			index = torch.where(pred_labels == i)[0]
-			if len(index) == 1:
-				indices[0].append(index)
-			else:
-				indices.append(index)
-		if len(indices[0]) > 0:
-			indices[0] = torch.cat(indices[0])
-		else:
-			indices[0] = torch.tensor([])
-		entry["indices"] = indices
-		return
+	# if task == "sgdet":
+	# 	# for sgdet, use the predicted object classes, as a special case of
+	# 	# the proposed method, comment this out for general coarse tracking.
+	# 	indices = [[]]
+	# 	# indices[0] store single-element sequence, to save memory
+	# 	pred_labels = torch.argmax(entry["distribution"], 1)
+	# 	for i in pred_labels.unique():
+	# 		index = torch.where(pred_labels == i)[0]
+	# 		if len(index) == 1:
+	# 			indices[0].append(index)
+	# 		else:
+	# 			indices.append(index)
+	# 	if len(indices[0]) > 0:
+	# 		indices[0] = torch.cat(indices[0])
+	# 	else:
+	# 		indices[0] = torch.tensor([])
+	# 	entry["indices"] = indices
+	# 	return
 	
 	w, h = shape
 	key_frames = np.array([annotation[0]["frame"] for annotation in gt_annotation])

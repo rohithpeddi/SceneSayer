@@ -4,9 +4,8 @@ import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
 
-from lib.supervised.biased.sga.blocks import EncoderLayer, Encoder, PositionalEncoding
+from lib.supervised.biased.sga.blocks import EncoderLayer, Encoder, PositionalEncoding, ObjectClassifierMLP
 from lib.word_vectors import obj_edge_vectors
-from blocks import ObjectClassifierMLP
 
 
 class BaselineWithAnticipation(nn.Module):
@@ -187,7 +186,7 @@ class BaselineWithAnticipation(nn.Module):
 			mask_input = sequence_features
 			output = []
 			for i in range(future):
-				out = self.anti_temporal_transformer(mask_input, src_key_padding_mask=masks.cuda(), mask=in_mask)
+				out = self.temporal_transformer(mask_input, src_key_padding_mask=masks.cuda(), mask=in_mask)
 				if i == 0:
 					mask2 = (~masks).int()
 					ind_col = torch.sum(mask2, dim=1) - 1

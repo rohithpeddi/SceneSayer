@@ -183,32 +183,15 @@ class BaselineWithAnticipationGenLoss(nn.Module):
             future_len = future_idx.shape[0]
 
             context_seq = []
+            future_seq = []
             new_future_seq = []
-            # Objects
             for i, s in enumerate(sequences):
                 context_index = s[(s < context_len)]
-                # Inner loop for frames
-                future_index = []
-                unique_future_idx = future_idx.unique()
-                for a, _ in enumerate(unique_future_idx):
-                    future_frame_id = unique_future_idx[a]
-                    next_future_frame_id = unique_future_idx[a + 1] if a + 1 < len(unique_future_idx) else None
-                    frame_future_index = s[(s >= future_frame_id) & (s < next_future_frame_id)] if next_future_frame_id \
-                        else s[(s >= future_frame_id)]
-                    if len(frame_future_index) > 1:
-                        frame_future_index = frame_future_index[0]
-                    elif len(frame_future_index) == 0:
-                        continue
-                    future_index.extend(frame_future_index)
+                future_index = s[(s >= context_len) & (s < (context_len + future_len))]
+                future_seq.append(future_index)
                 if len(context_index) != 0:
                     context_seq.append(context_index)
                     new_future_seq.append(future_index)
-
-            # # Considering only the objects that are present in the context
-            # new_future_seq = []
-            # for i, s in enumerate(future_seq):
-            #     if seq_mask[i] == 1:
-            #         new_future_seq.append(s)
 
             pos_index = []
             for index in context_seq:
@@ -277,6 +260,8 @@ class BaselineWithAnticipationGenLoss(nn.Module):
                 global_output.scatter_(0, indices_flat, rel_flat)
             except RuntimeError as e:
                 print(f"global_scatter : {e}")
+                context += 1
+                continue
             # pdb.set_trace()
 
             gb_output = global_output[context_len:context_len + future_len]

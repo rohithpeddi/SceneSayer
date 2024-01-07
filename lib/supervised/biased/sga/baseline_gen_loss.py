@@ -478,10 +478,22 @@ class BaselineWithGenLoss(nn.Module):
 			output = []
 			for i in range(future):
 				out = self.anti_temporal_transformer(mask_input, src_key_padding_mask=masks.cuda(), mask=in_mask)
-				output.append(out[:, -1, :].unsqueeze(1))
-				out_last = [out[:, -1, :]]
-				pred = torch.stack(out_last, dim=1)
-				mask_input = torch.cat([mask_input, pred], 1)
+				if i==0:
+		                	mask2=(~masks).int()
+		                    	ind_col = torch.sum(mask2,dim=1)-1
+		                    	out2=[]
+		                    	for j,ind in enumerate(ind_col):
+		                        	out2.append(out[j,find,:])
+		                    	out3=torch.stack(out2)
+		                    	out3=out3.unsqueeze(1)
+		                    	output.append(out3)
+		                    	mask_input = torch.cat([mask_input,out3],1)
+				else:
+		                    	output.append(out[:,-1,:].unsqueeze(1))
+		                    	out_last = [out[:,-1,:]]
+		                    	pred = torch.stack(out_last,dim =1)
+		                    	mask_input = torch.cat([mask_input,pred],1)
+				
 				in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(
 					torch.bool)
 				in_mask = in_mask.cuda()

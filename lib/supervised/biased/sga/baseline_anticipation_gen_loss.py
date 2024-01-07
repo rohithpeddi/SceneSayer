@@ -243,10 +243,32 @@ class BaselineWithAnticipationGenLoss(nn.Module):
             rel_ = rel_.cuda()
             rel_flat1 = []
 
-            for index, rel in zip(new_future_seq, rel_):
-                if len(index) == 0:
-                    continue
-                rel_flat1.extend(rel[:len(index)])
+            if self.training:
+                for index, rel in zip(new_future_seq, rel_):
+                    if len(index) == 0:
+                        continue
+                    rel_flat1.extend(rel[:len(index)])
+
+            else:
+                for index,rel in zip(new_future_seq,rel_):
+                    if len(index)==0:
+                        continue
+                    elif len(index)>future:
+                        im_id = entry["im_idx"][index]
+                        im_id = im_id.tolist()
+                        indices_sets = {}
+                        for i, element in enumerate(im_id):
+                            if element not in indices_sets:
+                                indices_sets[element] = []
+                            indices_sets[element].append(i)
+                        ind_set = list(indices_sets.values())
+                        rel_temp = torch.zeros(len(index),rel.shape[1])
+                        for i,seq in enumerate(ind_set):
+                            for k in range(len(seq)):
+                                rel_temp[k]=rel[i]
+                        rel_flat1.extend(rel_temp)
+                    else:
+                        rel_flat1.extend(rel[:len(index)])
 
             rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
             rel_flat = torch.tensor(rel_flat1)
@@ -256,24 +278,29 @@ class BaselineWithAnticipationGenLoss(nn.Module):
 
             global_output = torch.zeros_like(dsg_global_output).to(dsg_global_output.device)
 
+            temp = {}
+            temp["scatter_flag"] = 0
             try:
                 global_output.scatter_(0, indices_flat, rel_flat)
-            except RuntimeError as e:
-                print(f"global_scatter : {e}")
-                context += 1
+            except RuntimeError:
+                error_count += 1
+                context +=1
+                temp["scatter_flag"] = 1
+                result[count]=temp
+                count+=1
                 continue
             # pdb.set_trace()
 
             gb_output = global_output[context_len:context_len + future_len]
             context += 1
 
-            temp = {
-                "attention_distribution": self.a_rel_compress(gb_output),
-                "spatial_distribution": torch.sigmoid(self.s_rel_compress(gb_output)),
-                "contacting_distribution": torch.sigmoid(self.c_rel_compress(gb_output)),
-                "global_output": gb_output,
-                "original": global_output
-            }
+           
+            temp["attention_distribution"] =  self.a_rel_compress(gb_output)
+            temp["spatial_distribution"]  = torch.sigmoid(self.s_rel_compress(gb_output))
+            temp["contacting_distribution"] =  torch.sigmoid(self.c_rel_compress(gb_output))
+            temp["global_output"] =  gb_output
+            temp["original"] global_output
+
 
             result[count] = temp
             count += 1
@@ -382,7 +409,7 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         rel_ = output
         rel_ = rel_.cuda()
         rel_flat1 = []
-
+        
         for index, rel in zip(new_future_seq, rel_):
             if len(index) == 0:
                 continue

@@ -381,3 +381,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+# python train_baseline_gen_loss.py -use_raw_data -mode sgdet -baseline_future 5  -nepoch 10 -method_name baseline_so_gen_loss -data_path /data/rohith/ag/

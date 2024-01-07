@@ -5,7 +5,7 @@ import torch
 
 from lib.object_detector import detector
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.biased.sga.baseline_gen_loss import BaselineWithAnticipationGenLoss
+from lib.supervised.biased.sga.baseline_anticipation_gen_loss import BaselineWithAnticipationGenLoss
 from test_base import fetch_transformer_test_basic_config
 
 

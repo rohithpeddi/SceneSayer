@@ -7,7 +7,7 @@ import pandas as pd
 import torch
 
 from lib.object_detector import detector
-from lib.supervised.biased.sga.baseline_gen_loss import BaselineWithAnticipationGenLoss
+from lib.supervised.biased.sga.baseline_anticipation_gen_loss import BaselineWithAnticipationGenLoss
 from train_base import fetch_train_basic_config, prepare_optimizer, fetch_transformer_loss_functions, \
     get_sequence_no_tracking, save_model
 

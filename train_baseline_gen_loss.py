@@ -141,23 +141,23 @@ def process_train_video(entry, optimizer, model, epoch, num, tr):
 		
 		try:
 			at_loss = ce_loss(attention_distribution, attention_label)
-                	losses["attention_relation_loss"] += (at_loss*weight).sum()/weight.sum()
+                	losses["attention_relation_loss"] += (at_loss*weight).mean()
 		except ValueError:
 			attention_label = attention_label.unsqueeze(0)
                 	at_loss = ce_loss(attention_distribution, attention_label)
-                	losses["attention_relation_loss"] += (at_loss*weight).sum()/weight.sum()
+                	losses["attention_relation_loss"] += (at_loss*weight).mean()
 		if not conf.bce_loss:
 			sp_loss = mlm_loss(spatial_distribution, spatial_label)
-                	losses["spatial_relation_loss"] += (sp_loss*weight).sum()/weight.sum()
+                	losses["spatial_relation_loss"] += (sp_loss*weight).mean()
 
 			con_loss = mlm_loss(contact_distribution, contact_label)
-	                losses["contact_relation_loss"] += (con_loss*weight).sum()/weight.sum()
+	                losses["contact_relation_loss"] += (con_loss*weight).mean()
 		else:
 			sp_loss = bce_loss(spatial_distribution, spatial_label)
-                	losses["spatial_relation_loss"] += (sp_loss*weight).sum()/weight.sum()
+                	losses["spatial_relation_loss"] += (sp_loss*weight).mean()
 
 			con_loss = bce_loss(contact_distribution, contact_label)
-                	losses["contact_relation_loss"] += (con_loss*weight).sum()/weight.sum()
+                	losses["contact_relation_loss"] += (con_loss*weight).mean()
 		
 		context += 1
 		count += 1

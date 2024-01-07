@@ -235,8 +235,8 @@ class ODE(nn.Module):
                 rng = torch.cat((rng[ : i], torch.tensor([rng[i] for j in range(diff - 1)]).to(device=im_idx.device), rng[i : ]))
         if im_idx[0] > 0:
             rng = torch.cat((torch.tensor([0 for j in range(im_idx[0])]).to(device=im_idx.device), rng))
-        if rng.size(0) != len(gt_annotation) + 1:
-            rng = torch.cat((rng, torch.tensor([tot for j in range(len(gt_annotation) + 1 - rng.size(0))]).to(device=im_idx.device)))
+        if rng.size(0) != n + 1:
+            rng = torch.cat((rng, torch.tensor([tot for j in range(n + 1 - rng.size(0))]).to(device=im_idx.device)))
         entry["times"] = torch.repeat_interleave(t_unique.to(device=global_output.device), rng[1 : ] - rng[ : -1])
         entry["rng"] = rng
         t_unique = torch.cat((t_unique, t_extend)).to(device=global_output.device)

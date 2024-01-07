@@ -9,3 +9,4 @@ h5py==3.1.0
 dill==0.3.6
 matplotlib
 opencv-python
+pyrebase4

@@ -139,7 +139,7 @@ def fetch_train_basic_config():
 		AG_attention_predicates=ag_train_data.attention_relationships,
 		AG_spatial_predicates=ag_train_data.spatial_relationships,
 		AG_contacting_predicates=ag_train_data.contacting_relationships,
-		iou_threshold=0.5,
+		iou_threshold=0.0,
 		save_file=os.path.join(conf.save_path, const.PROGRESS_TEXT_FILE),
 		constraint='with'
 	)

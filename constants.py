@@ -164,7 +164,7 @@ class DataloaderConstants:
 	SGDET = "sgdet"
 	SGCLS = "sgcls"
 	PREDCLS = "predcls"
-
+	
 	FEATURES = "features"
 	
 	SUPERVISED = "supervised"
@@ -240,5 +240,56 @@ class DataloaderConstants:
 	FRAME = "frame"
 	BOUNDING_BOX_SIZE = "bbox_size"
 	GT_ANNOTATION = "gt_annotation"
-
+	
 	FRAME_SIZE = "frame_size"
+
+
+class ResultConstants:
+	RECALL_10 = "recall_10"
+	RECALL_20 = "recall_20"
+	RECALL_50 = "recall_50"
+	RECALL_100 = "recall_100"
+	MEAN_RECALL_10 = "mean_recall_10"
+	MEAN_RECALL_20 = "mean_recall_20"
+	MEAN_RECALL_50 = "mean_recall_50"
+	MEAN_RECALL_100 = "mean_recall_100"
+	HARMONIC_RECALL_10 = "harmonic_recall_10"
+	HARMONIC_RECALL_20 = "harmonic_recall_20"
+	HARMONIC_RECALL_50 = "harmonic_recall_50"
+	HARMONIC_RECALL_100 = "harmonic_recall_100"
+	
+	WITH_CONSTRAINT_METRICS = "with_constraint_metrics"
+	NO_CONSTRAINT_METRICS = "no_constraint_metrics"
+	SEMI_CONSTRAINT_METRICS = "semi_constraint_metrics"
+	
+	TASK_NAME = "task_name"
+	METHOD_NAME = "method_name"
+	MODE = "mode"
+	TRAIN_NUM_FUTURE_FRAMES = "train_num_future_frames"
+	TEST_NUM_FUTURE_FRAMES = "test_num_future_frames"
+	CONTEXT_FRACTION = "context_fraction"
+	RESULT_DETAILS = "result_details"
+	
+	RESULTS = "results"
+	RESULT_ID = "result_id"
+	
+	# Task Names
+	DYSGG = "dysgg"
+	DYSGA = "dysga"
+	
+	# Method Names
+	DYSTTRAN = "dysttran"
+	DYDSGDETR = "dydsgdetr"
+	BASELINE_SO_ANT = "baseline_so_ant"
+	BASELINE_SO_GEN_LOSS = "baseline_so_gen_loss"
+	NEURALODE = "NeuralODE"
+	NEURALSDE = "NeuralSDE"
+	
+	# Modes
+	SGDET = "sgdet"
+	SGCLS = "sgcls"
+	PREDCLS = "predcls"
+	
+	EVALUATION = "evaluation"
+	PERCENTAGE_EVALUATION = "percentage_evaluation"
+	GENERATION_IMPACT = "generation_impact"

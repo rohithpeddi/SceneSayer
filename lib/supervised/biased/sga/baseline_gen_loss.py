@@ -333,12 +333,12 @@ class BaselineWithGenLoss(nn.Module):
 	
 	def forward(self, entry, context, future):
 		"""
-		Forward method for the baseline
-		:param entry: Dictionary from object classifier
-		:param context: Frame idx for context
-		:param future: Number of next frames to anticipate
-		:return:
-		"""
+        Forward method for the baseline
+        :param entry: Dictionary from object classifier
+        :param context: Frame idx for context
+        :param future: Number of next frames to anticipate
+        :return:
+        """
 		entry = self.object_classifier(entry)
 		
 		# visual part
@@ -375,26 +375,28 @@ class BaselineWithGenLoss(nn.Module):
 			k = torch.where(obj_class.view(-1) == l)[0]
 			if len(k) > 0:
 				sequences.append(k)
-
+		
 		pos_index = []
-	        for index in sequences:
-	            im_idx, counts = torch.unique(entry["pair_idx"][index][:,0].view(-1), return_counts=True, sorted=True)
-	            counts = counts.tolist()
-	            pos = torch.cat([torch.LongTensor([im]*count) for im, count in zip(range(len(counts)), counts)])
-	            pos_index.append(pos)
-	        sequence_features = pad_sequence([rel_features[index] for index in sequences], batch_first=True)
-	        in_mask_dsg = (1-torch.tril(torch.ones(sequence_features.shape[1],sequence_features.shape[1]),diagonal = 0)).type(torch.bool)
-	        in_mask_dsg = in_mask_dsg.cuda()
-	        masks = (1-pad_sequence([torch.ones(len(index)) for index in sequences], batch_first=True)).bool()
-	        pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
-	        rel_ = self.global_transformer(self.positional_encoder(sequence_features, pos_index),src_key_padding_mask=masks.cuda(),mask=in_mask_dsg)
-	        
-	        rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(sequences,rel_)])
-	        indices_flat = torch.cat(sequences).unsqueeze(1).repeat(1,rel_features.shape[1])
-	
-	        assert len(indices_flat) == len(entry["pair_idx"])
-	        dsg_global_output = torch.zeros_like(rel_features).to(rel_features.device)
-	        dsg_global_output.scatter_(0, indices_flat, rel_flat)
+		for index in sequences:
+			im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True, sorted=True)
+			counts = counts.tolist()
+			pos = torch.cat([torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
+			pos_index.append(pos)
+		sequence_features = pad_sequence([rel_features[index] for index in sequences], batch_first=True)
+		in_mask_dsg = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
+		                              diagonal=0)).type(torch.bool)
+		in_mask_dsg = in_mask_dsg.cuda()
+		masks = (1 - pad_sequence([torch.ones(len(index)) for index in sequences], batch_first=True)).bool()
+		pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
+		rel_ = self.global_transformer(self.positional_encoder(sequence_features, pos_index),
+		                               src_key_padding_mask=masks.cuda(), mask=in_mask_dsg)
+		
+		rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(sequences, rel_)])
+		indices_flat = torch.cat(sequences).unsqueeze(1).repeat(1, rel_features.shape[1])
+		
+		assert len(indices_flat) == len(entry["pair_idx"])
+		dsg_global_output = torch.zeros_like(rel_features).to(rel_features.device)
+		dsg_global_output.scatter_(0, indices_flat, rel_flat)
 		
 		""" ################# changes regarding forecasting #################### """
 		
@@ -429,24 +431,24 @@ class BaselineWithGenLoss(nn.Module):
 			future_len = future_idx.shape[0]
 			
 			seq = []
-		        prev_seq = []
-		        seq_mask = torch.zeros(len(sequences))
-			for i,s in enumerate(sequences):
-				index = s[ (s<( context_len))]
+			prev_seq = []
+			seq_mask = torch.zeros(len(sequences))
+			for i, s in enumerate(sequences):
+				index = s[(s < context_len)]
 				prev_seq.append(index)
-				if len(index)!=0:
-				    seq_mask[i]=1
-				    seq.append(index) 
+				if len(index) != 0:
+					seq_mask[i] = 1
+					seq.append(index)
 			
 			future_seq = []
 			for s in sequences:
 				index = s[(s >= context_len) & (s < (context_len + future_len))]
 				future_seq.append(index)
-
-			new_future_seq =[]
-		    	for i,s in enumerate(future_seq):
-				if seq_mask[i]==1:
-			    		new_future_seq.append(s) 
+			
+			new_future_seq = []
+			for i, s in enumerate(future_seq):
+				if seq_mask[i] == 1:
+					new_future_seq.append(s)
 			
 			pos_index = []
 			for index in seq:
@@ -461,20 +463,21 @@ class BaselineWithGenLoss(nn.Module):
 			
 			# pdb.set_trace()
 			sequence_features = pad_sequence([dsg_global_output[index] for index in seq], batch_first=True)
-			in_mask = (1-torch.tril(torch.ones(sequence_features.shape[1],sequence_features.shape[1]),diagonal = 0)).type(torch.bool)
-		    	in_mask = in_mask.cuda()
-		    	masks = (1-pad_sequence([torch.ones(len(index)) for index in seq], batch_first=True)).bool()
-		    
-		    	pos_index = [torch.tensor(seq, dtype=torch.long) for seq in pos_index]
-		    	pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
-		    	sequence_features = self.positional_encoder(sequence_features, pos_index)
-		    	seq_len = sequence_features.shape[1]
-		
-		    	mask_input = sequence_features
+			in_mask = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
+			                          diagonal=0)).type(torch.bool)
+			in_mask = in_mask.cuda()
+			masks = (1 - pad_sequence([torch.ones(len(index)) for index in seq], batch_first=True)).bool()
+			
+			pos_index = [torch.tensor(seq, dtype=torch.long) for seq in pos_index]
+			pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
+			sequence_features = self.positional_encoder(sequence_features, pos_index)
+			seq_len = sequence_features.shape[1]
+			
+			mask_input = sequence_features
 			
 			output = []
 			for i in range(future):
-				out = self.anti_temporal_transformer(mask_input,src_key_padding_mask=masks.cuda(), mask=in_mask)
+				out = self.anti_temporal_transformer(mask_input, src_key_padding_mask=masks.cuda(), mask=in_mask)
 				output.append(out[:, -1, :].unsqueeze(1))
 				out_last = [out[:, -1, :]]
 				pred = torch.stack(out_last, dim=1)
@@ -484,55 +487,52 @@ class BaselineWithGenLoss(nn.Module):
 				in_mask = in_mask.cuda()
 				masks = torch.cat([masks, torch.full((masks.shape[0], 1), False, dtype=bool)], dim=1)
 			
-			output = torch.cat(output,dim=1)
-		        rel_ = output
-		        rel_ = rel_.cuda()
-		        rel_flat1 = []
-		
-		
-		        for index,rel in zip(new_future_seq,rel_):
-				if len(index)==0:
-		                    continue
-		                for i in range(len(index)):
-		                    rel_flat1.extend(rel)
-		
-		        rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
-		        rel_flat = torch.tensor(rel_flat1)
-		        rel_flat = rel_flat.to('cuda:0')
-		        #rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(future_seq,rel_)])
-		        indices_flat = torch.cat(new_future_seq).unsqueeze(1).repeat(1,dsg_global_output.shape[1])
-		            
-		        global_output = torch.zeros_like(dsg_global_output).to(dsg_global_output.device)
+			output = torch.cat(output, dim=1)
+			rel_ = output
+			rel_ = rel_.cuda()
+			rel_flat1 = []
+			
+			for index, rel in zip(new_future_seq, rel_):
+				if len(index) == 0:
+					continue
+				for i in range(len(index)):
+					rel_flat1.extend(rel)
+				
+			rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
+			rel_flat = torch.tensor(rel_flat1)
+			rel_flat = rel_flat.to('cuda:0')
+			# rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(future_seq,rel_)])
+			indices_flat = torch.cat(new_future_seq).unsqueeze(1).repeat(1, dsg_global_output.shape[1])
+			
+			global_output = torch.zeros_like(dsg_global_output).to(dsg_global_output.device)
 			
 			try:
-                		global_output.scatter_(0, indices_flat, rel_flat)
-            		except RuntimeError:
-		                error_count += 1
-		                print("global_scatter : ",error_count)
-		                pdb.set_trace()
+				global_output.scatter_(0, indices_flat, rel_flat)
+			except RuntimeError:
+				error_count += 1
+				print("global_scatter : ", error_count)
+				# pdb.set_trace()
+			
+			gb_output = global_output[context_len:context_len + future_len]
+			context += 1
+			
+			temp = {"attention_distribution": self.a_rel_compress(gb_output)}
+			
+			spatial_distribution = self.s_rel_compress(gb_output)
+			contacting_distribution = self.c_rel_compress(gb_output)
+			
+			temp["spatial_distribution"] = torch.sigmoid(spatial_distribution)
+			temp["contacting_distribution"] = torch.sigmoid(contacting_distribution)
+			temp["global_output"] = gb_output
+			temp["original"] = global_output
+			
+			result[count] = temp
+			count += 1
+			entry["gen_attention_distribution"] = self.gen_a_rel_compress(dsg_global_output)
+			gen_spatial_distribution = self.gen_s_rel_compress(dsg_global_output)
+			gen_contacting_distribution = self.gen_c_rel_compress(dsg_global_output)
+			entry["gen_spatial_distribution"] = torch.sigmoid(gen_spatial_distribution)
+			entry["gen_contacting_distribution"] = torch.sigmoid(gen_contacting_distribution)
+			entry["output"] = result
 		
-		        gb_output = global_output[context_len:context_len+future_len]
-		        context +=1
-		
-		                        
-		        temp = {}
-		
-		        temp["attention_distribution"] = self.a_rel_compress(gb_output)
-		        spatial_distribution = self.s_rel_compress(gb_output)
-		        contacting_distribution = self.c_rel_compress(gb_output)
-		
-		        temp["spatial_distribution"] = torch.sigmoid(spatial_distribution)
-		        temp["contacting_distribution"] = torch.sigmoid(contacting_distribution)
-		        temp["global_output"] = gb_output
-		        temp["original"] = global_output
-		
-		        result[count] = temp
-		        count+=1
-		entry["gen_attention_distribution"] = self.gen_a_rel_compress(dsg_global_output)
-	        gen_spatial_distribution = self.gen_s_rel_compress(dsg_global_output)
-	        gen_contacting_distribution = self.gen_c_rel_compress(dsg_global_output)
-	        entry["gen_spatial_distribution"] = torch.sigmoid(gen_spatial_distribution)
-	        entry["gen_contacting_distribution"] = torch.sigmoid(gen_contacting_distribution)
-	        entry["output"] = result
-
 		return entry

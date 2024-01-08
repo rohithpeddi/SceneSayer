@@ -23,12 +23,13 @@ def process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_devic
     
     get_sequence_no_tracking(entry, conf.mode)
     pred = model(entry, conf.baseline_context, conf.baseline_future)
-    losses = {
-        "attention_relation_loss": 0,
-        "spatial_relation_loss": 0,
-        "contact_relation_loss": 0,
-        "object_loss": ce_loss(pred['distribution'], pred['labels']).mean() if conf.mode in ['sgcls', 'sgdet'] else 0
-    }
+    losses={}
+    if conf.mode == 'sgcls' or conf.mode == 'sgdet':
+        losses['object_loss'] = ce_loss(pred['distribution'], pred['labels']).mean()
+
+    losses["attention_relation_loss"] = 0
+    losses["spatial_relation_loss"] = 0
+    losses["contact_relation_loss"] = 0
     
     context = min(context, total_frames - 1)
     future = min(future, total_frames - context)

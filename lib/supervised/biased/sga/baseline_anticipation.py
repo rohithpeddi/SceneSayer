@@ -118,10 +118,10 @@ class BaselineWithAnticipation(nn.Module):
         :param future: Number of next frames to anticipate
         :return:
         """
-		print("-----------------------------------------------------------------------------------------------")
-		print(f"Context: {context}, Future: {future}")
-		print(f"Model activated in phase : {self.training}")
-		print("-----------------------------------------------------------------------------------------------")
+		# print("-----------------------------------------------------------------------------------------------")
+		# print(f"Context: {context}, Future: {future}")
+		# print(f"Model activated in phase : {self.training}")
+		# print("-----------------------------------------------------------------------------------------------")
 		
 		entry, rel_features, sequences = self.process_entry(entry)
 		

@@ -155,7 +155,7 @@ def process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_devic
 def process_test_video(conf, entry, model, gt_annotation, evaluator):
     get_sequence_no_tracking(entry, conf.mode)
     pred = model(entry, conf.baseline_context, conf.baseline_future)
-    
+    start = 0
     count = 0
     context = conf.baseline_context
     future = conf.baseline_future
@@ -163,38 +163,53 @@ def process_test_video(conf, entry, model, gt_annotation, evaluator):
     
     context = min(context, total_frames - 1)
     future = min(future, total_frames - context)
-    while context + 1 <= total_frames:
+    
+    if (start + context + 1 > total_frames):
+        while (start + context + 1 != total_frames and context > 1):
+            context -= 1
+        future = 1
+    
+    if (start + context + future > total_frames > start + context):
+        future = total_frames - (start + context)
+    while (start + context + 1 <= total_frames):
+        
         future_frame_start_id = entry["im_idx"].unique()[context]
         prev_con = entry["im_idx"].unique()[context - 1]
-        if context + future > total_frames > context:
-            future = total_frames - context
+        
+        if (start + context + future > total_frames > start + context):
+            future = total_frames - (start + context)
         
         future_frame_end_id = entry["im_idx"].unique()[context + future - 1]
+        
         context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
+        context_idx = entry["im_idx"][:context_end_idx]
+        context_len = context_idx.shape[0]
+        
         future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1]) + 1
-        entry_future_idx = entry["im_idx"][context_end_idx:future_end_idx]
-        gt_future = gt_annotation[context:context + future]
+        future_idx = entry["im_idx"][context_end_idx:future_end_idx]
+        future_len = future_idx.shape[0]
         
-        context_boxes_idx = torch.where(entry["boxes"][:, 0] == future_frame_start_id)[0][0]
-        context_excluding_last_frame_boxes_idx = torch.where(entry["boxes"][:, 0] == prev_con)[0][0]
-        future_boxes_idx = torch.where(entry["boxes"][:, 0] == future_frame_end_id)[0][-1]
+        gt_future = gt_annotation[start + context:start + context + future]
         
+        vid_no = gt_annotation[0][0]["frame"].split('.')[0]
+        # print(vid_no)
+        ind = torch.where(entry["boxes"][:, 0] == future_frame_start_id)[0][0]
+        prev_ind = torch.where(entry["boxes"][:, 0] == prev_con)[0][0]
+        f_ind = torch.where(entry["boxes"][:, 0] == future_frame_end_id)[0][-1]
         if conf.mode == 'predcls':
-            context_last_frame_labels = set(
-                pred["labels"][context_excluding_last_frame_boxes_idx:context_boxes_idx].tolist())
-            future_labels = set(pred["labels"][context_boxes_idx:future_boxes_idx + 1].tolist())
-            context_labels = set(pred["labels"][:context_boxes_idx].tolist())
+            con = set(pred["labels"][prev_ind:ind].tolist())
+            fut = set(pred["labels"][ind:f_ind + 1].tolist())
+            all_con = set(pred["labels"][:ind].tolist())
         else:
-            context_last_frame_labels = set(
-                pred["pred_labels"][context_excluding_last_frame_boxes_idx:context].tolist())
-            future_labels = set(pred["pred_labels"][context:future_boxes_idx + 1].tolist())
-            context_labels = set(pred["pred_labels"][:context].tolist())
+            con = set(pred["pred_labels"][prev_ind:ind].tolist())
+            fut = set(pred["pred_labels"][ind:f_ind + 1].tolist())
+            all_con = set(pred["pred_labels"][prev_ind:ind].tolist())
         
-        box_mask = torch.ones(pred["boxes"][context_boxes_idx:future_boxes_idx + 1].shape[0])
-        frame_mask = torch.ones(entry_future_idx.shape[0])
+        box_mask = torch.ones(pred["boxes"][ind:f_ind + 1].shape[0])
+        frame_mask = torch.ones(future_idx.shape[0])
         
-        pred_future_im_idx = pred["im_idx"][context_end_idx:future_end_idx]
-        pred_future_im_idx = pred_future_im_idx - pred_future_im_idx.min()
+        im_idx = pred["im_idx"][context_end_idx:future_end_idx]
+        im_idx = im_idx - im_idx.min()
         
         pair_idx = pred["pair_idx"][context_end_idx:future_end_idx]
         reshape_pair = pair_idx.view(-1, 2)
@@ -202,67 +217,79 @@ def process_test_video(conf, entry, model, gt_annotation, evaluator):
         new_pair = reshape_pair - min_value
         pair_idx = new_pair.view(pair_idx.size())
         
-        appearing_objects_labels = future_labels - context_last_frame_labels
-        disappearing_objects_labels = context_labels - context_last_frame_labels
-        ignored_objects_labels = appearing_objects_labels.union(disappearing_objects_labels)
-        ignored_objects_labels = list(ignored_objects_labels)
-        for object_label in ignored_objects_labels:
+        boxes = pred["boxes"][ind:f_ind + 1]
+        labels = pred["labels"][ind:f_ind + 1]
+        pred_labels = pred["pred_labels"][ind:f_ind + 1]
+        scores = pred["scores"][ind:f_ind + 1]
+        if conf.mode != 'predcls':
+            pred_scores = pred["pred_scores"][ind:f_ind + 1]
+        
+        ob1 = fut - con
+        ob2 = all_con - con
+        objects = ob1.union(ob2)
+        objects = list(objects)
+        for obj in objects:
             for idx, pair in enumerate(pred["pair_idx"][context_end_idx:future_end_idx]):
                 if conf.mode == 'predcls':
-                    if pred["labels"][pair[1]] == object_label:
+                    if pred["labels"][pair[1]] == obj:
                         frame_mask[idx] = 0
                         box_mask[pair_idx[idx, 1]] = 0
                 else:
-                    if pred["pred_labels"][pair[1]] == object_label:
+                    if pred["pred_labels"][pair[1]] == obj:
                         frame_mask[idx] = 0
                         box_mask[pair_idx[idx, 1]] = 0
         
-        pred_future_im_idx = pred_future_im_idx[frame_mask == 1]
+        im_idx = im_idx[frame_mask == 1]
         removed = pair_idx[frame_mask == 0]
         mask_pair_idx = pair_idx[frame_mask == 1]
         
         flat_pair = mask_pair_idx.view(-1)
         flat_pair_copy = mask_pair_idx.view(-1).detach().clone()
+        var = 1
         for pair in removed:
             idx = pair[1]
             for i, p in enumerate(flat_pair_copy):
                 if p > idx:
                     flat_pair[i] -= 1
-        
-        future_pair_idx = flat_pair.view(mask_pair_idx.size())
-        
-        future_boxes = pred["boxes"][context_boxes_idx:future_boxes_idx + 1]
-        future_labels = pred["labels"][context_boxes_idx:future_boxes_idx + 1]
-        future_pred_labels = pred["pred_labels"][context_boxes_idx:future_boxes_idx + 1]
-        future_scores = pred["scores"][context_boxes_idx:future_boxes_idx + 1]
-        if conf.mode != 'predcls':
-            future_pred_scores = pred["pred_scores"][context_boxes_idx:future_boxes_idx + 1]
+        new_pair_idx = flat_pair.view(mask_pair_idx.size())
         
         if conf.mode == 'predcls':
-            future_scores = future_scores[box_mask == 1]
-            future_labels = future_labels[box_mask == 1]
-            future_pred_labels = future_pred_labels[box_mask == 1]
-            future_boxes = future_boxes[box_mask == 1]
+            scores = scores[box_mask == 1]
+            labels = labels[box_mask == 1]
+        pred_labels = pred_labels[box_mask == 1]
+        boxes = boxes[box_mask == 1]
         if conf.mode != 'predcls':
-            future_pred_scores = future_pred_scores[box_mask == 1]
+            pred_scores = pred_scores[box_mask == 1]
         
-        pred_dict = {
-            'attention_distribution': pred["output"][count]['attention_distribution'][frame_mask == 1],
-            'spatial_distribution': pred["output"][count]['spatial_distribution'][frame_mask == 1],
-            'contacting_distribution': pred["output"][count]['contacting_distribution'][frame_mask == 1],
-            'boxes': future_boxes,
-            'pair_idx': future_pair_idx,
-            'im_idx': pred_future_im_idx,
-        }
+        atten = pred["output"][count]['attention_distribution'][frame_mask == 1]
+        spatial = pred["output"][count]['spatial_distribution'][frame_mask == 1]
+        contact = pred["output"][count]['contacting_distribution'][frame_mask == 1]
         
         if conf.mode == 'predcls':
-            pred_dict['labels'] = future_labels
-            pred_dict['scores'] = future_scores
+            pred_dict = {'attention_distribution': atten,
+                         'spatial_distribution': spatial,
+                         'contacting_distribution': contact,
+                         'boxes': boxes,
+                         'pair_idx': new_pair_idx,
+                         'im_idx': im_idx,
+                         'labels': labels,
+                         'pred_labels': pred_labels,
+                         'scores': scores
+                         }
         else:
-            pred_dict['pred_labels'] = future_pred_labels
-            pred_dict['pred_scores'] = future_pred_scores
-        
+            pred_dict = {'attention_distribution': atten,
+                         'spatial_distribution': spatial,
+                         'contacting_distribution': contact,
+                         'boxes': boxes,
+                         'pair_idx': new_pair_idx,
+                         'im_idx': im_idx,
+                         # 'labels':labels,
+                         'pred_labels': pred_labels,
+                         # 'scores':scores,
+                         'pred_scores': pred_scores
+                         }
         evaluator.evaluate_scene_graph(gt_future, pred_dict)
+        # evaluator.print_stats()
         count += 1
         context += 1
 

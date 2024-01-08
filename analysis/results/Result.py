@@ -1,5 +1,5 @@
 import uuid
-
+from datetime import datetime
 
 from constants import ResultConstants as const
 
@@ -136,6 +136,8 @@ class Result:
 		
 		if result_id is None:
 			self.result_id = str(uuid.uuid4())
+			
+		self.result_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 	
 	def add_result_details(self, result_details):
 		self.result_details = result_details

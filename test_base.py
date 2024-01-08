@@ -1,8 +1,12 @@
 import csv
 import os
+from typing import List
+
 import torch
 from torch.utils.data import DataLoader
 
+from analysis.results.FirebaseService import FirebaseService
+from analysis.results.Result import Result, ResultDetails, Metrics
 from dataloader.supervised.generation.action_genome.ag_features import AGFeatures
 from dataloader.supervised.generation.action_genome.ag_features import cuda_collate_fn as ag_features_cuda_collate_fn
 from dataloader.supervised.generation.action_genome.ag_dataset import AG
@@ -10,6 +14,34 @@ from dataloader.supervised.generation.action_genome.ag_dataset import cuda_colla
 from constants import Constants as const
 from lib.supervised.config import Config
 from lib.supervised.evaluation_recall import BasicSceneGraphEvaluator
+
+
+def get_sequence_no_tracking(entry, task="sgcls"):
+	if task == "predcls":
+		indices = []
+		for i in entry["labels"].unique():
+			indices.append(torch.where(entry["labels"] == i)[0])
+		entry["indices"] = indices
+		return
+	
+	if task == "sgdet" or task == "sgcls":
+		# for sgdet, use the predicted object classes, as a special case of
+		# the proposed method, comment this out for general coase tracking.
+		indices = [[]]
+		# indices[0] store single-element sequence, to save memory
+		pred_labels = torch.argmax(entry["distribution"], 1)
+		for i in pred_labels.unique():
+			index = torch.where(pred_labels == i)[0]
+			if len(index) == 1:
+				indices[0].append(index)
+			else:
+				indices.append(index)
+		if len(indices[0]) > 0:
+			indices[0] = torch.cat(indices[0])
+		else:
+			indices[0] = torch.tensor([])
+		entry["indices"] = indices
+		return
 
 
 def generate_test_config_metadata():
@@ -175,7 +207,8 @@ def fetch_transformer_test_basic_config():
 	return ag_test_data, dataloader_test, gen_evaluators, future_evaluators, future_evaluators_modified_gt, percentage_evaluators, percentage_evaluators_modified_gt, gpu_device, conf
 
 
-def evaluate_anticipated_future_frame_scene_graph(gt, pred, future_frame_count, is_modified_gt, future_evaluators, future_evaluators_modified_gt):
+def evaluate_anticipated_future_frame_scene_graph(gt, pred, future_frame_count, is_modified_gt, future_evaluators,
+                                                  future_evaluators_modified_gt):
 	future_frame_count_list = [1, 2, 3, 4, 5]
 	if is_modified_gt:
 		for reference_frame_count in future_frame_count_list:
@@ -199,30 +232,39 @@ def collate_evaluation_stats(with_constraint_evaluator_stats, no_constraint_eval
 		with_constraint_evaluator_stats["recall"][10],
 		with_constraint_evaluator_stats["recall"][20],
 		with_constraint_evaluator_stats["recall"][50],
+		with_constraint_evaluator_stats["recall"][100],
 		with_constraint_evaluator_stats["mean_recall"][10],
 		with_constraint_evaluator_stats["mean_recall"][20],
 		with_constraint_evaluator_stats["mean_recall"][50],
+		with_constraint_evaluator_stats["mean_recall"][100],
 		with_constraint_evaluator_stats["harmonic_mean_recall"][10],
 		with_constraint_evaluator_stats["harmonic_mean_recall"][20],
 		with_constraint_evaluator_stats["harmonic_mean_recall"][50],
+		with_constraint_evaluator_stats["harmonic_mean_recall"][100],
 		no_constraint_evaluator_stats["recall"][10],
 		no_constraint_evaluator_stats["recall"][20],
 		no_constraint_evaluator_stats["recall"][50],
+		no_constraint_evaluator_stats["recall"][100],
 		no_constraint_evaluator_stats["mean_recall"][10],
 		no_constraint_evaluator_stats["mean_recall"][20],
 		no_constraint_evaluator_stats["mean_recall"][50],
+		no_constraint_evaluator_stats["mean_recall"][100],
 		no_constraint_evaluator_stats["harmonic_mean_recall"][10],
 		no_constraint_evaluator_stats["harmonic_mean_recall"][20],
 		no_constraint_evaluator_stats["harmonic_mean_recall"][50],
+		no_constraint_evaluator_stats["harmonic_mean_recall"][100],
 		semi_constraint_evaluator_stats["recall"][10],
 		semi_constraint_evaluator_stats["recall"][20],
 		semi_constraint_evaluator_stats["recall"][50],
+		semi_constraint_evaluator_stats["recall"][100],
 		semi_constraint_evaluator_stats["mean_recall"][10],
 		semi_constraint_evaluator_stats["mean_recall"][20],
 		semi_constraint_evaluator_stats["mean_recall"][50],
+		semi_constraint_evaluator_stats["mean_recall"][100],
 		semi_constraint_evaluator_stats["harmonic_mean_recall"][10],
 		semi_constraint_evaluator_stats["harmonic_mean_recall"][20],
-		semi_constraint_evaluator_stats["harmonic_mean_recall"][50]
+		semi_constraint_evaluator_stats["harmonic_mean_recall"][50],
+		semi_constraint_evaluator_stats["harmonic_mean_recall"][100]
 	]
 	
 	return collated_stats
@@ -250,9 +292,14 @@ def write_future_evaluators_stats(mode, future_frame_loss_num, method_name, futu
 			writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
 			if not file_exist:
 				writer.writerow([
-					"Method Name", "R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
-					"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
-					"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50"])
+					"Method Name",
+					"R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+					"hR@100"
+					"R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+					"hR@100",
+					"R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+					"hR@100"
+				])
 			writer.writerow(collated_stats)
 
 
@@ -275,18 +322,55 @@ def write_gen_evaluators_stats(mode, future_frame_loss_num, method_name, gen_eva
 		writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
 		if not file_exists:
 			writer.writerow([
-				"Method Name", "R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
-				"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
-				"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50"])
+				"Method Name",
+				"R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+				"hR@100"
+				"R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+				"hR@100",
+				"R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+				"hR@100"
+			])
 		writer.writerow(collated_stats)
 
 
-def write_percentage_evaluators_stats(mode, future_frame_loss_num, method_name, percentage_evaluators, context_fraction):
+def write_evaluators_stats_dysgg(mode, method_name, gen_evaluators):
 	results_dir = os.path.join(os.getcwd(), 'results')
 	mode_results_dir = os.path.join(results_dir, mode)
 	os.makedirs(mode_results_dir, exist_ok=True)
 	
-	results_file_path = os.path.join(mode_results_dir, f'{mode}_train_{future_frame_loss_num}_percentage_evaluation_{context_fraction}.csv')
+	results_file_path = os.path.join(mode_results_dir, f'{mode}_{method_name}_dysgg.csv')
+	with_constraint_evaluator_stats = gen_evaluators[0].fetch_stats_json()
+	no_constraint_evaluator_stats = gen_evaluators[1].fetch_stats_json()
+	semi_constraint_evaluator_stats = gen_evaluators[2].fetch_stats_json()
+	collated_stats = [method_name]
+	collated_stats.extend(collate_evaluation_stats(with_constraint_evaluator_stats, no_constraint_evaluator_stats,
+	                                               semi_constraint_evaluator_stats))
+	
+	file_exists = os.path.isfile(results_file_path)
+	
+	with open(results_file_path, "a", newline='') as activity_idx_step_idx_annotation_csv_file:
+		writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
+		if not file_exists:
+			writer.writerow([
+				"Method Name",
+				"R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+				"hR@100"
+				"R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+				"hR@100",
+				"R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+				"hR@100"
+			])
+		writer.writerow(collated_stats)
+
+
+def write_percentage_evaluators_stats(mode, future_frame_loss_num, method_name, percentage_evaluators,
+                                      context_fraction):
+	results_dir = os.path.join(os.getcwd(), 'results')
+	mode_results_dir = os.path.join(results_dir, mode)
+	os.makedirs(mode_results_dir, exist_ok=True)
+	
+	results_file_path = os.path.join(mode_results_dir,
+	                                 f'{mode}_train_{future_frame_loss_num}_percentage_evaluation_{context_fraction}.csv')
 	with_constraint_evaluator_stats = percentage_evaluators[context_fraction][0].fetch_stats_json()
 	no_constraint_evaluator_stats = percentage_evaluators[context_fraction][1].fetch_stats_json()
 	semi_constraint_evaluator_stats = percentage_evaluators[context_fraction][2].fetch_stats_json()
@@ -300,7 +384,110 @@ def write_percentage_evaluators_stats(mode, future_frame_loss_num, method_name, 
 		writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
 		if not file_exists:
 			writer.writerow([
-				"Method Name", "R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
-				"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
-				"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50"])
+				"Method Name",
+				"R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+				"hR@100"
+				"R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+				"hR@100",
+				"R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+				"hR@100"
+			])
 		writer.writerow(collated_stats)
+
+
+def fetch_dysgg_test_basic_config():
+	conf, device, gpu_device = generate_test_config_metadata()
+	
+	if not conf.use_raw_data:
+		ag_test_data = AGFeatures(
+			mode=conf.mode,
+			data_split=const.TEST,
+			device=device,
+			data_path=conf.data_path,
+			is_compiled_together=False,
+			filter_nonperson_box_frame=True,
+			filter_small_box=False if conf.mode == const.PREDCLS else True
+		)
+		
+		dataloader_test = DataLoader(
+			ag_test_data,
+			shuffle=False,
+			collate_fn=ag_features_cuda_collate_fn,
+			pin_memory=False
+		)
+	else:
+		ag_test_data = AG(
+			phase="test",
+			datasize=conf.datasize,
+			data_path=conf.data_path,
+			filter_nonperson_box_frame=True,
+			filter_small_box=False if conf.mode == 'predcls' else True
+		)
+		
+		dataloader_test = DataLoader(
+			ag_test_data,
+			shuffle=False,
+			collate_fn=ag_data_cuda_collate_fn,
+			pin_memory=False
+		)
+	
+	gen_evaluators = generate_evaluator_set_unlocalized(conf, ag_test_data)
+	return ag_test_data, dataloader_test, gen_evaluators, gpu_device, conf
+
+
+def prepare_metrics_from_stats(evaluator_stats):
+	metrics = Metrics(
+		evaluator_stats["recall"][10],
+		evaluator_stats["recall"][20],
+		evaluator_stats["recall"][50],
+		evaluator_stats["recall"][100],
+		evaluator_stats["mean_recall"][10],
+		evaluator_stats["mean_recall"][20],
+		evaluator_stats["mean_recall"][50],
+		evaluator_stats["mean_recall"][100],
+		evaluator_stats["harmonic_mean_recall"][10],
+		evaluator_stats["harmonic_mean_recall"][20],
+		evaluator_stats["harmonic_mean_recall"][50],
+		evaluator_stats["harmonic_mean_recall"][100]
+	)
+	
+	return metrics
+
+
+def send_results_to_firebase(evaluators: List[BasicSceneGraphEvaluator], task_name: str, method_name: str, mode: str,
+                             train_num_future_frames=None, context_fraction=None, test_future_frame_count=None):
+	assert task_name is not None and method_name is not None and mode is not None
+	db_service = FirebaseService()
+	
+	result = Result(
+		task_name=task_name,
+		method_name=method_name,
+		mode=mode,
+	)
+	
+	if train_num_future_frames is not None:
+		result.train_num_future_frames = train_num_future_frames
+	
+	if context_fraction is not None:
+		result.context_fraction = context_fraction
+	
+	if test_future_frame_count is not None:
+		result.test_num_future_frames = test_future_frame_count
+	
+	result_details = ResultDetails()
+	with_constraint_metrics = prepare_metrics_from_stats(evaluators[0].fetch_stats_json())
+	no_constraint_metrics = prepare_metrics_from_stats(evaluators[1].fetch_stats_json())
+	semi_constraint_metrics = prepare_metrics_from_stats(evaluators[2].fetch_stats_json())
+	
+	result_details.add_with_constraint_metrics(with_constraint_metrics)
+	result_details.add_no_constraint_metrics(no_constraint_metrics)
+	result_details.add_semi_constraint_metrics(semi_constraint_metrics)
+	
+	result.add_result_details(result_details)
+	
+	print("Saving result: ", result.result_id)
+	db_service.update_result(result.result_id, result.to_dict())
+	print("Saved result: ", result.result_id)
+	
+	return result
+	

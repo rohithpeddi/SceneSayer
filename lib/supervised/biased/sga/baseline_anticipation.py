@@ -107,21 +107,33 @@ class BaselineWithAnticipation(nn.Module):
 			k = torch.where(obj_class.view(-1) == l)[0]
 			if len(k) > 0:
 				sequences.append(k)
-				
+		
 		return entry, rel_features, sequences
 	
 	def forward(self, entry, context, future):
 		"""
-		Forward method for the baseline
-		:param entry: Dictionary from object classifier
-		:param context: Frame idx for context
-		:param future: Number of next frames to anticipate
-		:return:
-		"""
+        Forward method for the baseline
+        :param entry: Dictionary from object classifier
+        :param context: Frame idx for context
+        :param future: Number of next frames to anticipate
+        :return:
+        """
+		print("-----------------------------------------------------------------------------------------------")
+		print(f"Context: {context}, Future: {future}")
+		print(f"Model activated in phase : {self.training}")
+		print("-----------------------------------------------------------------------------------------------")
 		
 		entry, rel_features, sequences = self.process_entry(entry)
 		
-		""" ################# changes regarding forecasting #################### """
+		# -------------------------------------------------------------------------------------------------------------
+		# Anticipation Module
+		# -------------------------------------------------------------------------------------------------------------
+		# 1. This section maintains starts from a set context predicts the future relations corresponding to the last
+		# frame in the context
+		# 2. Then it moves the context by one frame and predicts the future relations corresponding to the
+		# last frame in the new context
+		# 3. This is repeated until the end of the video, loss is calculated for each
+		# future relation prediction and the loss is back-propagated
 		
 		count = 0
 		result = {}
@@ -146,44 +158,36 @@ class BaselineWithAnticipation(nn.Module):
 			
 			context_seq = []
 			future_seq = []
-			seq_mask = torch.zeros(len(sequences))
+			new_future_seq = []
 			for i, s in enumerate(sequences):
 				context_index = s[(s < context_len)]
 				future_index = s[(s >= context_len) & (s < (context_len + future_len))]
 				future_seq.append(future_index)
 				if len(context_index) != 0:
-					seq_mask[i] = 1
 					context_seq.append(context_index)
-			
-			new_future_seq = []
-			for i, s in enumerate(future_seq):
-				if seq_mask[i] == 1:
-					new_future_seq.append(s)
+					new_future_seq.append(future_index)
 			
 			pos_index = []
 			for index in context_seq:
-				im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True,
-				                              sorted=True)
+				im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True, sorted=True)
 				counts = counts.tolist()
 				if im_idx.numel() == 0:
 					pos = torch.tensor(
 						[torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
 				else:
-					pos = torch.cat(
-						[torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
+					pos = torch.cat([torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
 				pos_index.append(pos)
 			
-			# pdb.set_trace()
 			sequence_features = pad_sequence([rel_features[index] for index in context_seq], batch_first=True)
 			in_mask = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
 			                          diagonal=0)).type(torch.bool)
 			in_mask = in_mask.cuda()
 			masks = (1 - pad_sequence([torch.ones(len(index)) for index in context_seq], batch_first=True)).bool()
-			
 			pos_index = [torch.tensor(seq, dtype=torch.long) for seq in pos_index]
 			pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
 			sequence_features = self.positional_encoder(sequence_features, pos_index)
 			mask_input = sequence_features
+			
 			output = []
 			for i in range(future):
 				out = self.temporal_transformer(mask_input, src_key_padding_mask=masks.cuda(), mask=in_mask)
@@ -213,10 +217,31 @@ class BaselineWithAnticipation(nn.Module):
 			rel_ = rel_.cuda()
 			rel_flat1 = []
 			
-			for index, rel in zip(new_future_seq, rel_):
-				if len(index) == 0:
-					continue
-				rel_flat1.extend(rel[:len(index)])
+			if self.training:
+				for index, rel in zip(new_future_seq, rel_):
+					if len(index) == 0:
+						continue
+					rel_flat1.extend(rel[:len(index)])
+			else:
+				for index, rel in zip(new_future_seq, rel_):
+					if len(index) == 0:
+						continue
+					elif len(index) > future:
+						im_id = entry["im_idx"][index]
+						im_id = im_id.tolist()
+						indices_sets = {}
+						for i, element in enumerate(im_id):
+							if element not in indices_sets:
+								indices_sets[element] = []
+							indices_sets[element].append(i)
+						ind_set = list(indices_sets.values())
+						rel_temp = torch.zeros(len(index), rel.shape[1])
+						for i, seq in enumerate(ind_set):
+							for k in range(len(seq)):
+								rel_temp[k] = rel[i]
+						rel_flat1.extend(rel_temp)
+					else:
+						rel_flat1.extend(rel[:len(index)])
 			
 			rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
 			rel_flat = torch.tensor(rel_flat1)
@@ -225,23 +250,24 @@ class BaselineWithAnticipation(nn.Module):
 			indices_flat = torch.cat(new_future_seq).unsqueeze(1).repeat(1, rel_features.shape[1])
 			global_output = torch.zeros_like(rel_features).to(rel_features.device)
 			
+			temp = {"scatter_flag": 0}
 			try:
 				global_output.scatter_(0, indices_flat, rel_flat)
-			except RuntimeError as e:
-				print(f"global_scatter : {e}")
+			except RuntimeError:
+				context += 1
+				temp["scatter_flag"] = 1
+				result[count] = temp
+				count += 1
+				continue
 			# pdb.set_trace()
 			
 			gb_output = global_output[context_len:context_len + future_len]
 			context += 1
-			
-			temp = {
-				"attention_distribution": self.a_rel_compress(gb_output),
-				"spatial_distribution": torch.sigmoid(self.s_rel_compress(gb_output)),
-				"contacting_distribution": torch.sigmoid(self.c_rel_compress(gb_output)),
-				"global_output": gb_output,
-				"original": global_output
-			}
-			
+			temp["attention_distribution"] = self.a_rel_compress(gb_output)
+			temp["spatial_distribution"] = torch.sigmoid(self.s_rel_compress(gb_output))
+			temp["contacting_distribution"] = torch.sigmoid(self.c_rel_compress(gb_output))
+			temp["global_output"] = gb_output
+			temp["original"] = global_output
 			result[count] = temp
 			count += 1
 		entry["output"] = result
@@ -249,15 +275,15 @@ class BaselineWithAnticipation(nn.Module):
 	
 	def forward_single_entry(self, context_fraction, entry):
 		"""
-		Forward method for the baseline
-		:param context_fraction:
-		:param entry: Dictionary from object classifier
-		:return:
-		"""
+        Forward method for the baseline
+        :param context_fraction:
+        :param entry: Dictionary from object classifier
+        :return:
+        """
 		entry, rel_features, sequences = self.process_entry(entry)
 		
 		""" ################# changes regarding forecasting #################### """
-	
+		
 		total_frames = len(entry["im_idx"].unique())
 		context = int(math.ceil(context_fraction * total_frames))
 		future = total_frames - context

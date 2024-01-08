@@ -25,7 +25,7 @@ class Config(object):
         self.results_path = None
         self.method_name = None
         
-        self.max_window = 3
+        self.max_window = 5
         self.brownian_size = 1
         self.ode_ratio = 1.0
         self.sde_ratio = 1.0
@@ -53,7 +53,7 @@ class Config(object):
         parser.add_argument('-model_path', default=None, type=str)
         parser.add_argument('-method_name', default='NeuralODE', type=str)
         parser.add_argument('-results_path', default='results', type=str)
-        parser.add_argument('-max_window', default=3, type=int)
+        parser.add_argument('-max_window', default=5, type=int)
         parser.add_argument('-brownian_size', default=1, type=int)
         parser.add_argument('-ode_ratio', default=1.0, type=float)
         parser.add_argument('-sde_ratio', default=1.0, type=float)

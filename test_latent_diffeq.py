@@ -10,8 +10,10 @@ from tqdm import tqdm
 from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 from lib.supervised.biased.sga.SDE import SDE
-from test_base import fetch_diffeq_test_basic_config, write_future_evaluators_stats, write_percentage_evaluators_stats, \
-    write_gen_evaluators_stats, evaluate_anticipated_future_frame_scene_graph
+from test_base import (fetch_diffeq_test_basic_config, write_future_evaluators_stats, write_percentage_evaluators_stats, \
+                       write_gen_evaluators_stats, evaluate_anticipated_future_frame_scene_graph,
+                       send_future_evaluators_stats_to_firebase,
+                       send_percentage_evaluators_stats_to_firebase, send_gen_evaluators_stats_to_firebase)
 
 
 def process_data(matcher, model, max_window):
@@ -83,7 +85,10 @@ def process_data(matcher, model, max_window):
     # Write future and gen evaluators stats
     write_future_evaluators_stats(mode, future_frame_loss_num, method_name, future_evaluators)
     write_gen_evaluators_stats(mode, future_frame_loss_num, method_name, gen_evaluators)
-
+    # Send future evaluation and generation evaluation stats to firebase
+    send_future_evaluators_stats_to_firebase(future_evaluators, mode, method_name, future_frame_loss_num)
+    send_gen_evaluators_stats_to_firebase(gen_evaluators, mode, method_name, future_frame_loss_num)
+    
     print('*' * 50)
     print('Begin Percentage Evaluation')
     # Context Fraction Evaluation
@@ -103,6 +108,8 @@ def process_data(matcher, model, max_window):
             # Write percentage evaluation stats
             write_percentage_evaluators_stats(mode, future_frame_loss_num, method_name, percentage_evaluators,
                                               context_fraction)
+            # Send percentage evaluation stats to firebase
+            send_percentage_evaluators_stats_to_firebase(percentage_evaluators, mode, method_name,future_frame_loss_num, context_fraction)
 
 
 def load_ode(max_window):
@@ -114,15 +121,15 @@ def load_ode(max_window):
               enc_layer_num=conf.enc_layer,
               dec_layer_num=conf.dec_layer,
               max_window=max_window).to(device=gpu_device)
-
+    
     ode.eval()
-
+    
     ckpt = torch.load(conf.model_path, map_location=gpu_device)
     ode.load_state_dict(ckpt['ode_state_dict'], strict=False)
-
+    
     print('*' * 50)
     print('CKPT {} is loaded'.format(conf.model_path))
-
+    
     return ode
 
 
@@ -137,24 +144,24 @@ def load_sde(max_window):
               dec_layer_num=conf.dec_layer,
               max_window=max_window,
               brownian_size=brownian_size).to(device=gpu_device)
-
+    
     sde.eval()
-
+    
     ckpt = torch.load(conf.model_path, map_location=gpu_device)
     sde.load_state_dict(ckpt['sde_state_dict'], strict=False)
-
+    
     print('*' * 50)
     print('CKPT {} is loaded'.format(conf.model_path))
-
+    
     return sde
 
 
 def main():
     max_window = conf.max_window
-
+    
     matcher = HungarianMatcher(0.5, 1, 1, 0.5)
     matcher.eval()
-
+    
     model = None
     if method_name == "NeuralODE":
         assert train_method == "ode"
@@ -162,7 +169,7 @@ def main():
     elif method_name == "NeuralSDE":
         assert train_method == "sde"
         model = load_sde(max_window)
-
+    
     assert model is not None
     process_data(matcher, model, max_window)
 
@@ -176,6 +183,4 @@ if __name__ == '__main__':
     method_name = conf.method_name
     main()
 
-# python test_latent_diffeq.py -mode sgcls -method_name NeuralODE -model_path /data/rohith/ag/checkpoints/ode/ode_sgcls_future_3_epoch_9.tar
-
-#  python test_cttran.py -mode sgdet -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ -model_sttran_path cttran/no_temporal/sttran_9.tar -model_cttran_path cttran/no_temporal/cttran_9.tar
+# python test_latent_diffeq.py -mode sgcls -max_window 5 -method_name NeuralODE -model_path /data/rohith/ag/checkpoints/ode/ode_sgcls_future_3_epoch_9.tar

@@ -147,7 +147,8 @@ class Result:
 			const.TASK_NAME: self.task_name,
 			const.METHOD_NAME: self.method_name,
 			const.MODE: self.mode,
-			const.RESULT_ID: self.result_id
+			const.RESULT_ID: self.result_id,
+			const.DATE: self.result_date
 		}
 		
 		if self.train_num_future_frames is not None:
@@ -170,7 +171,7 @@ class Result:
 			task_name=result_dict[const.TASK_NAME],
 			method_name=result_dict[const.METHOD_NAME],
 			mode=result_dict[const.MODE],
-			result_id=result_dict[const.RESULT_ID]
+			result_id=result_dict[const.RESULT_ID],
 		)
 		
 		if const.TRAIN_NUM_FUTURE_FRAMES in result_dict:
@@ -184,5 +185,8 @@ class Result:
 		
 		if const.RESULT_DETAILS in result_dict:
 			result.add_result_details(ResultDetails.from_dict(result_dict[const.RESULT_DETAILS]))
+			
+		if const.DATE in result_dict:
+			result.result_date = result_dict[const.DATE]
 		
 		return result

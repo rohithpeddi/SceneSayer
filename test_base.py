@@ -490,4 +490,51 @@ def send_results_to_firebase(evaluators: List[BasicSceneGraphEvaluator], task_na
 	print("Saved result: ", result.result_id)
 	
 	return result
-	
+
+
+def send_future_evaluators_stats_to_firebase(future_evaluators, mode, method_name, future_frame_loss_num):
+	try:
+		future_frame_count_list = [1, 2, 3, 4, 5]
+		for reference_frame_count in future_frame_count_list:
+			reference_future_evaluators = future_evaluators[reference_frame_count]
+			send_results_to_firebase(
+				evaluators=reference_future_evaluators,
+				task_name="sga",
+				method_name=method_name,
+				mode=mode,
+				train_num_future_frames=future_frame_loss_num,
+				context_fraction=None,
+				test_future_frame_count=reference_frame_count
+			)
+	except Exception as e:
+		print(f"Error in sending future evaluator results to firebase {e}")
+		
+		
+def send_gen_evaluators_stats_to_firebase(gen_evaluators, mode, method_name, future_frame_loss_num):
+	try:
+		send_results_to_firebase(
+			evaluators=gen_evaluators,
+			task_name="sga",
+			method_name=method_name,
+			mode=mode,
+			train_num_future_frames=future_frame_loss_num,
+			context_fraction=None,
+			test_future_frame_count=None
+		)
+	except Exception as e:
+		print(f"Error in sending generation evaluator results to firebase {e}")
+		
+		
+def send_percentage_evaluators_stats_to_firebase(percentage_evaluators, mode, method_name, future_frame_loss_num, context_fraction):
+	try:
+		send_results_to_firebase(
+			evaluators=percentage_evaluators[context_fraction],
+			task_name="sga",
+			method_name=method_name,
+			mode=mode,
+			train_num_future_frames=future_frame_loss_num,
+			context_fraction=context_fraction,
+			test_future_frame_count=None
+		)
+	except Exception as e:
+		print(f"Error in sending percentage evaluator results to firebase {e}")

@@ -24,6 +24,7 @@ def load_DySTTran(conf, ag_train_data, gpu_device):
 	if conf.ckpt:
 		ckpt = torch.load(conf.ckpt, map_location=gpu_device)
 		model.load_state_dict(ckpt["dysttran_state_dict"], strict=False)
+		print(f"Loaded checkpoint from {conf.ckpt}")
 	
 	return model
 
@@ -40,6 +41,7 @@ def load_DyDsgDETR(conf, ag_train_data, gpu_device):
 	if conf.ckpt:
 		ckpt = torch.load(conf.ckpt, map_location=gpu_device)
 		model.load_state_dict(ckpt["dydsgdetr_state_dict"], strict=False)
+		print(f"Loaded checkpoint from {conf.ckpt}")
 	
 	return model
 
@@ -113,8 +115,7 @@ def main():
 		model_name = method_name
 		is_tracking_enabled = True
 	
-	assert model is not None and optimizer is not None and scheduler is not None
-	assert model_name is not None
+	assert model is not None and model_name is not None
 	
 	object_detector = load_object_detector(conf, gpu_device, ag_test_data)
 	process_data(model, object_detector, ag_test_data, dataloader_test, gen_evaluators, matcher, conf, model_name,

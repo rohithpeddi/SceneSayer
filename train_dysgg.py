@@ -28,6 +28,7 @@ def load_DySTTran(conf, ag_train_data, gpu_device):
 	if conf.ckpt:
 		ckpt = torch.load(conf.ckpt, map_location=gpu_device)
 		model.load_state_dict(ckpt["dysttran_state_dict"], strict=False)
+		print(f"Loaded checkpoint {conf.ckpt}")
 	
 	optimizer, scheduler = prepare_optimizer(conf, model)
 	return model, optimizer, scheduler
@@ -45,6 +46,7 @@ def load_DyDsgDETR(conf, ag_train_data, gpu_device):
 	if conf.ckpt:
 		ckpt = torch.load(conf.ckpt, map_location=gpu_device)
 		model.load_state_dict(ckpt["dydsgdetr_state_dict"], strict=False)
+		print(f"Loaded checkpoint {conf.ckpt}")
 	
 	optimizer, scheduler = prepare_optimizer(conf, model)
 	return model, optimizer, scheduler
@@ -205,7 +207,8 @@ def main():
 	
 	assert model is not None and optimizer is not None and scheduler is not None
 	assert model_name is not None
-	
+
+	print(f"Training model with name {model_name}")
 	object_detector = load_object_detector(conf, gpu_device, ag_train_data)
 	tr = []
 	for epoch in range(conf.nepoch):

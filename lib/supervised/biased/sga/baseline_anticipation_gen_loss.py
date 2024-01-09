@@ -115,8 +115,32 @@ class BaselineWithAnticipationGenLoss(nn.Module):
             k = torch.where(obj_class.view(-1) == l)[0]
             if len(k) > 0:
                 sequences.append(k)
+                
+                # Temporal message passing
+                pos_index = []
+                for index in sequences:
+                    im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True,
+                                                  sorted=True)
+                    counts = counts.tolist()
+                    pos = torch.cat([torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
+                    pos_index.append(pos)
+                sequence_features = pad_sequence([rel_features[index] for index in sequences], batch_first=True)
+                in_mask_dsg = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
+                                              diagonal=0)).type(torch.bool)
+                in_mask_dsg = in_mask_dsg.cuda()
+                masks = (1 - pad_sequence([torch.ones(len(index)) for index in sequences], batch_first=True)).bool()
+                pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
+                rel_ = self.gen_temporal_transformer(self.positional_encoder(sequence_features, pos_index),
+                                                     src_key_padding_mask=masks.cuda(), mask=in_mask_dsg)
+                
+                rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(sequences, rel_)])
+                indices_flat = torch.cat(sequences).unsqueeze(1).repeat(1, rel_features.shape[1])
+                
+                assert len(indices_flat) == len(entry["pair_idx"])
+                dsg_global_output = torch.zeros_like(rel_features).to(rel_features.device)
+                dsg_global_output.scatter_(0, indices_flat, rel_flat)
         
-        return entry, rel_features, sequences
+        return entry, rel_features, sequences, dsg_global_output
     
     def forward(self, entry, context, future):
         """
@@ -126,30 +150,7 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         :param future: Number of next frames to anticipate
         :return:
         """
-        entry, rel_features, sequences = self.process_entry(entry)
-        
-        # Temporal message passing
-        pos_index = []
-        for index in sequences:
-            im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True, sorted=True)
-            counts = counts.tolist()
-            pos = torch.cat([torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
-            pos_index.append(pos)
-        sequence_features = pad_sequence([rel_features[index] for index in sequences], batch_first=True)
-        in_mask_dsg = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
-                                      diagonal=0)).type(torch.bool)
-        in_mask_dsg = in_mask_dsg.cuda()
-        masks = (1 - pad_sequence([torch.ones(len(index)) for index in sequences], batch_first=True)).bool()
-        pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
-        rel_ = self.gen_temporal_transformer(self.positional_encoder(sequence_features, pos_index),
-                                             src_key_padding_mask=masks.cuda(), mask=in_mask_dsg)
-        
-        rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(sequences, rel_)])
-        indices_flat = torch.cat(sequences).unsqueeze(1).repeat(1, rel_features.shape[1])
-        
-        assert len(indices_flat) == len(entry["pair_idx"])
-        dsg_global_output = torch.zeros_like(rel_features).to(rel_features.device)
-        dsg_global_output.scatter_(0, indices_flat, rel_flat)
+        entry, rel_features, sequences, dsg_global_output = self.process_entry(entry)
         
         # -------------------------------------------------------------------------------------------------------------
         # Anticipation Module
@@ -248,28 +249,26 @@ class BaselineWithAnticipationGenLoss(nn.Module):
                     if len(index) == 0:
                         continue
                     rel_flat1.extend(rel[:len(index)])
-            
             else:
+                # Index has repetitions for each object in the future frame
+                # index - for a single frame - an object can occur multiple times
+                # repeat rel values for those indices where it repeats
                 for index, rel in zip(new_future_seq, rel_):
                     if len(index) == 0:
                         continue
-                    elif len(index) > future:
-                        im_id = entry["im_idx"][index]
-                        im_id = im_id.tolist()
-                        indices_sets = {}
-                        for i, element in enumerate(im_id):
-                            if element not in indices_sets:
-                                indices_sets[element] = []
-                            indices_sets[element].append(i)
-                        ind_set = list(indices_sets.values())
-                        rel_temp = torch.zeros(len(index), rel.shape[1])
-                        for i, seq in enumerate(ind_set):
-                            for k in range(len(seq)):
-                                rel_temp[k] = rel[i]
-                        rel_flat1.extend(rel_temp)
-                    else:
-                        rel_flat1.extend(rel[:len(index)])
-            
+                    frame_idx = entry["im_idx"][index]
+                    frame_idx_object_dict = {}
+                    for i, element in enumerate(frame_idx):
+                        if element not in frame_idx_object_dict:
+                            frame_idx_object_dict[element] = []
+                        frame_idx_object_dict[element].append(i)
+                    
+                    # Create a relation tensor by repeating the relation values
+                    rel_temp = torch.zeros(len(index), rel.shape[1])
+                    for i, seq in enumerate(frame_idx_object_dict.values()):
+                        for k in seq:
+                            rel_temp[k] = rel[i]
+                    rel_flat1.extend(rel_temp)
             rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
             rel_flat = torch.tensor(rel_flat1)
             rel_flat = rel_flat.to('cuda:0')
@@ -306,6 +305,7 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         
         return entry
     
+    # Use this only for long-term evaluation
     def forward_single_entry(self, context_fraction, entry):
         """
         Forward method for the baseline
@@ -313,14 +313,15 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         :param entry: Dictionary from object classifier
         :return:
         """
-        entry, rel_features, sequences = self.process_entry(entry)
+        entry, rel_features, sequences, dsg_global_output = self.process_entry(entry)
         
         """ ################# changes regarding forecasting #################### """
-        
+        count = 0
         total_frames = len(entry["im_idx"].unique())
         context = int(math.ceil(context_fraction * total_frames))
         future = total_frames - context
         
+        result = {}
         future_frame_start_id = entry["im_idx"].unique()[context]
         
         if context + future > total_frames > context:
@@ -338,44 +339,36 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         
         context_seq = []
         future_seq = []
-        seq_mask = torch.zeros(len(sequences))
+        new_future_seq = []
         for i, s in enumerate(sequences):
             context_index = s[(s < context_len)]
             future_index = s[(s >= context_len) & (s < (context_len + future_len))]
             future_seq.append(future_index)
             if len(context_index) != 0:
-                seq_mask[i] = 1
                 context_seq.append(context_index)
-        
-        new_future_seq = []
-        for i, s in enumerate(future_seq):
-            if seq_mask[i] == 1:
-                new_future_seq.append(s)
+                new_future_seq.append(future_index)
         
         pos_index = []
         for index in context_seq:
-            im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True,
-                                          sorted=True)
+            im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True, sorted=True)
             counts = counts.tolist()
             if im_idx.numel() == 0:
                 pos = torch.tensor(
                     [torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
             else:
-                pos = torch.cat(
-                    [torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
+                pos = torch.cat([torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
             pos_index.append(pos)
         
-        # pdb.set_trace()
-        sequence_features = pad_sequence([rel_features[index] for index in context_seq], batch_first=True)
+        sequence_features = pad_sequence([dsg_global_output[index] for index in context_seq], batch_first=True)
         in_mask = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
                                   diagonal=0)).type(torch.bool)
         in_mask = in_mask.cuda()
         masks = (1 - pad_sequence([torch.ones(len(index)) for index in context_seq], batch_first=True)).bool()
-        
         pos_index = [torch.tensor(seq, dtype=torch.long) for seq in pos_index]
         pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
         sequence_features = self.positional_encoder(sequence_features, pos_index)
         mask_input = sequence_features
+        
         output = []
         for i in range(future):
             out = self.anti_temporal_transformer(mask_input, src_key_padding_mask=masks.cuda(), mask=in_mask)
@@ -408,28 +401,49 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         for index, rel in zip(new_future_seq, rel_):
             if len(index) == 0:
                 continue
-            rel_flat1.extend(rel[:len(index)])
+            frame_idx = entry["im_idx"][index]
+            frame_idx_object_dict = {}
+            for i, element in enumerate(frame_idx):
+                if element not in frame_idx_object_dict:
+                    frame_idx_object_dict[element] = []
+                frame_idx_object_dict[element].append(i)
+                # Create a relation tensor by repeating the relation values
+            rel_temp = torch.zeros(len(index), rel.shape[1])
+            for i, seq in enumerate(frame_idx_object_dict.values()):
+                for k in seq:
+                    rel_temp[k] = rel[i]
+            rel_flat1.extend(rel_temp)
         
         rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
         rel_flat = torch.tensor(rel_flat1)
         rel_flat = rel_flat.to('cuda:0')
-        indices_flat = torch.cat(new_future_seq).unsqueeze(1).repeat(1, rel_features.shape[1])
-        global_output = torch.zeros_like(rel_features).to(rel_features.device)
+        # rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(future_seq,rel_)])
+        indices_flat = torch.cat(new_future_seq).unsqueeze(1).repeat(1, dsg_global_output.shape[1])
+        global_output = torch.zeros_like(dsg_global_output).to(dsg_global_output.device)
         
+        temp = {"scatter_flag": 0}
         try:
             global_output.scatter_(0, indices_flat, rel_flat)
-        except RuntimeError as e:
-            print(f"global_scatter : {e}")
+        except RuntimeError:
+            context += 1
+            temp["scatter_flag"] = 1
+            result[count] = temp
+            entry["output"] = result
+            return entry
+        # pdb.set_trace()
         
         gb_output = global_output[context_len:context_len + future_len]
-        context += 1
         
-        temp = {
-            "attention_distribution": self.a_rel_compress(gb_output),
-            "spatial_distribution": torch.sigmoid(self.s_rel_compress(gb_output)),
-            "contacting_distribution": torch.sigmoid(self.c_rel_compress(gb_output)),
-            "global_output": gb_output,
-            "original": global_output
-        }
+        temp["attention_distribution"] = self.a_rel_compress(gb_output)
+        temp["spatial_distribution"] = torch.sigmoid(self.s_rel_compress(gb_output))
+        temp["contacting_distribution"] = torch.sigmoid(self.c_rel_compress(gb_output))
+        temp["global_output"] = gb_output
+        temp["original"] = global_output
         
-        entry["output"] = temp
+        result[count] = temp
+        entry["gen_attention_distribution"] = self.gen_a_rel_compress(dsg_global_output)
+        entry["gen_spatial_distribution"] = torch.sigmoid(self.gen_s_rel_compress(dsg_global_output))
+        entry["gen_contacting_distribution"] = torch.sigmoid(self.gen_c_rel_compress(dsg_global_output))
+        entry["output"] = result
+        
+        return entry

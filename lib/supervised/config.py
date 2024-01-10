@@ -30,6 +30,8 @@ class Config(object):
         self.ode_ratio = 1.0
         self.sde_ratio = 1.0
         self.bbox_ratio = 0.1
+        self.features_path = None
+        self.additional_data_path = None
         
         self.baseline_context = 3
         self.baseline_future = 5
@@ -58,6 +60,8 @@ class Config(object):
         parser.add_argument('-ode_ratio', default=1.0, type=float)
         parser.add_argument('-sde_ratio', default=1.0, type=float)
         parser.add_argument('-bbox_ratio', default=0.1, type=float)
+        parser.add_argument('-features_path', default=None, type=str)
+        parser.add_argument('-additional_data_path', default=None, type=str)
         parser.add_argument('-baseline_context', default=3, type=int)
         parser.add_argument('-baseline_future', default=5, type=int)
         parser.add_argument('-use_raw_data', action='store_true')

@@ -1,13 +1,12 @@
+import os
+import pickle
+
 import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-import pickle
-import os
 from constants import DataloaderConstants as const
 from logger_config import get_logger
-import pdb
-
 
 logger = get_logger(__name__)
 
@@ -22,7 +21,9 @@ class AGFeatures(Dataset):
 			data_path=None,
 			is_compiled_together=True,
 			filter_nonperson_box_frame=True,
-			filter_small_box=False
+			filter_small_box=False,
+			features_path=None,
+			additional_data_path=None
 	):
 		self.root_path = data_path
 		self.data_split = data_split
@@ -34,9 +35,18 @@ class AGFeatures(Dataset):
 		self.filter_small_box = filter_small_box
 
 		self.is_train = True if self.data_split == const.TRAIN else False
-		self.entry_mode = const.SGDET if self.mode == const.SGDET else const.SGCLS  # Same attribute dictionary for SGCLS and PREDCLS
-		self.features_path = os.path.join(self.root_path, const.FEATURES, const.SUPERVISED, self.data_split)
-		self.additional_data_path = os.path.join(self.root_path, const.FEATURES, const.SUPERVISED, const.ADDITIONAL, self.data_split)
+		self.entry_mode = self.mode  # Same attribute dictionary for SGCLS and PREDCLS
+		
+		if features_path is not None:
+			self.features_path = features_path
+		else:
+			self.features_path = os.path.join(self.root_path, const.FEATURES, const.SUPERVISED, self.data_split)
+			
+		if additional_data_path is not None:
+			self.additional_data_path = additional_data_path
+		else:
+			self.additional_data_path = os.path.join(self.root_path, const.FEATURES, const.SUPERVISED, const.ADDITIONAL, self.data_split)
+
 		logger.info(f"Initializing static data from dataset in {self.mode}")
 		self._init_dataset_static_data()
 		logger.info(f"Finished processing static data from dataset in {self.mode}")

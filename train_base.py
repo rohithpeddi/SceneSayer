@@ -71,7 +71,9 @@ def fetch_train_basic_config():
             data_path=conf.data_path,
             is_compiled_together=False,
             filter_nonperson_box_frame=True,
-            filter_small_box=False if conf.mode == const.PREDCLS else True
+            filter_small_box=False if conf.mode == const.PREDCLS else True,
+            features_path=conf.features_path,
+            additional_data_path=conf.additional_data_path
         )
 
         ag_test_data = AGFeatures(

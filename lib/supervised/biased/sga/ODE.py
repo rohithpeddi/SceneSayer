@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
 from torchdiffeq import odeint_adjoint as odeint
 
-from lib.supervised.biased.sga.blocks import EncoderLayer, Encoder, PositionalEncoding, ObjectClassifier, GetBoxes
+from lib.supervised.biased.sga.blocks import EncoderLayer, Encoder, PositionalEncoding, ObjectClassifierTransformer, GetBoxes
 from lib.word_vectors import obj_edge_vectors
 
 
@@ -34,7 +34,7 @@ class STTran(nn.Module):
         self.mode = mode
         self.num_features = 1936
 
-        self.object_classifier = ObjectClassifier(mode=self.mode, obj_classes=self.obj_classes)
+        self.object_classifier = ObjectClassifierTransformer(mode=self.mode, obj_classes=self.obj_classes)
 
         self.get_subj_boxes = GetBoxes(1936)
         self.get_obj_boxes = GetBoxes(1936)
@@ -190,7 +190,6 @@ class ODE(nn.Module):
         self.d_model = 1936
         self.max_window = max_window
 
-        self.object_classifier = ObjectClassifier(mode=self.mode, obj_classes=self.obj_classes)
         self.dsgdetr = STTran(self.mode,
                               attention_class_num=attention_class_num,
                               spatial_class_num=spatial_class_num,
@@ -334,13 +333,13 @@ class ODE(nn.Module):
         return entry
 
     def forward_single_entry(self, context_fraction, entry):
-		# [0.3, 0.5, 0.7, 0.9]
-		# end = 39
-		# future_end = 140
-		# future_frame_idx = [40, 41, .............139]
-		# Take each entry and extrapolate it to the future
-		# evaluation_recall.evaluate_scene_graph_forecasting(self, gt, pred, end, future_end, future_frame_idx, count=0)
-		# entry["output"][0] = {pred_scores, pred_labels, attention_distribution, spatial_distribution, contact_distribution}
+        # [0.3, 0.5, 0.7, 0.9]
+        # end = 39
+        # future_end = 140
+        # future_frame_idx = [40, 41, .............139]
+        # Take each entry and extrapolate it to the future
+        # evaluation_recall.evaluate_scene_graph_forecasting(self, gt, pred, end, future_end, future_frame_idx, count=0)
+        # entry["output"][0] = {pred_scores, pred_labels, attention_distribution, spatial_distribution, contact_distribution}
         assert context_fraction > 0
         im_idx = entry["im_idx"]
         pair_idx = entry["pair_idx"]

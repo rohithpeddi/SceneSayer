@@ -256,18 +256,20 @@ class BaselineWithAnticipationGenLoss(nn.Module):
                 for index, rel in zip(new_future_seq, rel_):
                     if len(index) == 0:
                         continue
-                    frame_idx = entry["im_idx"][index]
-                    frame_idx_object_dict = {}
-                    for i, element in enumerate(frame_idx):
-                        if element not in frame_idx_object_dict:
-                            frame_idx_object_dict[element] = []
-                        frame_idx_object_dict[element].append(i)
-                    
-                    # Create a relation tensor by repeating the relation values
+                    ob_frame_idx = entry["im_idx"][index]
                     rel_temp = torch.zeros(len(index), rel.shape[1])
-                    for i, seq in enumerate(frame_idx_object_dict.values()):
-                        for k in seq:
-                            rel_temp[k] = rel[i]
+                    # For each frame in ob_frame_idx, if the value repeats then add the relation value of previous frame
+                    k = 0  # index for rel
+                    for i, frame in enumerate(ob_frame_idx):
+                        if i == 0:
+                            rel_temp[i] = rel[k]
+                            k += 1
+                        elif frame == ob_frame_idx[i - 1]:
+                            rel_temp[i] = rel_temp[i - 1]
+                        else:
+                            rel_temp[i] = rel[k]
+                            k += 1
+                    
                     rel_flat1.extend(rel_temp)
             rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
             rel_flat = torch.tensor(rel_flat1)
@@ -318,7 +320,7 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         """ ################# changes regarding forecasting #################### """
         count = 0
         total_frames = len(entry["im_idx"].unique())
-        context = int(math.ceil(context_fraction * total_frames))
+        context = min(int(math.ceil(context_fraction * total_frames)), total_frames - 1)
         future = total_frames - context
         
         result = {}
@@ -401,17 +403,20 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         for index, rel in zip(new_future_seq, rel_):
             if len(index) == 0:
                 continue
-            frame_idx = entry["im_idx"][index]
-            frame_idx_object_dict = {}
-            for i, element in enumerate(frame_idx):
-                if element not in frame_idx_object_dict:
-                    frame_idx_object_dict[element] = []
-                frame_idx_object_dict[element].append(i)
-                # Create a relation tensor by repeating the relation values
+            ob_frame_idx = entry["im_idx"][index]
             rel_temp = torch.zeros(len(index), rel.shape[1])
-            for i, seq in enumerate(frame_idx_object_dict.values()):
-                for k in seq:
-                    rel_temp[k] = rel[i]
+            # For each frame in ob_frame_idx, if the value repeats then add the relation value of previous frame
+            k = 0  # index for rel
+            for i, frame in enumerate(ob_frame_idx):
+                if i == 0:
+                    rel_temp[i] = rel[k]
+                    k += 1
+                elif frame == ob_frame_idx[i - 1]:
+                    rel_temp[i] = rel_temp[i - 1]
+                else:
+                    rel_temp[i] = rel[k]
+                    k += 1
+            
             rel_flat1.extend(rel_temp)
         
         rel_flat1 = [tensor.tolist() for tensor in rel_flat1]

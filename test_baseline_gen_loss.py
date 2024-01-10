@@ -15,7 +15,7 @@ from test_base import (fetch_transformer_test_basic_config, get_sequence_no_trac
 # Future Context - forward(entry,  context_fraction, entry)
 def evaluate_model_context_fraction(model, entry, gt_annotation, conf, context_fraction, percentage_evaluators):
 	get_sequence_no_tracking(entry, conf.mode)
-	pred = model(context_fraction, entry)
+	pred = model.forward_single_entry(context_fraction=context_fraction, entry=entry)
 	
 	count = 0
 	total_frames = len(entry["im_idx"].unique())
@@ -132,7 +132,10 @@ def evaluate_model_context_fraction(model, entry, gt_annotation, conf, context_f
 		             'pred_scores': pred_scores
 		             }
 	
-	percentage_evaluators[context_fraction].evaluate_scene_graph(gt_future, pred_dict)
+	evaluators = percentage_evaluators[context_fraction]
+	evaluators[0].evaluate_scene_graph(gt_future, pred_dict)
+	evaluators[1].evaluate_scene_graph(gt_future, pred_dict)
+	evaluators[2].evaluate_scene_graph(gt_future, pred_dict)
 
 
 # Future frames - Normal Test Evaluation - forward(entry, context, future)
@@ -272,9 +275,27 @@ def evaluate_model_future_frames(model, entry, gt_annotation, conf, num_future_f
 			             # 'scores':scores,
 			             'pred_scores': pred_scores
 			             }
-		future_evaluators[num_future_frames].evaluate_scene_graph(gt_future, pred_dict)
+		evaluators = future_evaluators[num_future_frames]
+		evaluators[0].evaluate_scene_graph(gt_future, pred_dict)
+		evaluators[1].evaluate_scene_graph(gt_future, pred_dict)
+		evaluators[2].evaluate_scene_graph(gt_future, pred_dict)
 		count += 1
 		context += 1
+
+
+def load_model(conf, dataset, gpu_device, model_name):
+	model = BaselineWithAnticipationGenLoss(mode=conf.mode,
+	                                        attention_class_num=len(ag_test_data.attention_relationships),
+	                                        spatial_class_num=len(ag_test_data.spatial_relationships),
+	                                        contact_class_num=len(ag_test_data.contacting_relationships),
+	                                        obj_classes=ag_test_data.object_classes,
+	                                        enc_layer_num=conf.enc_layer,
+	                                        dec_layer_num=conf.dec_layer).to(device=gpu_device)
+	
+	ckpt = torch.load(conf.ckpt, map_location=gpu_device)
+	model.load_state_dict(ckpt[f'{model_name}_state_dict'], strict=False)
+	print(f"Loaded model from checkpoint {conf.ckpt}")
+	return model
 
 
 def main():
@@ -287,17 +308,23 @@ def main():
 	future_frame_loss_num = checkpoint_name.split('_')[-3]
 	mode = checkpoint_name.split('_')[-5]
 	
-	model = BaselineWithAnticipationGenLoss(mode=conf.mode,
-	                                        attention_class_num=len(ag_test_data.attention_relationships),
-	                                        spatial_class_num=len(ag_test_data.spatial_relationships),
-	                                        contact_class_num=len(ag_test_data.contacting_relationships),
-	                                        obj_classes=ag_test_data.object_classes,
-	                                        enc_layer_num=conf.enc_layer,
-	                                        dec_layer_num=conf.dec_layer).to(device=gpu_device)
+	model_name = conf.method_name
+	checkpoint_name = os.path.basename(conf.ckpt).split('.')[0]
+	future_frame_loss_num = checkpoint_name.split('_')[-3]
+	mode = checkpoint_name.split('_')[-5]
 	
-	ckpt = torch.load(conf.ckpt, map_location=gpu_device)
-	model.load_state_dict(ckpt[f'{model_name}_state_dict'], strict=False)
-	print(f"Loaded model from checkpoint {conf.ckpt}")
+	print("----------------------------------------------------------")
+	print(f"Model name: {model_name}")
+	print(f"Checkpoint name: {checkpoint_name}")
+	print(f"Future frame loss num: {future_frame_loss_num}")
+	print(f"Mode: {mode}")
+	print("----------------------------------------------------------")
+	
+	model = load_model(conf, ag_test_data, gpu_device, model_name)
+	model.eval()
+	
+	matcher = HungarianMatcher(0.5, 1, 1, 0.5)
+	matcher.eval()
 	
 	object_detector = detector(
 		train=False,
@@ -306,13 +333,15 @@ def main():
 		mode=conf.mode
 	).to(device=gpu_device)
 	object_detector.eval()
+	object_detector.is_train = False
 	
-	matcher = HungarianMatcher(0.5, 1, 1, 0.5)
-	matcher.eval()
+	test_iter = iter(dataloader_test)
+	model.eval()
 	future_frames_list = [1, 2, 3, 4, 5]
 	context_fractions = [0.3, 0.5, 0.7, 0.9]
 	with torch.no_grad():
-		for id, data in enumerate(dataloader_test):
+		for b in range(len(dataloader_test)):
+			data = next(test_iter)
 			im_data = copy.deepcopy(data[0].cuda(0))
 			im_info = copy.deepcopy(data[1].cuda(0))
 			gt_boxes = copy.deepcopy(data[2].cuda(0))
@@ -321,12 +350,14 @@ def main():
 			
 			for num_future_frames in future_frames_list:
 				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-				get_sequence_no_tracking(entry, conf.mode)
 				evaluate_model_future_frames(model, entry, gt_annotation, conf, num_future_frames, future_evaluators)
 			
 			for context_fraction in context_fractions:
 				evaluate_model_context_fraction(model, entry, gt_annotation, conf, context_fraction,
 				                                percentage_evaluators)
+			
+			if b % 5 == 0:
+				print(f"Finished processing {b} of {len(dataloader_test)} batches")
 		
 		# Write future and gen evaluators stats
 		write_future_evaluators_stats(conf.mode, future_frame_loss_num, method_name=model_name,

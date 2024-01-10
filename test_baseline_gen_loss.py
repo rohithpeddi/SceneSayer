@@ -285,10 +285,10 @@ def evaluate_model_future_frames(model, entry, gt_annotation, conf, num_future_f
 
 def load_model(conf, dataset, gpu_device, model_name):
 	model = BaselineWithAnticipationGenLoss(mode=conf.mode,
-	                                        attention_class_num=len(ag_test_data.attention_relationships),
-	                                        spatial_class_num=len(ag_test_data.spatial_relationships),
-	                                        contact_class_num=len(ag_test_data.contacting_relationships),
-	                                        obj_classes=ag_test_data.object_classes,
+	                                        attention_class_num=len(dataset.attention_relationships),
+	                                        spatial_class_num=len(dataset.spatial_relationships),
+	                                        contact_class_num=len(dataset.contacting_relationships),
+	                                        obj_classes=dataset.object_classes,
 	                                        enc_layer_num=conf.enc_layer,
 	                                        dec_layer_num=conf.dec_layer).to(device=gpu_device)
 	
@@ -303,15 +303,10 @@ def main():
 	 future_evaluators_modified_gt, percentage_evaluators,
 	 percentage_evaluators_modified_gt, gpu_device, conf) = fetch_transformer_test_basic_config()
 	
-	model_name = "baseline_so_gen_loss"
-	checkpoint_name = os.path.basename(conf.ckpt).split('.')[0]
-	future_frame_loss_num = checkpoint_name.split('_')[-3]
-	mode = checkpoint_name.split('_')[-5]
-	
 	model_name = conf.method_name
 	checkpoint_name = os.path.basename(conf.ckpt).split('.')[0]
 	future_frame_loss_num = checkpoint_name.split('_')[-3]
-	mode = checkpoint_name.split('_')[-5]
+	mode = conf.mode
 	
 	print("----------------------------------------------------------")
 	print(f"Model name: {model_name}")
@@ -378,7 +373,7 @@ def main():
 			)
 			send_percentage_evaluators_stats_to_firebase(
 				percentage_evaluators,
-				mode,
+				conf.mode,
 				model_name,
 				future_frame_loss_num,
 				context_fraction

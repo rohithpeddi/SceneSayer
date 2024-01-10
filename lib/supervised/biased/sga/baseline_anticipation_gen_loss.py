@@ -116,29 +116,29 @@ class BaselineWithAnticipationGenLoss(nn.Module):
             if len(k) > 0:
                 sequences.append(k)
                 
-                # Temporal message passing
-                pos_index = []
-                for index in sequences:
-                    im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True,
-                                                  sorted=True)
-                    counts = counts.tolist()
-                    pos = torch.cat([torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
-                    pos_index.append(pos)
-                sequence_features = pad_sequence([rel_features[index] for index in sequences], batch_first=True)
-                in_mask_dsg = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
-                                              diagonal=0)).type(torch.bool)
-                in_mask_dsg = in_mask_dsg.cuda()
-                masks = (1 - pad_sequence([torch.ones(len(index)) for index in sequences], batch_first=True)).bool()
-                pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
-                rel_ = self.gen_temporal_transformer(self.positional_encoder(sequence_features, pos_index),
-                                                     src_key_padding_mask=masks.cuda(), mask=in_mask_dsg)
-                
-                rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(sequences, rel_)])
-                indices_flat = torch.cat(sequences).unsqueeze(1).repeat(1, rel_features.shape[1])
-                
-                assert len(indices_flat) == len(entry["pair_idx"])
-                dsg_global_output = torch.zeros_like(rel_features).to(rel_features.device)
-                dsg_global_output.scatter_(0, indices_flat, rel_flat)
+        # Temporal message passing
+        pos_index = []
+        for index in sequences:
+            im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True,
+                                          sorted=True)
+            counts = counts.tolist()
+            pos = torch.cat([torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
+            pos_index.append(pos)
+        sequence_features = pad_sequence([rel_features[index] for index in sequences], batch_first=True)
+        in_mask_dsg = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
+                                      diagonal=0)).type(torch.bool)
+        in_mask_dsg = in_mask_dsg.cuda()
+        masks = (1 - pad_sequence([torch.ones(len(index)) for index in sequences], batch_first=True)).bool()
+        pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
+        rel_ = self.gen_temporal_transformer(self.positional_encoder(sequence_features, pos_index),
+                                             src_key_padding_mask=masks.cuda(), mask=in_mask_dsg)
+
+        rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(sequences, rel_)])
+        indices_flat = torch.cat(sequences).unsqueeze(1).repeat(1, rel_features.shape[1])
+
+        assert len(indices_flat) == len(entry["pair_idx"])
+        dsg_global_output = torch.zeros_like(rel_features).to(rel_features.device)
+        dsg_global_output.scatter_(0, indices_flat, rel_flat)
         
         return entry, rel_features, sequences, dsg_global_output
     

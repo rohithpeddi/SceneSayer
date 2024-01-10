@@ -19,7 +19,7 @@ def evaluate_model_context_fraction(model, entry, gt_annotation, conf, context_f
 	
 	count = 0
 	total_frames = len(entry["im_idx"].unique())
-	context = int(math.ceil(context_fraction * total_frames))
+	context = min(int(math.ceil(context_fraction * total_frames)), total_frames - 1)
 	future = total_frames - context
 	
 	future_frame_start_id = entry["im_idx"].unique()[context]

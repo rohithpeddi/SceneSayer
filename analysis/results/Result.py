@@ -136,6 +136,8 @@ class Result:
 		
 		if result_id is None:
 			self.result_id = str(uuid.uuid4())
+		else:
+			self.result_id = result_id
 			
 		self.result_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 	

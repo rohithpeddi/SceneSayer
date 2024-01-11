@@ -1,5 +1,6 @@
 import argparse
 import csv
+import json
 import os
 
 from analysis.results.FirebaseService import FirebaseService
@@ -220,8 +221,22 @@ def model_evaluation_check_anticipation():
 			for model_name in models:
 				for train_future_frame in train_future_frame_loss_list:
 					writer.writerow([
-						mode, model_name, train_future_frame, evaluation_check_json[mode][model_name][train_future_frame]
+						mode, model_name, train_future_frame,
+						evaluation_check_json[mode][model_name][train_future_frame]
 					])
+
+
+def store_versioned_results(version):
+	results_dict = db_service.fetch_results()
+	for result_id, result_dict in results_dict.items():
+		result = Result.from_dict(result_dict)
+		if result.result_id is None:
+			result.result_id = result_id
+			print("Saving result: ", result.result_id)
+			db_service.update_result(result_id, result.to_dict())
+		json_file_path = os.path.join(os.path.dirname(__file__), "analysis", f"v{version}", result_id + ".json")
+		with open(json_file_path, "w") as json_file:
+			json.dump(result.to_dict(), json_file)
 
 
 if __name__ == '__main__':
@@ -235,5 +250,6 @@ if __name__ == '__main__':
 	# process_results()
 	# compile_results()
 	# print_results()
+	# model_evaluation_check_anticipation()
 	
-	model_evaluation_check_anticipation()
+	store_versioned_results(1)

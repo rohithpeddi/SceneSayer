@@ -56,15 +56,15 @@ class Metrics:
 			recall_10=metrics_dict[const.RECALL_10],
 			recall_20=metrics_dict[const.RECALL_20],
 			recall_50=metrics_dict[const.RECALL_50],
-			recall_100=metrics_dict[const.RECALL_100],
+			recall_100=metrics_dict[const.RECALL_100] if const.RECALL_100 in metrics_dict else None,
 			mean_recall_10=metrics_dict[const.MEAN_RECALL_10],
 			mean_recall_20=metrics_dict[const.MEAN_RECALL_20],
 			mean_recall_50=metrics_dict[const.MEAN_RECALL_50],
-			mean_recall_100=metrics_dict[const.MEAN_RECALL_100],
+			mean_recall_100=metrics_dict[const.MEAN_RECALL_100] if const.MEAN_RECALL_100 in metrics_dict else None,
 			harmonic_recall_10=metrics_dict[const.HARMONIC_RECALL_10],
 			harmonic_recall_20=metrics_dict[const.HARMONIC_RECALL_20],
 			harmonic_recall_50=metrics_dict[const.HARMONIC_RECALL_50],
-			harmonic_recall_100=metrics_dict[const.HARMONIC_RECALL_100],
+			harmonic_recall_100=metrics_dict[const.HARMONIC_RECALL_100] if const.HARMONIC_RECALL_100 in metrics_dict else None,
 		)
 
 

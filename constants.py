@@ -276,7 +276,7 @@ class ResultConstants:
 	
 	# Task Names
 	DYSGG = "dysgg"
-	DYSGA = "dysga"
+	SGA = "sga"
 	
 	# Method Names
 	DYSTTRAN = "dysttran"

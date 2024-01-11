@@ -10,3 +10,4 @@ dill==0.3.6
 matplotlib
 opencv-python
 pyrebase4
+openpyxl

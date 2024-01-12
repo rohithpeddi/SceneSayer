@@ -209,8 +209,135 @@ def prepare_context_results():
 	return
 
 
-def compile_future_frame_results():
-	pass
+def compile_complete_future_frame_results():
+	sga_result_list = fetch_sga_results()
+	context_results_json = {}
+	for test_num_future_frames in test_future_frame_list:
+		context_results_json[test_num_future_frames] = {}
+		for mode in modes:
+			context_results_json[test_num_future_frames][mode] = {}
+			for train_future_frame in train_future_frame_loss_list:
+				context_results_json[test_num_future_frames][mode][train_future_frame] = {}
+				for model_name in models:
+					model_name = fetch_model_name(model_name)
+					context_results_json[test_num_future_frames][mode][train_future_frame][
+						model_name] = fetch_empty_metrics_json()
+	
+	for test_num_future_frames in test_future_frame_list:
+		test_future_num_sga_list = []
+		for result in sga_result_list:
+			if result.test_num_future_frames is not None and str(
+					result.test_num_future_frames) == test_num_future_frames:
+				test_future_num_sga_list.append(result)
+		
+		for result in test_future_num_sga_list:
+			mode = result.mode
+			model_name = result.method_name
+			model_name = fetch_model_name(model_name)
+			
+			train_future_frame = str(result.train_num_future_frames)
+			
+			with_constraint_metrics = result.result_details.with_constraint_metrics
+			no_constraint_metrics = result.result_details.no_constraint_metrics
+			semi_constraint_metrics = result.result_details.semi_constraint_metrics
+			
+			completed_metrics_json = fetch_completed_metrics_json(
+				with_constraint_metrics,
+				no_constraint_metrics,
+				semi_constraint_metrics
+			)
+			
+			context_results_json[test_num_future_frames][mode][train_future_frame][model_name] = completed_metrics_json
+	
+	return context_results_json
+
+
+def generate_complete_future_frame_results_csvs(future_frame_results_json):
+	for test_num_future_frames in test_future_frame_list:
+		for mode in modes:
+			csv_file_name = f"{mode}_{test_num_future_frames}.csv"
+			csv_file_path = os.path.join(os.path.dirname(__file__), "analysis", "docs",
+			                             "complete_test_future_results_csvs",
+			                             csv_file_name)
+			os.makedirs(os.path.dirname(csv_file_path), exist_ok=True)
+			with open(csv_file_path, "a", newline='') as csv_file:
+				writer = csv.writer(csv_file, quoting=csv.QUOTE_NONNUMERIC)
+				writer.writerow([
+					"Anticipation Loss", "Method Name",
+					"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
+					"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50",
+					"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50"
+				])
+				for train_future_frame in train_future_frame_loss_list:
+					for model_name in models:
+						model_name = fetch_model_name(model_name)
+						writer.writerow([
+							train_future_frame,
+							model_name,
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"R@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"R@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"R@50"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"mR@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"mR@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"mR@50"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"hR@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"hR@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"hR@50"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"R@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"R@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"R@50"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"mR@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"mR@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"mR@50"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"hR@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"hR@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"hR@50"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"R@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"R@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"R@50"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"mR@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"mR@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"mR@50"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"hR@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"hR@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"hR@50"]
+						])
+
+
+def prepare_complete_future_frame_results():
+	complete_future_frame_json = compile_complete_future_frame_results()
+	# Generate Context Results CSVs
+	generate_complete_future_frame_results_csvs(complete_future_frame_json)
+	# Generate Context Results Latex Tables
+	
+	return
 
 
 def combine_csv_to_excel(folder_path, output_file):
@@ -231,6 +358,260 @@ def combine_csv_to_excel(folder_path, output_file):
 	writer.save()
 
 
+# --------------------------------------------------------------------------------------------
+# RESULTS IN PAPER
+# --------------------------------------------------------------------------------------------
+
+
+def generate_paper_combined_context_recall_results_csvs(context_results_json):
+	for mode in modes:
+		csv_file_name = f"recall_{mode}.csv"
+		csv_file_path = os.path.join(os.path.dirname(__file__), "analysis", "docs",
+		                             "paper_combined_context_results_csvs", csv_file_name)
+		os.makedirs(os.path.dirname(csv_file_path), exist_ok=True)
+		with open(csv_file_path, "a", newline='') as csv_file:
+			writer = csv.writer(csv_file, quoting=csv.QUOTE_NONNUMERIC)
+			writer.writerow([
+				"Anticipation Loss", "Context Fraction", "Method Name",
+				"R@10", "R@20", "R@50",
+				"R@10", "R@20", "R@50",
+				"R@10", "R@20", "R@50",
+			])
+			for train_future_frame in train_future_frame_loss_list:
+				for context_fraction in context_fraction_list:
+					for model_name in models:
+						model_name = fetch_model_name(model_name)
+						writer.writerow([
+							train_future_frame,
+							context_fraction,
+							model_name,
+							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["R@10"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["R@20"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["R@50"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["R@10"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["R@20"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["R@50"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["R@10"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["R@20"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["R@50"]
+						])
+
+
+def generate_paper_combined_context_mean_recall_results_csvs(context_results_json):
+	for mode in modes:
+		csv_file_name = f"mean_recall_{mode}.csv"
+		csv_file_path = os.path.join(os.path.dirname(__file__), "analysis", "docs",
+		                             "paper_combined_context_results_csvs", csv_file_name)
+		os.makedirs(os.path.dirname(csv_file_path), exist_ok=True)
+		with open(csv_file_path, "a", newline='') as csv_file:
+			writer = csv.writer(csv_file, quoting=csv.QUOTE_NONNUMERIC)
+			writer.writerow([
+				"Anticipation Loss", "Context Fraction", "Method Name",
+				"mR@10", "mR@20", "mR@50",
+				"mR@10", "mR@20", "mR@50",
+				"mR@10", "mR@20", "mR@50",
+			])
+			for train_future_frame in train_future_frame_loss_list:
+				for context_fraction in context_fraction_list:
+					for model_name in models:
+						model_name = fetch_model_name(model_name)
+						writer.writerow([
+							train_future_frame,
+							context_fraction,
+							model_name,
+							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["mR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["mR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["mR@50"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["mR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["mR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["mR@50"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["mR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["mR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["mR@50"]
+						])
+
+
+def generate_paper_combined_context_harmonic_recall_results_csvs(context_results_json):
+	for mode in modes:
+		csv_file_name = f"harmonic_recall_{mode}.csv"
+		csv_file_path = os.path.join(os.path.dirname(__file__), "analysis", "docs",
+		                             "paper_combined_context_results_csvs", csv_file_name)
+		os.makedirs(os.path.dirname(csv_file_path), exist_ok=True)
+		with open(csv_file_path, "a", newline='') as csv_file:
+			writer = csv.writer(csv_file, quoting=csv.QUOTE_NONNUMERIC)
+			writer.writerow([
+				"Anticipation Loss", "Context Fraction", "Method Name",
+				"hR@10", "hR@20", "hR@50",
+				"hR@10", "hR@20", "hR@50",
+				"hR@10", "hR@20", "hR@50",
+			])
+			for train_future_frame in train_future_frame_loss_list:
+				for context_fraction in context_fraction_list:
+					for model_name in models:
+						model_name = fetch_model_name(model_name)
+						writer.writerow([
+							train_future_frame,
+							context_fraction,
+							model_name,
+							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["hR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["hR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["hR@50"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["hR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["hR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["hR@50"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["hR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["hR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["hR@50"]
+						])
+
+
+def generate_paper_combined_future_frame_recall_results_csvs(future_frame_results_json):
+	for mode in modes:
+		csv_file_name = f"recall_{mode}.csv"
+		csv_file_path = os.path.join(os.path.dirname(__file__), "analysis", "docs",
+		                             "paper_combined_future_frame_results_csvs", csv_file_name)
+		os.makedirs(os.path.dirname(csv_file_path), exist_ok=True)
+		with open(csv_file_path, "a", newline='') as csv_file:
+			writer = csv.writer(csv_file, quoting=csv.QUOTE_NONNUMERIC)
+			writer.writerow([
+				"Anticipation Loss", "Context Fraction", "Method Name",
+				"R@10", "R@20", "R@50",
+				"R@10", "R@20", "R@50",
+				"R@10", "R@20", "R@50",
+			])
+			for train_future_frame in train_future_frame_loss_list:
+				for test_num_future_frames in test_future_frame_list:
+					for model_name in models:
+						model_name = fetch_model_name(model_name)
+						writer.writerow([
+							train_future_frame,
+							test_num_future_frames,
+							model_name,
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"R@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"R@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"R@50"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"R@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"R@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"R@50"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"R@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"R@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"R@50"]
+						])
+
+
+def generate_paper_combined_future_frame_mean_recall_results_csvs(future_frame_results_json):
+	for mode in modes:
+		csv_file_name = f"mean_recall_{mode}.csv"
+		csv_file_path = os.path.join(os.path.dirname(__file__), "analysis", "docs",
+		                             "paper_combined_future_frame_results_csvs", csv_file_name)
+		os.makedirs(os.path.dirname(csv_file_path), exist_ok=True)
+		with open(csv_file_path, "a", newline='') as csv_file:
+			writer = csv.writer(csv_file, quoting=csv.QUOTE_NONNUMERIC)
+			writer.writerow([
+				"Anticipation Loss", "Context Fraction", "Method Name",
+				"mR@10", "mR@20", "mR@50",
+				"mR@10", "mR@20", "mR@50",
+				"mR@10", "mR@20", "mR@50",
+			])
+			for train_future_frame in train_future_frame_loss_list:
+				for test_num_future_frames in test_future_frame_list:
+					for model_name in models:
+						model_name = fetch_model_name(model_name)
+						writer.writerow([
+							train_future_frame,
+							test_num_future_frames,
+							model_name,
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"mR@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"mR@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"mR@50"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"mR@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"mR@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"mR@50"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"mR@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"mR@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"mR@50"]
+						])
+
+
+def generate_paper_combined_future_frame_harmonic_recall_results_csvs(future_frame_results_json):
+	for mode in modes:
+		csv_file_name = f"harmonic_recall_{mode}.csv"
+		csv_file_path = os.path.join(os.path.dirname(__file__), "analysis", "docs",
+		                             "paper_combined_future_frame_results_csvs", csv_file_name)
+		os.makedirs(os.path.dirname(csv_file_path), exist_ok=True)
+		with open(csv_file_path, "a", newline='') as csv_file:
+			writer = csv.writer(csv_file, quoting=csv.QUOTE_NONNUMERIC)
+			writer.writerow([
+				"Anticipation Loss", "Context Fraction", "Method Name",
+				"hR@10", "hR@20", "hR@50",
+				"hR@10", "hR@20", "hR@50",
+				"hR@10", "hR@20", "hR@50",
+			])
+			for train_future_frame in train_future_frame_loss_list:
+				for test_num_future_frames in test_future_frame_list:
+					for model_name in models:
+						model_name = fetch_model_name(model_name)
+						writer.writerow([
+							train_future_frame,
+							test_num_future_frames,
+							model_name,
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"hR@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"hR@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+								"hR@50"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"hR@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"hR@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+								"hR@50"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"hR@10"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"hR@20"],
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+								"hR@50"]
+						])
+
+
+def prepare_paper_combined_future_frame_results():
+	complete_future_frame_json = compile_complete_future_frame_results()
+	# Generate Context Results CSVs
+	generate_paper_combined_future_frame_recall_results_csvs(complete_future_frame_json)
+	generate_paper_combined_future_frame_mean_recall_results_csvs(complete_future_frame_json)
+	generate_paper_combined_future_frame_harmonic_recall_results_csvs(complete_future_frame_json)
+	# Generate Context Results Latex Tables
+	return
+
+
+def prepare_paper_combined_context_results():
+	context_results_json = compile_context_results()
+	# Generate Context Results CSVs
+	generate_paper_combined_context_recall_results_csvs(context_results_json)
+	generate_paper_combined_context_mean_recall_results_csvs(context_results_json)
+	generate_paper_combined_context_harmonic_recall_results_csvs(context_results_json)
+
+
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-folder_path', type=str)
@@ -241,8 +622,26 @@ if __name__ == '__main__':
 	train_future_frame_loss_list = ["1", "3", "5"]
 	context_fraction_list = ["0.3", "0.5", "0.7", "0.9"]
 	
+	test_future_frame_list = ["1", "2", "3", "4", "5"]
+	
 	args = parser.parse_args()
 	db_service = FirebaseService()
 	
 	prepare_context_results()
-	combine_csv_to_excel(os.path.join(os.path.dirname(__file__), "analysis", "docs", "context_results_csvs"), os.path.join(os.path.dirname(__file__), "analysis", "docs", "combined_context_results.xlsx"))
+	combine_csv_to_excel(os.path.join(os.path.dirname(__file__), "analysis", "docs", "context_results_csvs"),
+	                     os.path.join(os.path.dirname(__file__), "analysis", "docs", "combined_context_results.xlsx"))
+	
+	prepare_complete_future_frame_results()
+	combine_csv_to_excel(
+		os.path.join(os.path.dirname(__file__), "analysis", "docs", "complete_test_future_results_csvs"),
+		os.path.join(os.path.dirname(__file__), "analysis", "docs", "complete_test_future_results.xlsx"))
+	
+	prepare_paper_combined_context_results()
+	combine_csv_to_excel(
+		os.path.join(os.path.dirname(__file__), "analysis", "docs", "paper_combined_context_results_csvs"),
+		os.path.join(os.path.dirname(__file__), "analysis", "docs", "paper_combined_context_results.xlsx"))
+	
+	prepare_paper_combined_future_frame_results()
+	combine_csv_to_excel(
+		os.path.join(os.path.dirname(__file__), "analysis", "docs", "paper_combined_future_frame_results_csvs"),
+		os.path.join(os.path.dirname(__file__), "analysis", "docs", "paper_combined_future_frame_results.xlsx"))

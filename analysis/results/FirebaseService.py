@@ -45,7 +45,10 @@ class FirebaseService:
 	def update_result(self, result_id: str, result: dict):
 		self.db.child(const.RESULTS).child(result_id).set(result)
 		logger.info(f"Updated result in the firebase - {result.__str__()}")
-
+	
+	def remove_result(self, result_id: str):
+		self.db.child(const.RESULTS).child(result_id).remove()
+	
 	# ---------------------- END RESULT ----------------------
 
 

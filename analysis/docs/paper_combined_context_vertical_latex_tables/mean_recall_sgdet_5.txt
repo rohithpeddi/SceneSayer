@@ -1,0 +1,31 @@
+\begin{table}[!ht]
+    \centering
+    \captionsetup{font=small}
+    \caption{\textbf{Anticipation Results} for $\mathcal{C}_{f}$ setting.}
+    \label{tab:anticipation_results_mean_recall}
+    \renewcommand{\arraystretch}{1.2} 
+    \resizebox{0.45\textwidth}{!}{
+    \begin{tabular}{llcccccc}
+    \hline
+        \multicolumn{2}{c}{\textbf{$\mathcal{C}_{f}$}} & \multicolumn{3}{c}{\textbf{With Constraint}} & \multicolumn{3}{c}{\textbf{No Constraint}} \\ 
+        \cmidrule(lr){1-2}\cmidrule(lr){3-5} \cmidrule(lr){6-8} 
+         $\mathcal{F}$ & \textbf{Method} & \textbf{mR@10} & \textbf{mR@20} & \textbf{mR@50} & \textbf{mR@10} & \textbf{mR@20} & \textbf{mR@50}  \\ \hline
+        \multirow{4}{*}{0.3} & SgatTran & 4.2 & 5.5 & 5.6 & 9.7 & 20.1 & 30.9  \\ 
+        & SgatFormer & \textbf{14.2} & \textbf{16.0} & 16.3 & \textbf{19.5} & \textbf{26.9} & 35.5  \\ 
+        & SgatODE & 11.0 & 14.0 & 15.1 & 13.8 & 20.6 & 34.2  \\ 
+        & SgatSDE & 11.2 & 15.1 & \textbf{16.6} & 15.1 & 22.4 & \textbf{36.4}  \\ \hline
+        \multirow{4}{*}{0.5} & SgatTran & 4.4 & 5.8 & 6.0 & 10.4 & 21.8 & 33.4  \\ 
+        & SgatFormer & \textbf{15.0} & \textbf{17.1} & \textbf{17.5} & \textbf{20.6} & \textbf{28.2} & 37.8  \\ 
+        & SgatODE & 11.6 & 15.2 & 16.4 & 14.4 & 21.9 & 37.5  \\ 
+        & SgatSDE & 12.0 & 15.7 & 17.4 & 15.8 & 23.6 & \textbf{38.7}  \\ \hline
+        \multirow{4}{*}{0.7} & SgatTran & 5.0 & 6.6 & 6.8 & 10.7 & 23.3 & 35.5  \\ 
+        & SgatFormer & \textbf{16.4} & \textbf{18.8} & \textbf{19.1} & \textbf{21.8} & \textbf{30.2} & 40.1  \\ 
+        & SgatODE & 13.1 & 16.7 & 17.9 & 16.2 & 24.4 & 40.9  \\ 
+        & SgatSDE & 13.0 & 17.1 & 18.6 & 17.6 & 25.8 & \textbf{42.0}  \\ \hline
+        \multirow{4}{*}{0.9} & SgatTran & 5.5 & 7.3 & 7.6 & 11.5 & 24.3 & 38.1  \\ 
+        & SgatFormer & \textbf{18.1} & \textbf{21.0} & \textbf{21.4} & \textbf{23.6} & \textbf{32.6} & 43.2  \\ 
+        & SgatODE & 14.3 & 17.8 & 19.0 & 17.9 & 26.7 & 44.4  \\ 
+        & SgatSDE & 14.2 & 18.1 & 19.7 & 19.3 & 28.4 & \textbf{45.3}  \\ \hline
+    \end{tabular}
+    }
+\end{table}

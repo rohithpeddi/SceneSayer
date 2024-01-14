@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 
+import numpy as np
 import pandas as pd
 
 from analysis.results.FirebaseService import FirebaseService
@@ -100,9 +101,9 @@ def fetch_model_name(model_name):
 	elif model_name == "NeuralSDE" or model_name == "sde":
 		model_name = "SgatSDE"
 	elif model_name == "baseline_so":
-		model_name = "Baseline"
+		model_name = "SgatTran"
 	elif model_name == "baseline_so_gen_loss":
-		model_name = "Sgatformer"
+		model_name = "SgatFormer"
 	
 	return model_name
 
@@ -618,12 +619,15 @@ def fetch_setting_name(mode):
 def generate_latex_header(setting_name, metric):
 	latex_header = "\\begin{table}[!ht]\n"
 	latex_header += "    \\centering\n"
-	latex_header += "    \\resizebox{0.8\\textwidth}{!}{\n"
-	latex_header += "    \\begin{tabular}{|l|l|ccc|ccc|}\n"
+	latex_header += "    \\captionsetup{font=small}\n"
+	latex_header += "    \\caption{\\textbf{Anticipation Results} for " + setting_name + " setting.}\n"
+	latex_header += "    \\label{tab:anticipation_results_" + metric + "}\n"
+	latex_header += "    \\renewcommand{\\arraystretch}{1.2} \n"
+	latex_header += "    \\resizebox{0.45\\textwidth}{!}{\n"
+	latex_header += "    \\begin{tabular}{llcccccc}\n"
 	latex_header += "    \\hline\n"
-	latex_header += "        \\rowcolor{gray!25} \n"
-	latex_header += "        \\multicolumn{2}{|c|}{\\textbf{" + setting_name + "}} & \\multicolumn{3}{c|}{\\textbf{With Constraint}} & \\multicolumn{3}{c|}{\\textbf{No Constraint}} \\\\ \\hline \n"
-	latex_header += "        \\rowcolor{gray!25}\n"
+	latex_header += "        \\multicolumn{2}{c}{\\textbf{" + setting_name + "}} & \\multicolumn{3}{c}{\\textbf{With Constraint}} & \\multicolumn{3}{c}{\\textbf{No Constraint}} \\\\ \n"
+	latex_header += "        \\cmidrule(lr){1-2}\\cmidrule(lr){3-5} \\cmidrule(lr){6-8} \n "
 	
 	if metric == "recall":
 		latex_header += "        $\\mathcal{F}$ & \\textbf{Method} & \\textbf{R@10} & \\textbf{R@20} & \\textbf{R@50} & \\textbf{R@10} & \\textbf{R@20} & \\textbf{R@50}  \\\\ \\hline\n"
@@ -643,6 +647,17 @@ def generate_latex_footer():
 	return latex_footer
 
 
+def fetch_value(value_string):
+	if value_string == "-":
+		return 0.0
+	else:
+		return round(float(value_string), 1)
+	
+	
+def fetch_rounded_value(value):
+	return round(float(value), 1)
+
+
 def generate_paper_combined_context_recall_vertical_latex_tables(context_results_json):
 	for mode in modes:
 		for train_num_future_frame in train_future_frame_loss_list:
@@ -656,15 +671,47 @@ def generate_paper_combined_context_recall_vertical_latex_tables(context_results
 			latex_table = generate_latex_header(setting_name, "recall")
 			
 			for context_fraction in context_fraction_list:
+				values_matrix = np.zeros((4, 6), dtype=np.float32)
+				
 				for idx, model_name in enumerate(models):
 					model_name = fetch_model_name(model_name)
+					values_matrix[idx, 0] = fetch_value(
+						context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]["R@10"])
+					values_matrix[idx, 1] = fetch_value(
+						context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]["R@20"])
+					values_matrix[idx, 2] = fetch_value(
+						context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]["R@50"])
+					values_matrix[idx, 3] = fetch_value(
+						context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]["R@10"])
+					values_matrix[idx, 4] = fetch_value(
+						context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]["R@20"])
+					values_matrix[idx, 5] = fetch_value(
+						context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]["R@50"])
+				
+				max_boolean_matrix = values_matrix == np.max(values_matrix, axis=0)
+				
+				for idx, model_name in enumerate(models):
+					model_name = fetch_model_name(model_name)
+					
+					initial_string = ""
 					if idx == 0:
-						latex_table += f"        \\multirow{{4}}{{*}}{{{context_fraction}}} & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@50']}  \\\\ \n"
-					elif idx in [1, 2]:
-						latex_table += f"        & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@50']}  \\\\ \n"
+						initial_string = f"        \\multirow{{4}}{{*}}{{{context_fraction}}} & {model_name}"
+					elif idx in [1, 2, 3]:
+						initial_string = f"        & {model_name}"
+					
+					latex_row = initial_string
+					for col_idx in range(6):
+						if max_boolean_matrix[idx, col_idx]:
+							latex_row += f" & \\textbf{{{fetch_rounded_value(values_matrix[idx, col_idx])}}}"
+						else:
+							latex_row += f" & {fetch_rounded_value(values_matrix[idx, col_idx])}"
+					
+					if idx == 3:
+						latex_row += "  \\\\ \\hline\n"
 					else:
-						latex_table += f"        & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@50']}  \\\\ \\hline\n"
-			
+						latex_row += "  \\\\ \n"
+					
+					latex_table += latex_row
 			latex_footer = generate_latex_footer()
 			latex_table += latex_footer
 			
@@ -685,15 +732,47 @@ def generate_paper_combined_context_mean_recall_vertical_latex_tables(context_re
 			latex_table = generate_latex_header(setting_name, "mean_recall")
 			
 			for context_fraction in context_fraction_list:
+				values_matrix = np.zeros((4, 6), dtype=np.float32)
+				
 				for idx, model_name in enumerate(models):
 					model_name = fetch_model_name(model_name)
+					values_matrix[idx, 0] = fetch_value(
+						context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]["mR@10"])
+					values_matrix[idx, 1] = fetch_value(
+						context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]["mR@20"])
+					values_matrix[idx, 2] = fetch_value(
+						context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]["mR@50"])
+					values_matrix[idx, 3] = fetch_value(
+						context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]["mR@10"])
+					values_matrix[idx, 4] = fetch_value(
+						context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]["mR@20"])
+					values_matrix[idx, 5] = fetch_value(
+						context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]["mR@50"])
+				
+				max_boolean_matrix = values_matrix == np.max(values_matrix, axis=0)
+				
+				for idx, model_name in enumerate(models):
+					model_name = fetch_model_name(model_name)
+					
+					initial_string = ""
 					if idx == 0:
-						latex_table += f"        \\multirow{{4}}{{*}}{{{context_fraction}}} & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@50']}  \\\\ \n"
-					elif idx in [1, 2]:
-						latex_table += f"        & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@50']}  \\\\ \n"
+						initial_string = f"        \\multirow{{4}}{{*}}{{{context_fraction}}} & {model_name}"
+					elif idx in [1, 2, 3]:
+						initial_string = f"        & {model_name}"
+					
+					latex_row = initial_string
+					for col_idx in range(6):
+						if max_boolean_matrix[idx, col_idx]:
+							latex_row += f" & \\textbf{{{fetch_rounded_value(values_matrix[idx, col_idx])}}}"
+						else:
+							latex_row += f" & {fetch_rounded_value(values_matrix[idx, col_idx])}"
+					
+					if idx == 3:
+						latex_row += "  \\\\ \\hline\n"
 					else:
-						latex_table += f"        & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@50']}  \\\\ \\hline\n"
-			
+						latex_row += "  \\\\ \n"
+					
+					latex_table += latex_row
 			latex_footer = generate_latex_footer()
 			latex_table += latex_footer
 			

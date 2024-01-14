@@ -1,0 +1,31 @@
+\begin{table}[!ht]
+    \centering
+    \captionsetup{font=small}
+    \caption{\textbf{Anticipation Results} for $\mathcal{C}_{llf}$ setting.}
+    \label{tab:anticipation_results_harmonic_recall}
+    \renewcommand{\arraystretch}{1.2} 
+    \resizebox{0.45\textwidth}{!}{
+    \begin{tabular}{llcccccc}
+    \hline
+        \multicolumn{2}{c}{\textbf{$\mathcal{C}_{llf}$}} & \multicolumn{3}{c}{\textbf{With Constraint}} & \multicolumn{3}{c}{\textbf{No Constraint}} \\ 
+        \cmidrule(lr){1-2}\cmidrule(lr){3-5} \cmidrule(lr){6-8} 
+         $\mathcal{F}$ & \textbf{Method} & \textbf{hR@10} & \textbf{hR@20} & \textbf{hR@50} & \textbf{hR@10} & \textbf{hR@20} & \textbf{hR@50}  \\ \hline
+        \multirow{4}{*}{0.3} & SgatTran & 13.62 & 14.41 & 14.42 & 24.31 & 43.61 & 59.86  \\ 
+        & SgatFormer & 26.37 & 27.32 & 27.32 & 37.35 & 51.81 & 61.81  \\ 
+        & SgatODE & 21.09 & 22.97 & 22.99 & 26.45 & 39.88 & 59.59  \\ 
+        & SgatSDE & 25.09 & 27.61 & 27.65 & 32.28 & 46.1 & 61.98  \\ \hline
+        \multirow{4}{*}{0.5} & SgatTran & 15.87 & 16.76 & 16.76 & 27.18 & 48.88 & 65.52  \\ 
+        & SgatFormer & 29.68 & 30.88 & 30.89 & 41.11 & 57.17 & 68.37  \\ 
+        & SgatODE & 24.37 & 26.66 & 26.73 & 30.68 & 44.98 & 65.77  \\ 
+        & SgatSDE & 28.38 & 31.04 & 31.11 & 35.32 & 50.51 & 68.27  \\ \hline
+        \multirow{4}{*}{0.7} & SgatTran & 18.7 & 19.61 & 19.61 & 31.78 & 56.15 & 73.78  \\ 
+        & SgatFormer & 34.83 & 35.85 & 35.85 & 47.99 & 65.34 & 77.74  \\ 
+        & SgatODE & 29.38 & 31.71 & 31.76 & 37.12 & 54.57 & 76.12  \\ 
+        & SgatSDE & 32.91 & 35.63 & 35.63 & 42.07 & 59.08 & 78.55  \\ \hline
+        \multirow{4}{*}{0.9} & SgatTran & 21.66 & 22.45 & 22.45 & 38.93 & 63.71 & 85.19  \\ 
+        & SgatFormer & 42.07 & 43.05 & 43.06 & 57.55 & 73.58 & 87.7  \\ 
+        & SgatODE & 34.92 & 36.6 & 36.6 & 47.27 & 64.8 & 86.21  \\ 
+        & SgatSDE & 38.68 & 40.24 & 40.24 & 52.16 & 69.71 & 90.23  \\ \hline
+    \end{tabular}
+    }
+\end{table}

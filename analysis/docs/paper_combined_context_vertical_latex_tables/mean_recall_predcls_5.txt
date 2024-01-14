@@ -1,0 +1,31 @@
+\begin{table}[!ht]
+    \centering
+    \captionsetup{font=small}
+    \caption{\textbf{Anticipation Results} for $\mathcal{C}_{llf}$ setting.}
+    \label{tab:anticipation_results_mean_recall}
+    \renewcommand{\arraystretch}{1.2} 
+    \resizebox{0.45\textwidth}{!}{
+    \begin{tabular}{llcccccc}
+    \hline
+        \multicolumn{2}{c}{\textbf{$\mathcal{C}_{llf}$}} & \multicolumn{3}{c}{\textbf{With Constraint}} & \multicolumn{3}{c}{\textbf{No Constraint}} \\ 
+        \cmidrule(lr){1-2}\cmidrule(lr){3-5} \cmidrule(lr){6-8} 
+         $\mathcal{F}$ & \textbf{Method} & \textbf{mR@10} & \textbf{mR@20} & \textbf{mR@50} & \textbf{mR@10} & \textbf{mR@20} & \textbf{mR@50}  \\ \hline
+        \multirow{4}{*}{0.3} & SgatTran & 9.1 & 9.6 & 9.6 & 17.4 & 34.8 & 54.8  \\ 
+        & SgatFormer & \textbf{19.6} & \textbf{20.3} & \textbf{20.3} & \textbf{31.4} & \textbf{44.7} & \textbf{58.6}  \\ 
+        & SgatODE & 0.0 & 0.0 & 0.0 & 0.0 & 0.0 & 0.0  \\ 
+        & SgatSDE & 0.0 & 0.0 & 0.0 & 0.0 & 0.0 & 0.0  \\ \hline
+        \multirow{4}{*}{0.5} & SgatTran & 10.4 & 11.0 & 11.0 & 19.4 & 38.7 & 59.9  \\ 
+        & SgatFormer & \textbf{22.5} & \textbf{23.4} & \textbf{23.5} & \textbf{34.4} & \textbf{49.3} & \textbf{63.7}  \\ 
+        & SgatODE & 0.0 & 0.0 & 0.0 & 0.0 & 0.0 & 0.0  \\ 
+        & SgatSDE & 0.0 & 0.0 & 0.0 & 0.0 & 0.0 & 0.0  \\ \hline
+        \multirow{4}{*}{0.7} & SgatTran & 11.9 & 12.5 & 12.5 & 22.8 & 45.0 & 66.5  \\ 
+        & SgatFormer & \textbf{26.4} & \textbf{27.3} & \textbf{27.3} & \textbf{40.0} & \textbf{56.0} & \textbf{73.0}  \\ 
+        & SgatODE & 0.0 & 0.0 & 0.0 & 0.0 & 0.0 & 0.0  \\ 
+        & SgatSDE & 0.0 & 0.0 & 0.0 & 0.0 & 0.0 & 0.0  \\ \hline
+        \multirow{4}{*}{0.9} & SgatTran & 13.4 & 13.9 & 13.9 & 28.2 & 51.2 & 74.9  \\ 
+        & SgatFormer & \textbf{32.5} & \textbf{33.3} & \textbf{33.3} & \textbf{48.2} & \textbf{63.5} & \textbf{82.8}  \\ 
+        & SgatODE & 0.0 & 0.0 & 0.0 & 0.0 & 0.0 & 0.0  \\ 
+        & SgatSDE & 0.0 & 0.0 & 0.0 & 0.0 & 0.0 & 0.0  \\ \hline
+    \end{tabular}
+    }
+\end{table}

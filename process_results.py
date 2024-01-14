@@ -268,7 +268,10 @@ def remove_de_predcls_results():
 		if result.task_name == const.SGA:
 			if result.mode == "predcls":
 				if result.method_name == "NeuralODE" or result.method_name == "NeuralSDE":
-					db_service.remove_result(result_id)
+					if result.train_num_future_frames == "3":
+						print(f"Removing result: {result_id}, method_name: {result.method_name}, "
+						      f"mode: {result.mode}, train_num_future_frames: {result.train_num_future_frames}")
+						db_service.remove_result(result_id)
 				else:
 					print(f"Skipping result: {result_id}, method_name: {result.method_name}")
 			else:
@@ -323,6 +326,7 @@ def remove_misread_results_2():
 						print(f"Removing result: {result_id}, method_name: {result.method_name}, "
 						      f"mode: {result.mode}, train_num_future_frames: {result.train_num_future_frames}")
 						db_service.remove_result(result_id)
+					
 
 
 def process_misread_results():
@@ -396,12 +400,13 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 	db_service = FirebaseService()
 	
+	remove_de_predcls_results()
 
 # process_misread_results()
 
 # process_results()
 # compile_results()
 # print_results()
-	model_evaluation_check_anticipation()
+# 	model_evaluation_check_anticipation()
 
-# store_versioned_results(2)
+	# store_versioned_results(3)

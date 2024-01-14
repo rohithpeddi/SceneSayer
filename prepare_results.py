@@ -604,12 +604,142 @@ def prepare_paper_combined_future_frame_results():
 	return
 
 
+def fetch_setting_name(mode):
+	if mode == "sgdet":
+		setting_name = "$\\mathcal{C}_{f}$"
+	elif mode == "sgcls":
+		setting_name = "$\\mathcal{C}_{lf}$"
+	elif mode == "predcls":
+		setting_name = "$\\mathcal{C}_{llf}$"
+	
+	return setting_name
+
+
+def generate_latex_header(setting_name, metric):
+	latex_header = "\\begin{table}[!ht]\n"
+	latex_header += "    \\centering\n"
+	latex_header += "    \\resizebox{0.8\\textwidth}{!}{\n"
+	latex_header += "    \\begin{tabular}{|l|l|ccc|ccc|}\n"
+	latex_header += "    \\hline\n"
+	latex_header += "        \\rowcolor{gray!25} \n"
+	latex_header += "        \\multicolumn{2}{|c|}{\\textbf{" + setting_name + "}} & \\multicolumn{3}{c|}{\\textbf{With Constraint}} & \\multicolumn{3}{c|}{\\textbf{No Constraint}} \\\\ \\hline \n"
+	latex_header += "        \\rowcolor{gray!25}\n"
+	
+	if metric == "recall":
+		latex_header += "        $\\mathcal{F}$ & \\textbf{Method} & \\textbf{R@10} & \\textbf{R@20} & \\textbf{R@50} & \\textbf{R@10} & \\textbf{R@20} & \\textbf{R@50}  \\\\ \\hline\n"
+	elif metric == "mean_recall":
+		latex_header += "        $\\mathcal{F}$ & \\textbf{Method} & \\textbf{mR@10} & \\textbf{mR@20} & \\textbf{mR@50} & \\textbf{mR@10} & \\textbf{mR@20} & \\textbf{mR@50}  \\\\ \\hline\n"
+	elif metric == "harmonic_recall":
+		latex_header += "        $\\mathcal{F}$ & \\textbf{Method} & \\textbf{hR@10} & \\textbf{hR@20} & \\textbf{hR@50} & \\textbf{hR@10} & \\textbf{hR@20} & \\textbf{hR@50}  \\\\ \\hline\n"
+	
+	return latex_header
+
+
+def generate_latex_footer():
+	latex_footer = "    \\end{tabular}\n"
+	latex_footer += "    }\n"
+	latex_footer += "\\end{table}\n"
+	
+	return latex_footer
+
+
+def generate_paper_combined_context_recall_vertical_latex_tables(context_results_json):
+	for mode in modes:
+		for train_num_future_frame in train_future_frame_loss_list:
+			latex_file_name = f"recall_{mode}_{train_num_future_frame}.txt"
+			latex_file_path = os.path.join(os.path.dirname(__file__), "analysis", "docs",
+			                               "paper_combined_context_vertical_latex_tables", latex_file_name)
+			os.makedirs(os.path.dirname(latex_file_path), exist_ok=True)
+			
+			setting_name = fetch_setting_name(mode)
+			
+			latex_table = generate_latex_header(setting_name, "recall")
+			
+			for context_fraction in context_fraction_list:
+				for idx, model_name in enumerate(models):
+					model_name = fetch_model_name(model_name)
+					if idx == 0:
+						latex_table += f"        \\multirow{{4}}{{*}}{{{context_fraction}}} & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@50']}  \\\\ \n"
+					elif idx in [1, 2]:
+						latex_table += f"        & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@50']}  \\\\ \n"
+					else:
+						latex_table += f"        & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['R@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['R@50']}  \\\\ \\hline\n"
+			
+			latex_footer = generate_latex_footer()
+			latex_table += latex_footer
+			
+			with open(latex_file_path, "a", newline='') as latex_file:
+				latex_file.write(latex_table)
+
+
+def generate_paper_combined_context_mean_recall_vertical_latex_tables(context_results_json):
+	for mode in modes:
+		for train_num_future_frame in train_future_frame_loss_list:
+			latex_file_name = f"mean_recall_{mode}_{train_num_future_frame}.txt"
+			latex_file_path = os.path.join(os.path.dirname(__file__), "analysis", "docs",
+			                               "paper_combined_context_vertical_latex_tables", latex_file_name)
+			os.makedirs(os.path.dirname(latex_file_path), exist_ok=True)
+			
+			setting_name = fetch_setting_name(mode)
+			
+			latex_table = generate_latex_header(setting_name, "mean_recall")
+			
+			for context_fraction in context_fraction_list:
+				for idx, model_name in enumerate(models):
+					model_name = fetch_model_name(model_name)
+					if idx == 0:
+						latex_table += f"        \\multirow{{4}}{{*}}{{{context_fraction}}} & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@50']}  \\\\ \n"
+					elif idx in [1, 2]:
+						latex_table += f"        & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@50']}  \\\\ \n"
+					else:
+						latex_table += f"        & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['mR@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['mR@50']}  \\\\ \\hline\n"
+			
+			latex_footer = generate_latex_footer()
+			latex_table += latex_footer
+			
+			with open(latex_file_path, "a", newline='') as latex_file:
+				latex_file.write(latex_table)
+
+
+def generate_paper_combined_context_harmonic_recall_vertical_latex_tables(context_results_json):
+	for mode in modes:
+		for train_num_future_frame in train_future_frame_loss_list:
+			latex_file_name = f"harmonic_recall_{mode}_{train_num_future_frame}.txt"
+			latex_file_path = os.path.join(os.path.dirname(__file__), "analysis", "docs",
+			                               "paper_combined_context_vertical_latex_tables", latex_file_name)
+			os.makedirs(os.path.dirname(latex_file_path), exist_ok=True)
+			
+			setting_name = fetch_setting_name(mode)
+			
+			latex_table = generate_latex_header(setting_name, "harmonic_recall")
+			
+			for context_fraction in context_fraction_list:
+				for idx, model_name in enumerate(models):
+					model_name = fetch_model_name(model_name)
+					if idx == 0:
+						latex_table += f"        \\multirow{{4}}{{*}}{{{context_fraction}}} & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['hR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['hR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['hR@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['hR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['hR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['hR@50']}  \\\\ \n"
+					elif idx in [1, 2]:
+						latex_table += f"        & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['hR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['hR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['hR@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['hR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['hR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['hR@50']}  \\\\ \n"
+					else:
+						latex_table += f"        & {model_name} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['hR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['hR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]['hR@50']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['hR@10']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['hR@20']} & {context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]['hR@50']}  \\\\ \\hline\n"
+			
+			latex_footer = generate_latex_footer()
+			latex_table += latex_footer
+			
+			with open(latex_file_path, "a", newline='') as latex_file:
+				latex_file.write(latex_table)
+
+
 def prepare_paper_combined_context_results():
 	context_results_json = compile_context_results()
 	# Generate Context Results CSVs
 	generate_paper_combined_context_recall_results_csvs(context_results_json)
 	generate_paper_combined_context_mean_recall_results_csvs(context_results_json)
 	generate_paper_combined_context_harmonic_recall_results_csvs(context_results_json)
+	# Generate Context LateX Tables
+	generate_paper_combined_context_recall_vertical_latex_tables(context_results_json)
+	generate_paper_combined_context_mean_recall_vertical_latex_tables(context_results_json)
+	generate_paper_combined_context_harmonic_recall_vertical_latex_tables(context_results_json)
 
 
 if __name__ == '__main__':

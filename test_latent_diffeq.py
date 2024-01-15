@@ -42,8 +42,10 @@ def process_data(matcher, model, max_window):
                     mask_gt = pred["mask_gt_" + str(i)]
                     last = pred["last_" + str(i)]
                     pred_anticipated["spatial_distribution"] = pred["anticipated_spatial_distribution"][i - 1, : last]
-                    pred_anticipated["contacting_distribution"] = pred["anticipated_contacting_distribution"][i - 1, : last]
-                    pred_anticipated["attention_distribution"] = pred["anticipated_attention_distribution"][i - 1, : last]
+                    pred_anticipated["contacting_distribution"] = pred["anticipated_contacting_distribution"][i - 1,
+                                                                  : last]
+                    pred_anticipated["attention_distribution"] = pred["anticipated_attention_distribution"][i - 1,
+                                                                 : last]
                     pred_anticipated["im_idx"] = pred["im_idx_test_" + str(i)]
                     pred_anticipated["pair_idx"] = pred["pair_idx_test_" + str(i)]
                     if conf.mode == "predcls":
@@ -117,7 +119,8 @@ def process_data(matcher, model, max_window):
             write_percentage_evaluators_stats(mode, future_frame_loss_num, method_name, percentage_evaluators,
                                               context_fraction)
             # Send percentage evaluation stats to firebase
-            send_percentage_evaluators_stats_to_firebase(percentage_evaluators, mode, method_name,future_frame_loss_num, context_fraction)
+            send_percentage_evaluators_stats_to_firebase(percentage_evaluators, mode, method_name,
+                                                         future_frame_loss_num, context_fraction)
 
 
 def load_ode(max_window):
@@ -142,98 +145,100 @@ def load_ode(max_window):
 
 
 def load_sde(max_window):
-	brownian_size = conf.brownian_size
-	sde = SDE(mode=conf.mode,
-	          attention_class_num=len(ag_test_data.attention_relationships),
-	          spatial_class_num=len(ag_test_data.spatial_relationships),
-	          contact_class_num=len(ag_test_data.contacting_relationships),
-	          obj_classes=ag_test_data.object_classes,
-	          enc_layer_num=conf.enc_layer,
-	          dec_layer_num=conf.dec_layer,
-	          max_window=max_window,
-	          brownian_size=brownian_size).to(device=gpu_device)
+    brownian_size = conf.brownian_size
+    sde = SDE(mode=conf.mode,
+              attention_class_num=len(ag_test_data.attention_relationships),
+              spatial_class_num=len(ag_test_data.spatial_relationships),
+              contact_class_num=len(ag_test_data.contacting_relationships),
+              obj_classes=ag_test_data.object_classes,
+              enc_layer_num=conf.enc_layer,
+              dec_layer_num=conf.dec_layer,
+              max_window=max_window,
+              brownian_size=brownian_size).to(device=gpu_device)
 
-	sde.eval()
+    sde.eval()
 
-	ckpt = torch.load(conf.model_path, map_location=gpu_device)
-	sde.load_state_dict(ckpt['sde_state_dict'], strict=False)
+    ckpt = torch.load(conf.model_path, map_location=gpu_device)
+    sde.load_state_dict(ckpt['sde_state_dict'], strict=False)
 
-	print('*' * 50)
-	print('CKPT {} is loaded'.format(conf.model_path))
+    print('*' * 50)
+    print('CKPT {} is loaded'.format(conf.model_path))
 
-	return sde
+    return sde
 
 
 def main():
-	max_window = conf.max_window
+    max_window = conf.max_window
 
-	matcher = HungarianMatcher(0.5, 1, 1, 0.5)
-	matcher.eval()
+    matcher = HungarianMatcher(0.5, 1, 1, 0.5)
+    matcher.eval()
 
-	model = None
-	if method_name == "NeuralODE":
-		assert train_method == "ode"
-		model = load_ode(max_window)
-	elif method_name == "NeuralSDE":
-		assert train_method == "sde"
-		model = load_sde(max_window)
+    model = None
+    if method_name == "NeuralODE":
+        assert train_method == "ode"
+        model = load_ode(max_window)
+    elif method_name == "NeuralSDE":
+        assert train_method == "sde"
+        model = load_sde(max_window)
 
-	assert model is not None
-	process_data(matcher, model, max_window)
+    assert model is not None
+    process_data(matcher, model, max_window)
 
 
 def generate_qualitative_results():
-	video_id_index_map = {}
-	for index, video_gt_annotation in enumerate(ag_test_data.gt_annotations):
-		video_id = video_gt_annotation[0][0]['frame'].split(".")[0]
-		video_id_index_map[video_id] = index
+    video_id_index_map = {}
+    for index, video_key in enumerate(ag_test_data.gt_annotations):
+        video_gt_annotation = ag_test_data.gt_annotations[video_key]
+        video_id = video_gt_annotation[0][0]['frame'].split(".")[0]
+        print(index, video_id)
+        video_id_index_map[video_id] = index
 
-	model = None
-	if method_name == "ode":
-		assert train_method == "ode"
-		model = load_ode(conf.max_window)
-	elif method_name == "sde":
-		assert train_method == "sde"
-		model = load_sde(conf.max_window)
+    model = None
+    if method_name == "ode":
+        assert train_method == "ode"
+        model = load_ode(conf.max_window)
+    elif method_name == "sde":
+        assert train_method == "sde"
+        model = load_sde(conf.max_window)
 
-	matcher = HungarianMatcher(0.5, 1, 1, 0.5)
-	matcher.eval()
+    matcher = HungarianMatcher(0.5, 1, 1, 0.5)
+    matcher.eval()
 
-	video_id_list = ["21F9H", "X95D0", "M18XP", "0A8CF", "LUQWY", "QE4YE", "ENOLD"]
-	context_fraction_list = [0.3, 0.5, 0.7, 0.9]
-	with torch.no_grad():
-		for context_fraction in context_fraction_list:
-			for video_id in video_id_list:
-				entry = ag_test_data.fetch_video_data([video_id_index_map[video_id]])
-				gt_annotation = entry[const.GT_ANNOTATION]
-				frame_size = entry[const.FRAME_SIZE]
-				get_sequence_with_tracking(entry, gt_annotation, matcher, frame_size, conf.mode)
-				entry = model(entry, True)
-				ind, pred = model.forward_single_entry(context_fraction=context_fraction, entry=entry)
-				if ind >= len(gt_annotation):
-					continue
-				with_constraint_predictions_map = percentage_evaluators[context_fraction][0].evaluate_scene_graph(
-					gt_annotation[ind:], pred)
-				no_constraint_prediction_map = percentage_evaluators[context_fraction][1].evaluate_scene_graph(
-					gt_annotation[ind:], pred)
-				prepare_prediction_graph(
-					with_constraint_predictions_map,
-					ag_test_data, video_id, method_name, "with_constraints", conf.mode
-				)
+    video_id_list = ["21F9H", "X95D0", "M18XP", "0A8CF", "LUQWY", "QE4YE", "ENOLD"]
+    context_fraction_list = [0.3, 0.5, 0.7, 0.9]
+    with torch.no_grad():
+        for context_fraction in context_fraction_list:
+            for video_id in video_id_list:
+                entry = ag_test_data.fetch_video_data(video_id_index_map[video_id])
+                gt_annotation = entry[const.GT_ANNOTATION]
+                frame_size = entry[const.FRAME_SIZE]
+                get_sequence_with_tracking(entry, gt_annotation, matcher, frame_size, conf.mode)
+                entry = model(entry, True)
+                ind, pred = model.forward_single_entry(context_fraction=context_fraction, entry=entry)
+                if ind >= len(gt_annotation):
+                    continue
+                with_constraint_predictions_map = percentage_evaluators[context_fraction][0].fetch_pred_tuples(
+                    gt_annotation[ind:], pred)
+                no_constraint_prediction_map = percentage_evaluators[context_fraction][1].fetch_pred_tuples(
+                    gt_annotation[ind:], pred)
+                prepare_prediction_graph(
+                    with_constraint_predictions_map,
+                    ag_test_data, video_id, method_name, "with_constraints", conf.mode, context_fraction
+                )
 
-				prepare_prediction_graph(
-					no_constraint_prediction_map,
-					ag_test_data, video_id, method_name, "no_constraints", conf.mode
-				)
+                prepare_prediction_graph(
+                    no_constraint_prediction_map,
+                    ag_test_data, video_id, method_name, "no_constraints", conf.mode, context_fraction
+                )
 
 
 if __name__ == '__main__':
-	ag_test_data, dataloader_test, gen_evaluators, future_evaluators, future_evaluators_modified_gt, percentage_evaluators, percentage_evaluators_modified_gt, gpu_device, conf = fetch_diffeq_test_basic_config()
-	model_name = os.path.basename(conf.model_path).split('.')[0]
-	future_frame_loss_num = model_name.split('_')[-3]
-	train_method = model_name.split('_')[0]
-	mode = model_name.split('_')[-5]
-	method_name = conf.method_name
-	generate_qualitative_results()
+    ag_test_data, dataloader_test, gen_evaluators, future_evaluators, future_evaluators_modified_gt, percentage_evaluators, percentage_evaluators_modified_gt, gpu_device, conf = fetch_diffeq_test_basic_config()
+    model_name = os.path.basename(conf.model_path).split('.')[0]
+    future_frame_loss_num = model_name.split('_')[-3]
+    train_method = model_name.split('_')[0]
+    mode = model_name.split('_')[-5]
+    method_name = conf.method_name
+    generate_qualitative_results()
 
 # python test_latent_diffeq.py -mode sgcls -max_window 5 -method_name NeuralODE -model_path /data/rohith/ag/checkpoints/ode/ode_sgcls_future_3_epoch_9.tar

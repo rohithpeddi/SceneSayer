@@ -314,7 +314,9 @@ class AGFeatures(Dataset):
 		return attribute_dictionary
 	
 	def fetch_video_data(self, index):
+		print(index)
 		video_feature_file_path = self.video_list[index]
+		print(video_feature_file_path)
 		with open(os.path.join(video_feature_file_path), 'rb') as pkl_file:
 			data_dictionary = pickle.load(pkl_file)
 			if self.is_compiled_together:

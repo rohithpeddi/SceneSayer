@@ -397,14 +397,14 @@ def evaluate_recall(
         _triplet(pred_rels[:, 2], pred_rels[:, :2], pred_classes, pred_boxes,
                  rel_scores, cls_scores)
     
-    sorted_scores = relation_scores.prod(1)
-    pred_triplets = pred_triplets[sorted_scores.argsort()[::-1], :]
-    pred_triplet_boxes = pred_triplet_boxes[sorted_scores.argsort()[::-1], :]
-    relation_scores = relation_scores[sorted_scores.argsort()[::-1], :]
-    scores_overall = relation_scores.prod(1)
+    # sorted_scores = relation_scores.prod(1)
+    # pred_triplets = pred_triplets[sorted_scores.argsort()[::-1], :]
+    # pred_triplet_boxes = pred_triplet_boxes[sorted_scores.argsort()[::-1], :]
+    # relation_scores = relation_scores[sorted_scores.argsort()[::-1], :]
+    # scores_overall = relation_scores.prod(1)
     
-    if not np.all(scores_overall[1:] <= scores_overall[:-1] + 1e-5):
-        print("Somehow the relations weren't sorted properly: \n{}".format(scores_overall))
+    # if not np.all(scores_overall[1:] <= scores_overall[:-1] + 1e-5):
+    #     print("Somehow the relations weren't sorted properly: \n{}".format(scores_overall))
     # pdb.set_trace()
     # raise ValueError("Somehow the relations weren't sorted properly")
     

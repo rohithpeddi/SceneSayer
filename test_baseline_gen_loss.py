@@ -372,9 +372,9 @@ def main():
 			num_boxes = copy.deepcopy(data[3].cuda(0))
 			gt_annotation = ag_test_data.gt_annotations[data[4]]
 			
-			for num_future_frames in future_frames_list:
-				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-				evaluate_model_future_frames(model, entry, gt_annotation, conf, num_future_frames, future_evaluators)
+			# for num_future_frames in future_frames_list:
+			# 	entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+			# 	evaluate_model_future_frames(model, entry, gt_annotation, conf, num_future_frames, future_evaluators)
 			
 			for context_fraction in context_fractions:
 				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
@@ -384,13 +384,13 @@ def main():
 			if b % 5 == 0:
 				print(f"Finished processing {b} of {len(dataloader_test)} batches")
 		
-		# Write future and gen evaluators stats
-		write_future_evaluators_stats(conf.mode, future_frame_loss_num, method_name=model_name,
-		                              future_evaluators=future_evaluators)
-		
-		# Send future evaluation and generation evaluation stats to firebase
-		send_future_evaluators_stats_to_firebase(future_evaluators, conf.mode, method_name=model_name,
-		                                         future_frame_loss_num=future_frame_loss_num)
+		# # Write future and gen evaluators stats
+		# write_future_evaluators_stats(conf.mode, future_frame_loss_num, method_name=model_name,
+		#                               future_evaluators=future_evaluators)
+		#
+		# # Send future evaluation and generation evaluation stats to firebase
+		# send_future_evaluators_stats_to_firebase(future_evaluators, conf.mode, method_name=model_name,
+		#                                          future_frame_loss_num=future_frame_loss_num)
 		
 		# Write percentage evaluation stats and send to firebase
 		for context_fraction in context_fractions:
@@ -401,13 +401,13 @@ def main():
 				percentage_evaluators,
 				context_fraction
 			)
-			send_percentage_evaluators_stats_to_firebase(
-				percentage_evaluators,
-				conf.mode,
-				model_name,
-				future_frame_loss_num,
-				context_fraction
-			)
+			# send_percentage_evaluators_stats_to_firebase(
+			# 	percentage_evaluators,
+			# 	conf.mode,
+			# 	model_name,
+			# 	future_frame_loss_num,
+			# 	context_fraction
+			# )
 
 
 def generate_qualitative_results():
@@ -466,6 +466,6 @@ def generate_qualitative_results():
 
 
 if __name__ == '__main__':
-	generate_qualitative_results()
+	main()
 
 """ python test_forecasting.py -mode sgdet -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ -model_path forecasting/sgdet_full_context_f3/DSG_masked_9.tar """

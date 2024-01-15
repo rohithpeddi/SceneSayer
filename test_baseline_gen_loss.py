@@ -156,12 +156,14 @@ def generate_context_qualitative_results(
 	
 	prepare_prediction_graph(
 		with_constraint_predictions_map,
-		ag_test_data, video_id, "baseline_so_gen_loss", "with_constraints", conf.mode
+		ag_test_data, video_id, "baseline_so_gen_loss",
+		"with_constraints", conf.mode, context_fraction
 	)
 	
 	prepare_prediction_graph(
 		no_constraint_prediction_map,
-		ag_test_data, video_id, "baseline_so_gen_loss", "no_constraints", conf.mode
+		ag_test_data, video_id, "baseline_so_gen_loss",
+		"no_constraints", conf.mode, context_fraction
 	)
 
 

@@ -544,7 +544,7 @@ def send_percentage_evaluators_stats_to_firebase(percentage_evaluators, mode, me
 		print(f"Error in sending percentage evaluator results to firebase {e}")
 
 
-def prepare_prediction_graph(predictions_map, dataset, video_id, model_name, constraint_type, mode):
+def prepare_prediction_graph(predictions_map, dataset, video_id, model_name, constraint_type, mode, context_fraction):
 	# Loop through each frame in the video
 	for frame_idx, pred_numpy_array in predictions_map.items():
 		graph = nx.MultiGraph()
@@ -557,17 +557,17 @@ def prepare_prediction_graph(predictions_map, dataset, video_id, model_name, con
 		for pred_tuple in pred_set:
 			subject_class = dataset.object_classes[pred_tuple[0]]
 			object_class = dataset.object_classes[pred_tuple[1]]
-			predicate_class = dataset.relationships[pred_tuple[2]]
+			predicate_class = dataset.relationship_classes[pred_tuple[2]]
 			
 			# Add nodes and edge
 			graph.add_node(subject_class, label=subject_class)
 			graph.add_node(object_class, label=object_class)
 			graph.add_edge(subject_class, object_class, label=predicate_class)
 			
-		draw_and_save_graph(graph, video_id, frame_idx, model_name, constraint_type, mode)
+		draw_and_save_graph(graph, video_id, frame_idx, model_name, constraint_type, mode, context_fraction)
 
 
-def draw_and_save_graph(graph, video_id, frame_idx, model_name, constraint_type, mode):
+def draw_and_save_graph(graph, video_id, frame_idx, model_name, constraint_type, mode, context_fraction):
 	plt.figure(figsize=(12, 12))
 	
 	pos = nx.spring_layout(graph, seed=42)  # positions for all nodes, with a fixed layout
@@ -603,7 +603,7 @@ def draw_and_save_graph(graph, video_id, frame_idx, model_name, constraint_type,
 	# Save graph
 	file_name = "{}_{}.png".format(video_id, frame_idx)
 	file_directory_path = os.path.join(os.path.dirname(__file__), "analysis", "docs",
-	                                   "qualitative_results", model_name, video_id, mode, constraint_type)
+	                                   "qualitative_results", model_name, video_id, mode, constraint_type, str(context_fraction))
 	os.makedirs(file_directory_path, exist_ok=True)
 	file_path = os.path.join(file_directory_path, file_name)
 	plt.savefig(file_path)

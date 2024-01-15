@@ -118,35 +118,35 @@ class SupervisedFeatureExtractor:
             sgcls_entry = self.sgcls_object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None,
                                                      is_feature_extraction=True)
 
-            entry = {
-                const.SGDET: sgdet_entry,
-                const.SGCLS: sgcls_entry
-            }
+            # entry = {
+            #     const.SGDET: sgdet_entry,
+            #     const.SGCLS: sgcls_entry
+            # }
 
-        pkl_path = os.path.join(output_directory, mode, f"{video_name}.pkl")
+        # pkl_path = os.path.join(output_directory, mode, f"{video_name}.pkl")
 
-        # sgdet_pkl_path = os.path.join(output_directory, mode, f"{video_name}_sgdet.pkl")
-        # sgcls_pkl_path = os.path.join(output_directory, mode, f"{video_name}_sgcls.pkl")
-        # os.makedirs(os.path.dirname(sgdet_pkl_path), exist_ok=True)
-        # try:
-        #     with open(sgdet_pkl_path, 'wb') as pkl_file:
-        #         pickle.dump(sgdet_entry, pkl_file)
-        #         logger.info("Dumped sgdet features for video: {}".format(video_name))
-        #     with open(sgcls_pkl_path, 'wb') as pkl_file:
-        #         pickle.dump(sgcls_entry, pkl_file)
-        #         logger.info("Dumped sgcls features for video: {}".format(video_name))
-        # except Exception as e:
-        #     logger.error("Error in dumping features for video: {}".format(video_name))
-        #     logger.error("Error: {}".format(e))
-
-        os.makedirs(os.path.dirname(pkl_path), exist_ok=True)
+        sgdet_pkl_path = os.path.join(output_directory, mode, f"{video_name}_sgdet.pkl")
+        sgcls_pkl_path = os.path.join(output_directory, mode, f"{video_name}_sgcls.pkl")
+        os.makedirs(os.path.dirname(sgdet_pkl_path), exist_ok=True)
         try:
-            with open(pkl_path, 'wb') as pkl_file:
-                pickle.dump(entry, pkl_file)
-                logger.info("Dumped features for video: {}".format(video_name))
+            with open(sgdet_pkl_path, 'wb') as pkl_file:
+                pickle.dump(sgdet_entry, pkl_file)
+                logger.info("Dumped sgdet features for video: {}".format(video_name))
+            with open(sgcls_pkl_path, 'wb') as pkl_file:
+                pickle.dump(sgcls_entry, pkl_file)
+                logger.info("Dumped sgcls features for video: {}".format(video_name))
         except Exception as e:
             logger.error("Error in dumping features for video: {}".format(video_name))
             logger.error("Error: {}".format(e))
+
+        # os.makedirs(os.path.dirname(pkl_path), exist_ok=True)
+        # try:
+        #     with open(pkl_path, 'wb') as pkl_file:
+        #         pickle.dump(entry, pkl_file)
+        #         logger.info("Dumped features for video: {}".format(video_name))
+        # except Exception as e:
+        #     logger.error("Error in dumping features for video: {}".format(video_name))
+        #     logger.error("Error: {}".format(e))
 
     def generate_supervised_features(self, output_directory):
         os.makedirs(output_directory, exist_ok=True)
@@ -185,7 +185,7 @@ class SupervisedFeatureExtractor:
         os.makedirs(output_directory, exist_ok=True)
         logger.info("Generating frame idx pkl for train data")
         for video in tqdm(self.train_dataloader):
-             self._generate_video_frame_idx_pkl(video, output_directory, self.train_dataset, mode=const.TRAIN)
+            self._generate_video_frame_idx_pkl(video, output_directory, self.train_dataset, mode=const.TRAIN)
         logger.info("Generating frame idx pkl for test data")
         for video in tqdm(self.test_dataloader):
             self._generate_video_frame_idx_pkl(video, output_directory, self.test_dataset, mode=const.TEST)
@@ -199,5 +199,6 @@ def load_pickle(pkl_path):
 
 if __name__ == "__main__":
     supervised_feature_extractor = SupervisedFeatureExtractor()
-    #supervised_feature_extractor.generate_supervised_features(output_directory="/home/maths/btech/mt1200841/scratch/dataset/ag/features/supervised")
-    supervised_feature_extractor.generate_frame_idx(output_directory="/home/maths/btech/mt1200841/scratch/dataset/ag/features/supervised/additional")
+    # supervised_feature_extractor.generate_supervised_features(output_directory="/home/maths/btech/mt1200841/scratch/dataset/ag/features/supervised")
+    supervised_feature_extractor.generate_frame_idx(
+        output_directory="/home/maths/btech/mt1200841/scratch/dataset/ag/features/supervised/additional")

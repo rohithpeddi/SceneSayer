@@ -207,19 +207,24 @@ def generate_ground_truth_graphs():
 				print("Attention Relationships: {}".format(len(attention_relationships)))
 				print("Spatial Relationships: {}".format(len(spatial_relationships)))
 				print("Contacting Relationships: {}".format(len(contacting_relationships)))
-				
-				for attention_relationship_idx in range(len(attention_relationships)):
-					if attention_relationships[attention_relationship_idx] in [0, 1]:
-						graph.add_edge(subject_node_class, object_node_class,
+				print("--------------------------------------------------------")
+				for idx, attention_relationship_idx in enumerate(attention_relationships):
+					attention_label = dataset.attention_relationships[attention_relationship_idx]
+					print(f"Attention Relationship Label: {attention_label}")
+					graph.add_edge(subject_node_class, object_node_class,
 						               label=dataset.attention_relationships[attention_relationship_idx])
-				for spatial_relationship_idx in range(len(spatial_relationships)):
+				for idx, spatial_relationship_idx in enumerate(spatial_relationships):
+					spatial_label = dataset.spatial_relationships[spatial_relationship_idx]
+					print(f"Spatial Relationship Label: {spatial_label}")
 					graph.add_edge(subject_node_class, object_node_class,
 					               label=dataset.spatial_relationships[spatial_relationship_idx])
-				for contacting_relationship_idx in range(len(contacting_relationships)):
+				for idx, contacting_relationship_idx in enumerate(contacting_relationships):
+					contacting_label = dataset.contacting_relationships[contacting_relationship_idx]
+					print(f"Contacting Relationship Label: {contacting_label}")
 					graph.add_edge(subject_node_class, object_node_class,
 					               label=dataset.contacting_relationships[contacting_relationship_idx])
 			
-			draw_and_save_graph(graph, video_id, frame_idx, dataset)
+			draw_and_save_graph(graph, video_id, frame_idx)
 
 
 if __name__ == '__main__':
@@ -228,7 +233,7 @@ if __name__ == '__main__':
 	context_list = ["0.3", "0.5", "0.7", "0.9"]
 	
 	action_genome_data_path = r"D:\DATA\OPEN\action_genome"
-	video_id_list = ["21F9H", "X95D0", "M18XP", "0A8CF", "LUQWY", "QE4YE", "ENOLD"]
+	video_id_list = ["0A8CF", "21F9H", "X95D0", "M18XP",  "LUQWY", "QE4YE", "ENOLD"]
 	
 	# main()
 	generate_ground_truth_graphs()

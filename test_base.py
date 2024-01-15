@@ -2,7 +2,10 @@ import csv
 import os
 from typing import List
 
+import networkx as nx
 import torch
+from matplotlib import pyplot as plt
+from matplotlib.patches import FancyArrowPatch
 from torch.utils.data import DataLoader
 
 from analysis.results.FirebaseService import FirebaseService
@@ -538,3 +541,45 @@ def send_percentage_evaluators_stats_to_firebase(percentage_evaluators, mode, me
 		)
 	except Exception as e:
 		print(f"Error in sending percentage evaluator results to firebase {e}")
+
+
+def draw_and_save_graph(graph, video_id, frame_idx, model_name):
+	plt.figure(figsize=(12, 12))
+	
+	pos = nx.spring_layout(graph, seed=42)  # positions for all nodes, with a fixed layout
+	
+	# Draw nodes and labels
+	nx.draw_networkx_nodes(graph, pos, node_size=700)
+	nx.draw_networkx_labels(graph, pos)
+	
+	# Custom drawing of the edges using FancyArrowPatch
+	for u, v, key, data in graph.edges(keys=True, data=True):
+		# Determine if there are multiple edges and calculate offset
+		num_edges = graph.number_of_edges(u, v)
+		edge_count = sum(1 for _ in graph[u][v])
+		offset = 0.13 * (key - edge_count // 2)  # Offset for curvature
+		
+		# Parameters for the FancyArrowPatch
+		arrow_options = {
+			'arrowstyle': '-',
+			'connectionstyle': f"arc3,rad={offset}",
+			'color': 'black',
+			'linewidth': 1
+		}
+		
+		# Draw the edge with curvature
+		edge = FancyArrowPatch(pos[u], pos[v], **arrow_options)
+		plt.gca().add_patch(edge)
+		
+		# Improved calculation for the position of the edge label
+		label_pos_x = (pos[u][0] + pos[v][0]) / 2 + offset * 0.75 * (pos[v][1] - pos[u][1])
+		label_pos_y = (pos[u][1] + pos[v][1]) / 2 - offset * 0.75 * (pos[v][0] - pos[u][0])
+		plt.text(label_pos_x, label_pos_y, str(data['label']), color='blue', fontsize=10, ha='center', va='center')
+	
+	# Save graph
+	file_name = "{}_{}.png".format(video_id, frame_idx)
+	file_directory_path = os.path.join(os.path.dirname(__file__), "analysis", "docs",
+	                                   "qualitative_results", model_name, video_id)
+	os.makedirs(file_directory_path, exist_ok=True)
+	file_path = os.path.join(file_directory_path, file_name)
+	plt.savefig(file_path)

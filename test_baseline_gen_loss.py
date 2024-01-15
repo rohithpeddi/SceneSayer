@@ -7,13 +7,12 @@ import torch
 from lib.object_detector import detector
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 from lib.supervised.biased.sga.baseline_anticipation_gen_loss import BaselineWithAnticipationGenLoss
-from test_base import (fetch_transformer_test_basic_config, get_sequence_no_tracking,
+from test_base import (fetch_transformer_test_basic_config, get_sequence_no_tracking, prepare_prediction_graph,
                        send_future_evaluators_stats_to_firebase, write_future_evaluators_stats,
                        write_percentage_evaluators_stats, send_percentage_evaluators_stats_to_firebase)
 
 
-# Future Context - forward(entry,  context_fraction, entry)
-def evaluate_model_context_fraction(model, entry, gt_annotation, conf, context_fraction, percentage_evaluators):
+def fetch_model_context_pred_dict(model, entry, gt_annotation, conf, context_fraction):
 	get_sequence_no_tracking(entry, conf.mode)
 	pred = model.forward_single_entry(context_fraction=context_fraction, entry=entry)
 	
@@ -132,10 +131,38 @@ def evaluate_model_context_fraction(model, entry, gt_annotation, conf, context_f
 		             'pred_scores': pred_scores
 		             }
 	
+	return gt_future, pred_dict
+
+
+# Future Context - forward(entry,  context_fraction, entry)
+def evaluate_model_context_fraction(model, entry, gt_annotation, conf, context_fraction, percentage_evaluators):
+	gt_future, pred_dict = fetch_model_context_pred_dict(model, entry, gt_annotation, conf, context_fraction)
 	evaluators = percentage_evaluators[context_fraction]
 	evaluators[0].evaluate_scene_graph(gt_future, pred_dict)
 	evaluators[1].evaluate_scene_graph(gt_future, pred_dict)
 	evaluators[2].evaluate_scene_graph(gt_future, pred_dict)
+
+
+def generate_context_qualitative_results(
+		model, entry, gt_annotation, conf,
+		context_fraction, percentage_evaluators,
+		video_id, ag_test_data
+):
+	gt_future, pred_dict = fetch_model_context_pred_dict(model, entry, gt_annotation, conf, context_fraction)
+	
+	evaluators = percentage_evaluators[context_fraction]
+	with_constraint_predictions_map = evaluators[0].fetch_pred_tuples(gt_future, pred_dict)
+	no_constraint_prediction_map = evaluators[1].fetch_pred_tuples(gt_future, pred_dict)
+	
+	prepare_prediction_graph(
+		with_constraint_predictions_map,
+		ag_test_data, video_id, "baseline_so_gen_loss", "with_constraints", conf.mode
+	)
+	
+	prepare_prediction_graph(
+		no_constraint_prediction_map,
+		ag_test_data, video_id, "baseline_so_gen_loss", "no_constraints", conf.mode
+	)
 
 
 # Future frames - Normal Test Evaluation - forward(entry, context, future)
@@ -379,8 +406,8 @@ def main():
 				future_frame_loss_num,
 				context_fraction
 			)
-			
-			
+
+
 def generate_qualitative_results():
 	(ag_test_data, dataloader_test, gen_evaluators, future_evaluators,
 	 future_evaluators_modified_gt, percentage_evaluators,
@@ -390,6 +417,11 @@ def generate_qualitative_results():
 	checkpoint_name = os.path.basename(conf.ckpt).split('.')[0]
 	future_frame_loss_num = checkpoint_name.split('_')[-3]
 	mode = conf.mode
+	
+	video_id_index_map = {}
+	for index, video_gt_annotation in enumerate(ag_test_data.gt_annotations):
+		video_id = video_gt_annotation[0][0]['frame'].split(".")[0]
+		video_id_index_map[video_id] = index
 	
 	print("----------------------------------------------------------")
 	print(f"Model name: {model_name}")
@@ -413,58 +445,25 @@ def generate_qualitative_results():
 	object_detector.eval()
 	object_detector.is_train = False
 	
-	test_iter = iter(dataloader_test)
 	model.eval()
-	future_frames_list = [1, 2, 3, 4, 5]
+	video_id_list = ["21F9H", "X95D0", "M18XP", "0A8CF", "LUQWY", "QE4YE", "ENOLD"]
 	context_fractions = [0.3, 0.5, 0.7, 0.9]
 	with torch.no_grad():
-		for b in range(len(dataloader_test)):
-			data = next(test_iter)
-			im_data = copy.deepcopy(data[0].cuda(0))
-			im_info = copy.deepcopy(data[1].cuda(0))
-			gt_boxes = copy.deepcopy(data[2].cuda(0))
-			num_boxes = copy.deepcopy(data[3].cuda(0))
-			gt_annotation = ag_test_data.gt_annotations[data[4]]
-			
-			for num_future_frames in future_frames_list:
-				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-				evaluate_model_future_frames(model, entry, gt_annotation, conf, num_future_frames,
-				                             future_evaluators)
-			
+		for video_id in video_id_list:
+			d_im_data, d_im_info, d_gt_boxes, d_num_boxes, d_index = ag_test_data.fetch_video_data(
+				video_id_index_map[video_id])
+			im_data = copy.deepcopy(d_im_data.cuda(0))
+			im_info = copy.deepcopy(d_im_info.cuda(0))
+			gt_boxes = copy.deepcopy(d_gt_boxes.cuda(0))
+			num_boxes = copy.deepcopy(d_num_boxes.cuda(0))
+			gt_annotation = ag_test_data.gt_annotations[video_id_index_map[video_id]]
 			for context_fraction in context_fractions:
-				evaluate_model_context_fraction(model, entry, gt_annotation, conf, context_fraction,
-				                                percentage_evaluators)
-			
-			if b % 5 == 0:
-				print(f"Finished processing {b} of {len(dataloader_test)} batches")
-		
-		# Write future and gen evaluators stats
-		write_future_evaluators_stats(conf.mode, future_frame_loss_num, method_name=model_name,
-		                              future_evaluators=future_evaluators)
-		
-		# Send future evaluation and generation evaluation stats to firebase
-		send_future_evaluators_stats_to_firebase(future_evaluators, conf.mode, method_name=model_name,
-		                                         future_frame_loss_num=future_frame_loss_num)
-		
-		# Write percentage evaluation stats and send to firebase
-		for context_fraction in context_fractions:
-			write_percentage_evaluators_stats(
-				conf.mode,
-				future_frame_loss_num,
-				model_name,
-				percentage_evaluators,
-				context_fraction
-			)
-			# send_percentage_evaluators_stats_to_firebase(
-			# 	percentage_evaluators,
-			# 	conf.mode,
-			# 	model_name,
-			# 	future_frame_loss_num,
-			# 	context_fraction
-			# )
+				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+				generate_context_qualitative_results(model, entry, gt_annotation, conf, context_fraction,
+				                                     percentage_evaluators, video_id, ag_test_data)
 
 
 if __name__ == '__main__':
-	main()
+	generate_qualitative_results()
 
 """ python test_forecasting.py -mode sgdet -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ -model_path forecasting/sgdet_full_context_f3/DSG_masked_9.tar """

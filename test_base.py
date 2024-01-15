@@ -511,8 +511,8 @@ def send_future_evaluators_stats_to_firebase(future_evaluators, mode, method_nam
 			)
 	except Exception as e:
 		print(f"Error in sending future evaluator results to firebase {e}")
-		
-		
+
+
 def send_gen_evaluators_stats_to_firebase(gen_evaluators, mode, method_name, future_frame_loss_num):
 	try:
 		send_results_to_firebase(
@@ -526,9 +526,10 @@ def send_gen_evaluators_stats_to_firebase(gen_evaluators, mode, method_name, fut
 		)
 	except Exception as e:
 		print(f"Error in sending generation evaluator results to firebase {e}")
-		
-		
-def send_percentage_evaluators_stats_to_firebase(percentage_evaluators, mode, method_name, future_frame_loss_num, context_fraction):
+
+
+def send_percentage_evaluators_stats_to_firebase(percentage_evaluators, mode, method_name, future_frame_loss_num,
+                                                 context_fraction):
 	try:
 		send_results_to_firebase(
 			evaluators=percentage_evaluators[context_fraction],
@@ -543,7 +544,39 @@ def send_percentage_evaluators_stats_to_firebase(percentage_evaluators, mode, me
 		print(f"Error in sending percentage evaluator results to firebase {e}")
 
 
-def draw_and_save_graph(graph, video_id, frame_idx, model_name):
+def prepare_prediction_graph(predictions_map, dataset, video_id, model_name, constraint_type, mode):
+	# Loop through each frame in the video
+	for frame_idx, pred_tuple_array in predictions_map.items():
+		pred_set = set()
+		for idx in range(len(pred_tuple_array)):
+			pred_set.add(list(pred_tuple_array[idx]))
+		
+		graph = nx.MultiGraph()
+		
+		subject_classes = set()
+		object_classes = set()
+		for pred_list in pred_set:
+			subject_class = dataset.object_classes[pred_list[0]]
+			object_class = dataset.object_classes[pred_list[1]]
+			subject_classes.add(subject_class)
+			object_classes.add(object_class)
+		
+		for subject_class in subject_classes:
+			graph.add_node(subject_class, label=subject_class)
+		
+		for object_class in object_classes:
+			graph.add_node(object_class, label=object_class)
+		
+		for pred_list in pred_set:
+			subject_class = dataset.object_classes[pred_list[0]]
+			object_class = dataset.object_classes[pred_list[1]]
+			predicate_class = dataset.relationships[pred_list[2]]
+			graph.add_edge(subject_class, object_class, label=predicate_class)
+			
+		draw_and_save_graph(graph, video_id, frame_idx, model_name, constraint_type, mode)
+
+
+def draw_and_save_graph(graph, video_id, frame_idx, model_name, constraint_type, mode):
 	plt.figure(figsize=(12, 12))
 	
 	pos = nx.spring_layout(graph, seed=42)  # positions for all nodes, with a fixed layout
@@ -579,7 +612,7 @@ def draw_and_save_graph(graph, video_id, frame_idx, model_name):
 	# Save graph
 	file_name = "{}_{}.png".format(video_id, frame_idx)
 	file_directory_path = os.path.join(os.path.dirname(__file__), "analysis", "docs",
-	                                   "qualitative_results", model_name, video_id)
+	                                   "qualitative_results", model_name, video_id, mode, constraint_type)
 	os.makedirs(file_directory_path, exist_ok=True)
 	file_path = os.path.join(file_directory_path, file_name)
 	plt.savefig(file_path)

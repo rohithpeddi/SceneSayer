@@ -378,6 +378,89 @@ def main():
 				future_frame_loss_num,
 				context_fraction
 			)
+			
+			
+def generate_qualitative_results():
+	(ag_test_data, dataloader_test, gen_evaluators, future_evaluators,
+	 future_evaluators_modified_gt, percentage_evaluators,
+	 percentage_evaluators_modified_gt, gpu_device, conf) = fetch_transformer_test_basic_config()
+	
+	model_name = conf.method_name
+	checkpoint_name = os.path.basename(conf.ckpt).split('.')[0]
+	future_frame_loss_num = checkpoint_name.split('_')[-3]
+	mode = conf.mode
+	
+	print("----------------------------------------------------------")
+	print(f"Model name: {model_name}")
+	print(f"Checkpoint name: {checkpoint_name}")
+	print(f"Future frame loss num: {future_frame_loss_num}")
+	print(f"Mode: {mode}")
+	print("----------------------------------------------------------")
+	
+	model = load_model(conf, ag_test_data, gpu_device, model_name)
+	model.eval()
+	
+	matcher = HungarianMatcher(0.5, 1, 1, 0.5)
+	matcher.eval()
+	
+	object_detector = detector(
+		train=False,
+		object_classes=ag_test_data.object_classes,
+		use_SUPPLY=True,
+		mode=conf.mode
+	).to(device=gpu_device)
+	object_detector.eval()
+	object_detector.is_train = False
+	
+	test_iter = iter(dataloader_test)
+	model.eval()
+	future_frames_list = [1, 2, 3, 4, 5]
+	context_fractions = [0.3, 0.5, 0.7, 0.9]
+	with torch.no_grad():
+		for b in range(len(dataloader_test)):
+			data = next(test_iter)
+			im_data = copy.deepcopy(data[0].cuda(0))
+			im_info = copy.deepcopy(data[1].cuda(0))
+			gt_boxes = copy.deepcopy(data[2].cuda(0))
+			num_boxes = copy.deepcopy(data[3].cuda(0))
+			gt_annotation = ag_test_data.gt_annotations[data[4]]
+			
+			for num_future_frames in future_frames_list:
+				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+				evaluate_model_future_frames(model, entry, gt_annotation, conf, num_future_frames,
+				                             future_evaluators)
+			
+			for context_fraction in context_fractions:
+				evaluate_model_context_fraction(model, entry, gt_annotation, conf, context_fraction,
+				                                percentage_evaluators)
+			
+			if b % 5 == 0:
+				print(f"Finished processing {b} of {len(dataloader_test)} batches")
+		
+		# Write future and gen evaluators stats
+		write_future_evaluators_stats(conf.mode, future_frame_loss_num, method_name=model_name,
+		                              future_evaluators=future_evaluators)
+		
+		# Send future evaluation and generation evaluation stats to firebase
+		send_future_evaluators_stats_to_firebase(future_evaluators, conf.mode, method_name=model_name,
+		                                         future_frame_loss_num=future_frame_loss_num)
+		
+		# Write percentage evaluation stats and send to firebase
+		for context_fraction in context_fractions:
+			write_percentage_evaluators_stats(
+				conf.mode,
+				future_frame_loss_num,
+				model_name,
+				percentage_evaluators,
+				context_fraction
+			)
+			send_percentage_evaluators_stats_to_firebase(
+				percentage_evaluators,
+				conf.mode,
+				model_name,
+				future_frame_loss_num,
+				context_fraction
+			)
 
 
 if __name__ == '__main__':

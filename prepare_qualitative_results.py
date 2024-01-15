@@ -1,7 +1,9 @@
 import os
 
+import numpy as np
 import torch
 from matplotlib import pyplot as plt
+from matplotlib.patches import FancyArrowPatch
 from torch.utils.data import DataLoader
 
 from constants import Constants as const
@@ -9,10 +11,10 @@ from dataloader.supervised.generation.action_genome.ag_dataset import AG
 from dataloader.supervised.generation.action_genome.ag_dataset import cuda_collate_fn as ag_data_cuda_collate_fn
 from dataloader.supervised.generation.action_genome.ag_features import AGFeatures
 from dataloader.supervised.generation.action_genome.ag_features import cuda_collate_fn as ag_features_cuda_collate_fn
-from lib.supervised.biased.sga.ODE import ODE
-from lib.supervised.biased.sga.SDE import SDE
-from lib.supervised.biased.sga.baseline_anticipation import BaselineWithAnticipation
-from lib.supervised.biased.sga.baseline_anticipation_gen_loss import BaselineWithAnticipationGenLoss
+# from lib.supervised.biased.sga.ODE import ODE
+# from lib.supervised.biased.sga.SDE import SDE
+# from lib.supervised.biased.sga.baseline_anticipation import BaselineWithAnticipation
+# from lib.supervised.biased.sga.baseline_anticipation_gen_loss import BaselineWithAnticipationGenLoss
 from lib.supervised.config import Config
 import networkx as nx
 
@@ -29,67 +31,67 @@ def load_raw_data(dataset, video_id):
 	return img_tensor, im_info, gt_boxes, num_boxes, index
 
 
-def load_model(model_name, conf, dataset, gpu_device):
-	if model_name == "baseline_so":
-		model = BaselineWithAnticipation(mode=conf.mode,
-		                                 attention_class_num=len(dataset.attention_relationships),
-		                                 spatial_class_num=len(dataset.spatial_relationships),
-		                                 contact_class_num=len(dataset.contacting_relationships),
-		                                 obj_classes=dataset.object_classes,
-		                                 enc_layer_num=conf.enc_layer,
-		                                 dec_layer_num=conf.dec_layer).to(device=gpu_device)
-	elif model_name == "baseline_so_gen_loss":
-		model = BaselineWithAnticipationGenLoss(mode=conf.mode,
-		                                        attention_class_num=len(dataset.attention_relationships),
-		                                        spatial_class_num=len(dataset.spatial_relationships),
-		                                        contact_class_num=len(dataset.contacting_relationships),
-		                                        obj_classes=dataset.object_classes,
-		                                        enc_layer_num=conf.enc_layer,
-		                                        dec_layer_num=conf.dec_layer).to(device=gpu_device)
-	elif model_name == "ode":
-		model = ODE(mode=conf.mode,
-		            attention_class_num=len(dataset.attention_relationships),
-		            spatial_class_num=len(dataset.spatial_relationships),
-		            contact_class_num=len(dataset.contacting_relationships),
-		            obj_classes=dataset.object_classes,
-		            enc_layer_num=conf.enc_layer,
-		            dec_layer_num=conf.dec_layer,
-		            max_window=conf.max_window).to(device=gpu_device)
-	elif model_name == "sde":
-		brownian_size = conf.brownian_size
-		model = SDE(mode=conf.mode,
-		            attention_class_num=len(dataset.attention_relationships),
-		            spatial_class_num=len(dataset.spatial_relationships),
-		            contact_class_num=len(dataset.contacting_relationships),
-		            obj_classes=dataset.object_classes,
-		            enc_layer_num=conf.enc_layer,
-		            dec_layer_num=conf.dec_layer,
-		            max_window=conf.max_window,
-		            brownian_size=brownian_size).to(device=gpu_device)
-	
-	ckpt = torch.load(conf.ckpt, map_location=gpu_device)
-	model.load_state_dict(ckpt[f'{model_name}_state_dict'], strict=False)
-	print(f"Loaded model from checkpoint {conf.ckpt}")
-	model.eval()
-	return model
-
-
-def main():
-	conf, device, gpu_device = generate_test_config_metadata()
-	if conf.use_raw_data:
-		dataset, video_id_index_map, dataloader_test = load_action_genome_dataset(conf.data_path, conf)
-	else:
-		dataset, video_id_index_map, dataloader_test = load_action_genome_features_dataset(conf.data_path, conf, device)
-	
-	model_name = conf.method_name
-	mode = conf.mode
-	model = load_model(model_name, conf, dataset, gpu_device)
-	
-	for video_id in video_id_list:
-		if conf.use_raw_data:
-			img_tensor, im_info, gt_boxes, num_boxes, index = load_raw_data(dataset, video_id_index_map[video_id])
-		else:
-			entry = load_features_data(dataset, video_id_index_map[video_id])
+# def load_model(model_name, conf, dataset, gpu_device):
+# 	if model_name == "baseline_so":
+# 		model = BaselineWithAnticipation(mode=conf.mode,
+# 		                                 attention_class_num=len(dataset.attention_relationships),
+# 		                                 spatial_class_num=len(dataset.spatial_relationships),
+# 		                                 contact_class_num=len(dataset.contacting_relationships),
+# 		                                 obj_classes=dataset.object_classes,
+# 		                                 enc_layer_num=conf.enc_layer,
+# 		                                 dec_layer_num=conf.dec_layer).to(device=gpu_device)
+# 	elif model_name == "baseline_so_gen_loss":
+# 		model = BaselineWithAnticipationGenLoss(mode=conf.mode,
+# 		                                        attention_class_num=len(dataset.attention_relationships),
+# 		                                        spatial_class_num=len(dataset.spatial_relationships),
+# 		                                        contact_class_num=len(dataset.contacting_relationships),
+# 		                                        obj_classes=dataset.object_classes,
+# 		                                        enc_layer_num=conf.enc_layer,
+# 		                                        dec_layer_num=conf.dec_layer).to(device=gpu_device)
+# 	elif model_name == "ode":
+# 		model = ODE(mode=conf.mode,
+# 		            attention_class_num=len(dataset.attention_relationships),
+# 		            spatial_class_num=len(dataset.spatial_relationships),
+# 		            contact_class_num=len(dataset.contacting_relationships),
+# 		            obj_classes=dataset.object_classes,
+# 		            enc_layer_num=conf.enc_layer,
+# 		            dec_layer_num=conf.dec_layer,
+# 		            max_window=conf.max_window).to(device=gpu_device)
+# 	elif model_name == "sde":
+# 		brownian_size = conf.brownian_size
+# 		model = SDE(mode=conf.mode,
+# 		            attention_class_num=len(dataset.attention_relationships),
+# 		            spatial_class_num=len(dataset.spatial_relationships),
+# 		            contact_class_num=len(dataset.contacting_relationships),
+# 		            obj_classes=dataset.object_classes,
+# 		            enc_layer_num=conf.enc_layer,
+# 		            dec_layer_num=conf.dec_layer,
+# 		            max_window=conf.max_window,
+# 		            brownian_size=brownian_size).to(device=gpu_device)
+#
+# 	ckpt = torch.load(conf.ckpt, map_location=gpu_device)
+# 	model.load_state_dict(ckpt[f'{model_name}_state_dict'], strict=False)
+# 	print(f"Loaded model from checkpoint {conf.ckpt}")
+# 	model.eval()
+# 	return model
+#
+#
+# def main():
+# 	conf, device, gpu_device = generate_test_config_metadata()
+# 	if conf.use_raw_data:
+# 		dataset, video_id_index_map, dataloader_test = load_action_genome_dataset(conf.data_path, conf)
+# 	else:
+# 		dataset, video_id_index_map, dataloader_test = load_action_genome_features_dataset(conf.data_path, conf, device)
+#
+# 	model_name = conf.method_name
+# 	mode = conf.mode
+# 	model = load_model(model_name, conf, dataset, gpu_device)
+#
+# 	for video_id in video_id_list:
+# 		if conf.use_raw_data:
+# 			img_tensor, im_info, gt_boxes, num_boxes, index = load_raw_data(dataset, video_id_index_map[video_id])
+# 		else:
+# 			entry = load_features_data(dataset, video_id_index_map[video_id])
 
 
 def load_action_genome_features_dataset(data_path, conf, device):
@@ -127,47 +129,46 @@ def load_action_genome_dataset(data_path, conf):
 		filter_small_box=False if conf.mode == 'predcls' else True
 	)
 	
-	dataloader_test = DataLoader(
-		ag_test_data,
-		shuffle=False,
-		collate_fn=ag_data_cuda_collate_fn,
-		pin_memory=False
-	)
-	
 	video_id_index_map = {}
 	for index, video_gt_annotation in enumerate(ag_test_data.gt_annotations):
 		video_id = video_gt_annotation[0][0]['frame'].split(".")[0]
 		video_id_index_map[video_id] = index
 	
-	return ag_test_data, video_id_index_map, dataloader_test
+	return ag_test_data, video_id_index_map
 
 
-def draw_and_save_graph(graph, video_id, frame_idx, dataset):
-	plt.figure(figsize=(8, 6))
+def draw_and_save_graph(graph, video_id, frame_idx):
+	plt.figure(figsize=(12, 12))
 	
-	# Assuming 'graph' is your NetworkX MultiGraph object
+	pos = nx.spring_layout(graph, seed=42)  # positions for all nodes, with a fixed layout
 	
-	# Positions for all nodes
-	pos = nx.spring_layout(graph)
-	
-	# Draw nodes
-	nx.draw_networkx_nodes(graph, pos)
-	
-	# Extract different types of relationships
-	attention_edges = [(u, v) for u, v, d in graph.edges(data=True) if d['label'] in dataset.attention_relationships]
-	spatial_edges = [(u, v) for u, v, d in graph.edges(data=True) if d['label'] in dataset.spatial_relationships]
-	contacting_edges = [(u, v) for u, v, d in graph.edges(data=True) if d['label'] in dataset.contacting_relationships]
-	
-	# Draw edges for different types of relationships
-	nx.draw_networkx_edges(graph, pos, edgelist=attention_edges, edge_color='red', label='Attention Relationships')
-	nx.draw_networkx_edges(graph, pos, edgelist=spatial_edges, edge_color='blue', label='Spatial Relationships')
-	nx.draw_networkx_edges(graph, pos, edgelist=contacting_edges, edge_color='green', label='Contacting Relationships')
-	
-	# Draw node labels
+	# Draw nodes and labels
+	nx.draw_networkx_nodes(graph, pos, node_size=700)
 	nx.draw_networkx_labels(graph, pos)
 	
-	# Add legend
-	plt.legend()
+	# Custom drawing of the edges using FancyArrowPatch
+	for u, v, key, data in graph.edges(keys=True, data=True):
+		# Determine if there are multiple edges and calculate offset
+		num_edges = graph.number_of_edges(u, v)
+		edge_count = sum(1 for _ in graph[u][v])
+		offset = 0.13 * (key - edge_count // 2)  # Offset for curvature
+		
+		# Parameters for the FancyArrowPatch
+		arrow_options = {
+			'arrowstyle': '-',
+			'connectionstyle': f"arc3,rad={offset}",
+			'color': 'black',
+			'linewidth': 1
+		}
+		
+		# Draw the edge with curvature
+		edge = FancyArrowPatch(pos[u], pos[v], **arrow_options)
+		plt.gca().add_patch(edge)
+		
+		# Improved calculation for the position of the edge label
+		label_pos_x = (pos[u][0] + pos[v][0]) / 2 + offset * 0.75 * (pos[v][1] - pos[u][1])
+		label_pos_y = (pos[u][1] + pos[v][1]) / 2 - offset * 0.75 * (pos[v][0] - pos[u][0])
+		plt.text(label_pos_x, label_pos_y, str(data['label']), color='blue', fontsize=10, ha='center', va='center')
 	
 	# Save graph
 	file_name = "{}_{}.png".format(video_id, frame_idx)
@@ -190,11 +191,12 @@ def generate_ground_truth_graphs():
 			print("Loaded data for frame {}".format(frame_gt_annotation[0]['frame']))
 			frame_idx = frame_gt_annotation[0]['frame'].split("/")[1][:-4]
 			graph = nx.MultiGraph()
-			graph.add_node(0, label=const.PERSON)
-			subject_node_idx = 0
+			subject_node_class = "Person"
+			graph.add_node(subject_node_class, label=const.PERSON)
+			
 			for object_node_idx in range(1, len(frame_gt_annotation)):
 				object_node_class = dataset.object_classes[frame_gt_annotation[object_node_idx]['class']]
-				graph.add_node(object_node_idx, label=object_node_class)
+				graph.add_node(object_node_class, label=object_node_class)
 				
 				attention_relationships = frame_gt_annotation[object_node_idx][
 					const.ATTENTION_RELATIONSHIP].cpu().numpy()
@@ -208,13 +210,13 @@ def generate_ground_truth_graphs():
 				
 				for attention_relationship_idx in range(len(attention_relationships)):
 					if attention_relationships[attention_relationship_idx] in [0, 1]:
-						graph.add_edge(subject_node_idx, object_node_idx,
+						graph.add_edge(subject_node_class, object_node_class,
 						               label=dataset.attention_relationships[attention_relationship_idx])
 				for spatial_relationship_idx in range(len(spatial_relationships)):
-					graph.add_edge(subject_node_idx, object_node_idx,
+					graph.add_edge(subject_node_class, object_node_class,
 					               label=dataset.spatial_relationships[spatial_relationship_idx])
 				for contacting_relationship_idx in range(len(contacting_relationships)):
-					graph.add_edge(subject_node_idx, object_node_idx,
+					graph.add_edge(subject_node_class, object_node_class,
 					               label=dataset.contacting_relationships[contacting_relationship_idx])
 			
 			draw_and_save_graph(graph, video_id, frame_idx, dataset)

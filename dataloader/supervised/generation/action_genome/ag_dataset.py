@@ -191,6 +191,28 @@ class AG(Dataset):
 		
 		self.invalid_video_names = np.setdiff1d(all_video_names, self.valid_video_names, assume_unique=False)
 	
+	def fetch_video_data(self, index):
+		frame_names = self.video_list[index]
+		processed_ims = []
+		im_scales = []
+		for idx, name in enumerate(frame_names):
+			im = cv2.imread(os.path.join(self.frames_path, name))  # channel h,w,3
+			# im = im[:, :, ::-1]  # rgb -> bgr
+			# cfg.PIXEL_MEANS, target_size, cfg.TRAIN.MAX_SIZE
+			im, im_scale = prep_im_for_blob(im, [[[102.9801, 115.9465, 122.7717]]], 600, 1000)
+			im_scales.append(im_scale)
+			processed_ims.append(im)
+		blob = im_list_to_blob(processed_ims)
+		im_info = np.array([[blob.shape[1], blob.shape[2], im_scales[0]]], dtype=np.float32)
+		im_info = torch.from_numpy(im_info).repeat(blob.shape[0], 1)
+		img_tensor = torch.from_numpy(blob)
+		img_tensor = img_tensor.permute(0, 3, 1, 2)
+		
+		gt_boxes = torch.zeros([img_tensor.shape[0], 1, 5])
+		num_boxes = torch.zeros([img_tensor.shape[0]], dtype=torch.int64)
+		
+		return img_tensor, im_info, gt_boxes, num_boxes, index
+	
 	def __getitem__(self, index):
 		frame_names = self.video_list[index]
 		processed_ims = []

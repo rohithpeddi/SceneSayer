@@ -313,6 +313,28 @@ class AGFeatures(Dataset):
 				attribute_dictionary[key] = torch.from_numpy(attribute_dictionary[key]).to(self.device)
 		return attribute_dictionary
 	
+	def fetch_video_data(self, index):
+		video_feature_file_path = self.video_list[index]
+		with open(os.path.join(video_feature_file_path), 'rb') as pkl_file:
+			data_dictionary = pickle.load(pkl_file)
+			if self.is_compiled_together:
+				attribute_dictionary = data_dictionary[self.entry_mode]
+			else:
+				attribute_dictionary = data_dictionary
+		pkl_file.close()
+		entry = self._construct_entry(attribute_dictionary)
+		
+		if self.is_compiled_together:
+			video_name = video_feature_file_path.split('/')[-1][:-4]
+		else:
+			video_feature_filename = video_feature_file_path.split('/')[-1]
+			video_name = video_feature_filename.split('.mp4')[0] + ".mp4"
+		
+		entry = self._add_additional_info(entry, video_name)
+		if self.change_device:
+			entry = self._load_dictionary_tensors_to_device(entry)
+		return entry
+	
 	def __getitem__(self, index):
 		video_feature_file_path = self.video_list[index]
 		print(video_feature_file_path)

@@ -31,7 +31,7 @@ class BasicSceneGraphEvaluator:
         self.result_dict[self.mode + '_mean_recall_collect'] = {
             k: [[] for _ in range(self.num_rel)] for k in (10, 20, 50, 100)
         }
-
+        
         self.constraint = constraint  # semi constraint if True
         self.iou_threshold = iou_threshold
         self.AG_object_classes = AG_object_classes
@@ -41,70 +41,147 @@ class BasicSceneGraphEvaluator:
         self.AG_contacting_predicates = AG_contacting_predicates
         self.semi_threshold = semi_threshold
         self.save_file = save_file
-
+    
     def reset_result(self):
         self.result_dict[self.mode + '_recall'] = {10: [], 20: [], 50: [], 100: []}
         self.result_dict[self.mode + '_mean_recall_collect'] = {
             k: [[] for _ in range(self.num_rel)] for k in (10, 20, 50, 100)
         }
-
+    
     def fetch_stats_json(self):
         recall_dict = {}
         mean_recall_dict = {}
         harmonic_mean_recall_dict = {}
-
+        
         for k, v in self.result_dict[self.mode + '_recall'].items():
             recall_value = np.mean(v)
             recall_dict[k] = recall_value
-
+        
         for k, v in self.result_dict[self.mode + '_mean_recall_collect'].items():
             sum_recall = np.sum([np.mean(vi) if vi else 0.0 for vi in v])
             mean_recall_value = sum_recall / float(self.num_rel)
             mean_recall_dict[k] = mean_recall_value
-
+        
         for k, recall_value in recall_dict.items():
             mean_recall_value = mean_recall_dict[k]
             harmonic_mean = 2 * mean_recall_value * recall_value / (mean_recall_value + recall_value)
             harmonic_mean_recall_dict[k] = harmonic_mean
-
+        
         results = {
             "recall": recall_dict,
             "mean_recall": mean_recall_dict,
             "harmonic_mean_recall": harmonic_mean_recall_dict
         }
-
+        
         return results
-
+    
     def print_stats(self):
         def print_and_write(message):
             print(message)
             stats_file.write(message + '\n')
-
+        
         with open(self.save_file, "a") as stats_file:
             header = f'======================{self.mode}======================'
             print_and_write(header)
-
+            
             recall_dict = {}
             mean_recall_dict = {}
             harmonic_mean_recall_dict = {}
-
+            
             for k, v in self.result_dict[self.mode + '_recall'].items():
                 recall_value = np.mean(v)
                 recall_dict[k] = recall_value
                 print_and_write(f'R@{k}: {recall_value:.6f}')
-
+            
             for k, v in self.result_dict[self.mode + '_mean_recall_collect'].items():
                 sum_recall = np.sum([np.mean(vi) if vi else 0.0 for vi in v])
                 mean_recall_value = sum_recall / float(self.num_rel)
                 mean_recall_dict[k] = mean_recall_value
                 print_and_write(f'mR@{k}: {mean_recall_value:.6f}')
-
+            
             for k, recall_value in recall_dict.items():
                 mean_recall_value = mean_recall_dict[k]
                 harmonic_mean = 2 * mean_recall_value * recall_value / (mean_recall_value + recall_value)
                 harmonic_mean_recall_dict[k] = harmonic_mean
                 print_and_write(f'hR@{k}: {harmonic_mean:.6f}')
-
+    
+    def fetch_pred_tuples(self, gt, pred):
+        idx_pred_triplets_map = {}
+        pred['attention_distribution'] = nn.functional.softmax(pred['attention_distribution'], dim=1)
+        for idx, frame_gt in enumerate(gt):
+            
+            # first part for attention and contact, second for spatial
+            rels_i = np.concatenate((pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy(),  # attention
+                                     pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy()[:, ::-1],  # spatial
+                                     pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy()),
+                                    axis=0)  # contacting
+            
+            pred_scores_1 = np.concatenate((pred['attention_distribution'][pred['im_idx'] == idx].cpu().numpy(),
+                                            np.zeros([pred['pair_idx'][pred['im_idx'] == idx].shape[0],
+                                                      pred['spatial_distribution'].shape[1]]),
+                                            np.zeros([pred['pair_idx'][pred['im_idx'] == idx].shape[0],
+                                                      pred['contacting_distribution'].shape[1]])), axis=1)
+            pred_scores_2 = np.concatenate(
+                (np.zeros([pred['pair_idx'][pred['im_idx'] == idx].shape[0], pred['attention_distribution'].shape[1]]),
+                 pred['spatial_distribution'][pred['im_idx'] == idx].cpu().numpy(),
+                 np.zeros(
+                     [pred['pair_idx'][pred['im_idx'] == idx].shape[0], pred['contacting_distribution'].shape[1]])),
+                axis=1)
+            pred_scores_3 = np.concatenate(
+                (np.zeros([pred['pair_idx'][pred['im_idx'] == idx].shape[0], pred['attention_distribution'].shape[1]]),
+                 np.zeros([pred['pair_idx'][pred['im_idx'] == idx].shape[0], pred['spatial_distribution'].shape[1]]),
+                 pred['contacting_distribution'][pred['im_idx'] == idx].cpu().numpy()), axis=1)
+            
+            if self.mode == 'predcls':
+                pred_entry = {
+                    'pred_boxes': pred['boxes'][:, 1:].cpu().clone().numpy(),
+                    'pred_classes': pred['labels'].cpu().clone().numpy(),
+                    'pred_rel_inds': rels_i,
+                    'obj_scores': pred['scores'].cpu().clone().numpy(),
+                    'rel_scores': np.concatenate((pred_scores_1, pred_scores_2, pred_scores_3), axis=0)
+                }
+            else:
+                pred_entry = {
+                    'pred_boxes': pred['boxes'][:, 1:].cpu().clone().numpy(),
+                    'pred_classes': pred['pred_labels'].cpu().clone().numpy(),
+                    'pred_rel_inds': rels_i,
+                    'obj_scores': pred['pred_scores'].cpu().clone().numpy(),
+                    'rel_scores': np.concatenate((pred_scores_1, pred_scores_2, pred_scores_3), axis=0)
+                }
+            
+            pred_rel_inds = pred_entry['pred_rel_inds']
+            rel_scores = pred_entry['rel_scores']
+            
+            pred_boxes = pred_entry['pred_boxes'].astype(float)
+            pred_classes = pred_entry['pred_classes']
+            obj_scores = pred_entry['obj_scores']
+            
+            if self.constraint == 'no':
+                obj_scores_per_rel = obj_scores[pred_rel_inds].prod(1)
+                overall_scores = obj_scores_per_rel[:, None] * rel_scores
+                score_inds = argsort_desc(overall_scores)[:100]
+                pred_rels = np.column_stack((pred_rel_inds[score_inds[:, 0]], score_inds[:, 1]))
+                predicate_scores = rel_scores[score_inds[:, 0], score_inds[:, 1]]
+            else:
+                pred_rels = np.column_stack(
+                    (pred_rel_inds, rel_scores.argmax(1)))  # 1+  dont add 1 because no dummy 'no relations'
+                predicate_scores = rel_scores.max(1)
+            
+            if pred_rels.size == 0:
+                continue
+            
+            pred_triplets, pred_triplet_boxes, relation_scores = \
+                _triplet(pred_rels[:, 2], pred_rels[:, :2], pred_classes, pred_boxes,
+                         rel_scores, obj_scores)
+            
+            sorted_scores = relation_scores.prod(1)
+            pred_triplets = pred_triplets[sorted_scores.argsort()[::-1], :]
+            
+            # Subject Object Relationship Class
+            idx_pred_triplets_map[idx] = pred_triplets[:, [0, 2, 1]]
+        
+        return idx_pred_triplets_map
+    
     def evaluate_scene_graph(self, gt, pred):
         """collect the ground truth and prediction"""
         pred['attention_distribution'] = nn.functional.softmax(pred['attention_distribution'], dim=1)
@@ -129,19 +206,19 @@ class BasicSceneGraphEvaluator:
                 for contact in n['contacting_relationship'].numpy().tolist():
                     gt_relations.append([human_idx, m + 1, self.AG_all_predicates.index(
                         self.AG_contacting_predicates[contact])])  # for contact triplet <human-object-predicate>
-
+            
             gt_entry = {
                 'gt_classes': gt_classes,
                 'gt_relations': np.array(gt_relations),
                 'gt_boxes': gt_boxes,
             }
-
+            
             # first part for attention and contact, second for spatial
             rels_i = np.concatenate((pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy(),  # attention
                                      pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy()[:, ::-1],  # spatial
                                      pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy()),
                                     axis=0)  # contacting
-
+            
             pred_scores_1 = np.concatenate((pred['attention_distribution'][pred['im_idx'] == idx].cpu().numpy(),
                                             np.zeros([pred['pair_idx'][pred['im_idx'] == idx].shape[0],
                                                       pred['spatial_distribution'].shape[1]]),
@@ -157,7 +234,7 @@ class BasicSceneGraphEvaluator:
                 (np.zeros([pred['pair_idx'][pred['im_idx'] == idx].shape[0], pred['attention_distribution'].shape[1]]),
                  np.zeros([pred['pair_idx'][pred['im_idx'] == idx].shape[0], pred['spatial_distribution'].shape[1]]),
                  pred['contacting_distribution'][pred['im_idx'] == idx].cpu().numpy()), axis=1)
-
+            
             if self.mode == 'predcls':
                 pred_entry = {
                     'pred_boxes': pred['boxes'][:, 1:].cpu().clone().numpy(),
@@ -174,7 +251,7 @@ class BasicSceneGraphEvaluator:
                     'obj_scores': pred['pred_scores'].cpu().clone().numpy(),
                     'rel_scores': np.concatenate((pred_scores_1, pred_scores_2, pred_scores_3), axis=0)
                 }
-
+            
             evaluate_from_dict(gt_entry, pred_entry, self.mode, self.result_dict,
                                iou_thresh=self.iou_threshold, method=self.constraint, threshold=self.semi_threshold,
                                num_rel=self.num_rel)
@@ -196,14 +273,14 @@ def evaluate_from_dict(gt_entry, pred_entry, mode, result_dict, method=None, thr
     gt_rels = gt_entry['gt_relations']
     gt_boxes = gt_entry['gt_boxes'].astype(float)
     gt_classes = gt_entry['gt_classes']
-
+    
     pred_rel_inds = pred_entry['pred_rel_inds']
     rel_scores = pred_entry['rel_scores']
-
+    
     pred_boxes = pred_entry['pred_boxes'].astype(float)
     pred_classes = pred_entry['pred_classes']
     obj_scores = pred_entry['obj_scores']
-
+    
     if method == 'semi':
         pred_rels = []
         predicate_scores = []
@@ -234,29 +311,29 @@ def evaluate_from_dict(gt_entry, pred_entry, mode, result_dict, method=None, thr
         pred_rels = np.column_stack(
             (pred_rel_inds, rel_scores.argmax(1)))  # 1+  dont add 1 because no dummy 'no relations'
         predicate_scores = rel_scores.max(1)
-
+    
     pred_to_gt, pred_5ples, rel_scores = evaluate_recall(
         gt_rels, gt_boxes, gt_classes,
         pred_rels, pred_boxes, pred_classes,
         predicate_scores, obj_scores, phrdet=mode == 'phrdet', **kwargs)
-
+    
     for k in result_dict[mode + '_recall']:
         match = reduce(np.union1d, pred_to_gt[:k])
         recall_hit = [0] * num_rel
         recall_count = [0] * num_rel
-
+        
         for idx in range(gt_rels.shape[0]):
             local_label = gt_rels[idx, 2]
             recall_count[int(local_label)] += 1
-
+        
         for idx in range(len(match)):
             local_label = gt_rels[int(match[idx]), 2]
             recall_hit[int(local_label)] += 1
-
+        
         for n in range(num_rel):
             if recall_count[n] > 0:
                 result_dict[mode + '_mean_recall_collect'][k][n].append(float(recall_hit[n] / recall_count[n]))
-
+        
         rec_i = float(len(match)) / float(gt_rels.shape[0])
         result_dict[mode + '_recall'][k].append(rec_i)
     return pred_to_gt, pred_5ples, rel_scores
@@ -295,42 +372,42 @@ def evaluate_recall(
                    """
     if pred_rels.size == 0:
         return [[]], np.zeros((0, 5)), np.zeros(0)
-
+    
     num_gt_boxes = gt_boxes.shape[0]
     num_gt_relations = gt_rels.shape[0]
     assert num_gt_relations != 0
-
+    
     gt_triplets, gt_triplet_boxes, _ = _triplet(gt_rels[:, 2],
                                                 gt_rels[:, :2],
                                                 gt_classes,
                                                 gt_boxes)
     num_boxes = pred_boxes.shape[0]
-
+    
     try:
         assert pred_rels[:, :2].max() < pred_classes.shape[0]
     except AssertionError:
         print("assert error ")
     # pdb.set_trace()
-
+    
     # Exclude self rels
     # assert np.all(pred_rels[:,0] != pred_rels[:,ĺeftright])
     # assert np.all(pred_rels[:,2] > 0)
-
+    
     pred_triplets, pred_triplet_boxes, relation_scores = \
         _triplet(pred_rels[:, 2], pred_rels[:, :2], pred_classes, pred_boxes,
                  rel_scores, cls_scores)
-
+    
     sorted_scores = relation_scores.prod(1)
     pred_triplets = pred_triplets[sorted_scores.argsort()[::-1], :]
     pred_triplet_boxes = pred_triplet_boxes[sorted_scores.argsort()[::-1], :]
     relation_scores = relation_scores[sorted_scores.argsort()[::-1], :]
     scores_overall = relation_scores.prod(1)
-
+    
     if not np.all(scores_overall[1:] <= scores_overall[:-1] + 1e-5):
         print("Somehow the relations weren't sorted properly: \n{}".format(scores_overall))
     # pdb.set_trace()
     # raise ValueError("Somehow the relations weren't sorted properly")
-
+    
     # Compute recall. It's most efficient to match once and then do recall after
     pred_to_gt = _compute_pred_matches(
         gt_triplets,
@@ -340,13 +417,13 @@ def evaluate_recall(
         iou_thresh,
         phrdet=phrdet,
     )
-
+    
     # Contains some extra stuff for visualization. Not needed.
     pred_5ples = np.column_stack((
         pred_rels[:, :2],
         pred_triplets[:, [0, 2, 1]],
     ))
-
+    
     return pred_to_gt, pred_5ples, relation_scores
 
 
@@ -373,11 +450,11 @@ def _triplet(
              Triplet scores: num_relation array of the scores overall for the triplets
     """
     assert (predicates.shape[0] == relations.shape[0])
-
+    
     sub_ob_classes = classes[relations[:, :2]]
     triplets = np.column_stack((sub_ob_classes[:, 0], predicates, sub_ob_classes[:, 1]))
     triplet_boxes = np.column_stack((boxes[relations[:, 0]], boxes[relations[:, 1]]))
-
+    
     triplet_scores = None
     if predicate_scores is not None and class_scores is not None:
         triplet_scores = np.column_stack((
@@ -385,7 +462,7 @@ def _triplet(
             class_scores[relations[:, 1]],
             predicate_scores,
         ))
-
+    
     return triplets, triplet_boxes, triplet_scores
 
 
@@ -422,17 +499,17 @@ def _compute_pred_matches(
             # Evaluate where the union box > 0.5
             gt_box_union = gt_box.reshape((2, 4))
             gt_box_union = np.concatenate((gt_box_union.min(0)[:2], gt_box_union.max(0)[2:]), 0)
-
+            
             box_union = boxes.reshape((-1, 2, 4))
             box_union = np.concatenate((box_union.min(1)[:, :2], box_union.max(1)[:, 2:]), 1)
-
+            
             inds = bbox_overlaps(gt_box_union[None], box_union)[0] >= iou_thresh
         else:
             sub_iou = bbox_overlaps(gt_box[None, :4], boxes[:, :4])[0]
             obj_iou = bbox_overlaps(gt_box[None, 4:], boxes[:, 4:])[0]
-
+            
             inds = (sub_iou >= iou_thresh) & (obj_iou >= iou_thresh)
-
+        
         for i in np.where(keep_inds)[0][inds]:
             pred_to_gt[i].append(int(gt_ind))
     return pred_to_gt

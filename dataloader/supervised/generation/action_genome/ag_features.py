@@ -313,9 +313,8 @@ class AGFeatures(Dataset):
 				attribute_dictionary[key] = torch.from_numpy(attribute_dictionary[key]).to(self.device)
 		return attribute_dictionary
 	
-	def fetch_video_data(self, index):
-		print(index)
-		video_feature_file_path = self.video_list[index]
+	def fetch_video_data(self, video_name):
+		video_feature_file_path = os.path.join(self.features_path, f"{video_name}_{self.mode}.pkl")
 		print(video_feature_file_path)
 		with open(os.path.join(video_feature_file_path), 'rb') as pkl_file:
 			data_dictionary = pickle.load(pkl_file)

@@ -186,13 +186,6 @@ def main():
 
 
 def generate_qualitative_results():
-    video_id_index_map = {}
-    for index, video_key in enumerate(ag_test_data.gt_annotations):
-        video_gt_annotation = ag_test_data.gt_annotations[video_key]
-        video_id = video_gt_annotation[0][0]['frame'].split(".")[0]
-        print(index, video_id)
-        video_id_index_map[video_id] = index
-
     model = None
     if method_name == "ode":
         assert train_method == "ode"
@@ -209,7 +202,8 @@ def generate_qualitative_results():
     with torch.no_grad():
         for context_fraction in context_fraction_list:
             for video_id in video_id_list:
-                entry = ag_test_data.fetch_video_data(video_id_index_map[video_id])
+                video_name = video_id + ".mp4"
+                entry = ag_test_data.fetch_video_data(video_name)
                 gt_annotation = entry[const.GT_ANNOTATION]
                 frame_size = entry[const.FRAME_SIZE]
                 get_sequence_with_tracking(entry, gt_annotation, matcher, frame_size, conf.mode)

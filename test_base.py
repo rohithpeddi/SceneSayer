@@ -546,31 +546,22 @@ def send_percentage_evaluators_stats_to_firebase(percentage_evaluators, mode, me
 
 def prepare_prediction_graph(predictions_map, dataset, video_id, model_name, constraint_type, mode):
 	# Loop through each frame in the video
-	for frame_idx, pred_tuple_array in predictions_map.items():
-		pred_set = set()
-		for idx in range(len(pred_tuple_array)):
-			pred_set.add(list(pred_tuple_array[idx]))
-		
+	for frame_idx, pred_numpy_array in predictions_map.items():
 		graph = nx.MultiGraph()
+		pred_set = set()
+		for pred in pred_numpy_array:
+			# Convert numpy arrays to tuples for hashing
+			pred_set.add(tuple(pred))
 		
-		subject_classes = set()
-		object_classes = set()
-		for pred_list in pred_set:
-			subject_class = dataset.object_classes[pred_list[0]]
-			object_class = dataset.object_classes[pred_list[1]]
-			subject_classes.add(subject_class)
-			object_classes.add(object_class)
-		
-		for subject_class in subject_classes:
+		# Process each prediction
+		for pred_tuple in pred_set:
+			subject_class = dataset.object_classes[pred_tuple[0]]
+			object_class = dataset.object_classes[pred_tuple[1]]
+			predicate_class = dataset.relationships[pred_tuple[2]]
+			
+			# Add nodes and edge
 			graph.add_node(subject_class, label=subject_class)
-		
-		for object_class in object_classes:
 			graph.add_node(object_class, label=object_class)
-		
-		for pred_list in pred_set:
-			subject_class = dataset.object_classes[pred_list[0]]
-			object_class = dataset.object_classes[pred_list[1]]
-			predicate_class = dataset.relationships[pred_list[2]]
 			graph.add_edge(subject_class, object_class, label=predicate_class)
 			
 		draw_and_save_graph(graph, video_id, frame_idx, model_name, constraint_type, mode)

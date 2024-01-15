@@ -172,7 +172,7 @@ class BasicSceneGraphEvaluator:
             
             pred_triplets, pred_triplet_boxes, relation_scores = \
                 _triplet(pred_rels[:, 2], pred_rels[:, :2], pred_classes, pred_boxes,
-                         rel_scores, obj_scores)
+                         predicate_scores, obj_scores)
             
             sorted_scores = relation_scores.prod(1)
             pred_triplets = pred_triplets[sorted_scores.argsort()[::-1], :]

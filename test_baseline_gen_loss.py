@@ -448,7 +448,7 @@ def generate_qualitative_results():
 	object_detector.is_train = False
 	
 	model.eval()
-	video_id_list = ["21F9H", "X95D0", "M18XP", "0A8CF", "LUQWY", "QE4YE", "ENOLD"]
+	video_id_list = ["0A8CF", "21F9H", "X95D0", "M18XP",  "LUQWY", "QE4YE", "ENOLD"]
 	context_fractions = [0.3, 0.5, 0.7, 0.9]
 	with torch.no_grad():
 		for video_id in video_id_list:
@@ -466,6 +466,6 @@ def generate_qualitative_results():
 
 
 if __name__ == '__main__':
-	main()
+	generate_qualitative_results()
 
 """ python test_forecasting.py -mode sgdet -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ -model_path forecasting/sgdet_full_context_f3/DSG_masked_9.tar """

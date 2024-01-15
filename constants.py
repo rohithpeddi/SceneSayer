@@ -105,6 +105,9 @@ class Constants:
 	
 	GT_ANNOTATION = "gt_annotation"
 	FRAME_SIZE = "frame_size"
+	
+	PERSON = "person"
+	OBJECT = "object"
 
 
 class DetectorConstants:

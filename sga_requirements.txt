@@ -11,3 +11,4 @@ matplotlib
 opencv-python
 pyrebase4
 openpyxl
+networkx

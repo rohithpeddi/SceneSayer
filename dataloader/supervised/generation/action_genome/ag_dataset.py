@@ -1,15 +1,13 @@
-import torch
-from PIL import Image
-from torch.utils.data import Dataset
-from torchvision.transforms import Resize, Compose, ToTensor, Normalize
-import random
+import os
+import pickle
 
 import cv2
 import numpy as np
-import pickle
-import os
-from fasterRCNN.lib.model.utils.blob import prep_im_for_blob, im_list_to_blob
+import torch
+from torch.utils.data import Dataset
+
 from constants import Constants as const
+from fasterRCNN.lib.model.utils.blob import prep_im_for_blob, im_list_to_blob
 
 
 class AG(Dataset):

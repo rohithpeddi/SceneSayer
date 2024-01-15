@@ -348,6 +348,7 @@ def main():
 				evaluate_model_future_frames(model, entry, gt_annotation, conf, num_future_frames, future_evaluators)
 			
 			for context_fraction in context_fractions:
+				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
 				evaluate_model_context_fraction(model, entry, gt_annotation, conf, context_fraction,
 				                                percentage_evaluators)
 			
@@ -454,13 +455,13 @@ def generate_qualitative_results():
 				percentage_evaluators,
 				context_fraction
 			)
-			send_percentage_evaluators_stats_to_firebase(
-				percentage_evaluators,
-				conf.mode,
-				model_name,
-				future_frame_loss_num,
-				context_fraction
-			)
+			# send_percentage_evaluators_stats_to_firebase(
+			# 	percentage_evaluators,
+			# 	conf.mode,
+			# 	model_name,
+			# 	future_frame_loss_num,
+			# 	context_fraction
+			# )
 
 
 if __name__ == '__main__':

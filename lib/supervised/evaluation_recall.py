@@ -109,7 +109,7 @@ class BasicSceneGraphEvaluator:
         idx_pred_triplets_map = {}
         pred['attention_distribution'] = nn.functional.softmax(pred['attention_distribution'], dim=1)
         for idx, frame_gt in enumerate(gt):
-            
+            frame_idx = frame_gt[0]['frame'].split('/')[-1].split('.')[0]
             # first part for attention and contact, second for spatial
             rels_i = np.concatenate((pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy(),  # attention
                                      pred['pair_idx'][pred['im_idx'] == idx].cpu().clone().numpy()[:, ::-1],  # spatial
@@ -178,7 +178,7 @@ class BasicSceneGraphEvaluator:
             pred_triplets = pred_triplets[sorted_scores.argsort()[::-1], :]
             
             # Subject Object Relationship Class
-            idx_pred_triplets_map[idx] = pred_triplets[:, [0, 2, 1]]
+            idx_pred_triplets_map[frame_idx] = pred_triplets[:, [0, 2, 1]]
         
         return idx_pred_triplets_map
     

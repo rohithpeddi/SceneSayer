@@ -3,6 +3,7 @@ import math
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
+import pdb
 
 from lib.supervised.biased.sga.blocks import EncoderLayer, Encoder, PositionalEncoding, ObjectClassifierMLP
 from lib.word_vectors import obj_edge_vectors
@@ -80,7 +81,6 @@ class BaselineWithAnticipationGenLoss(nn.Module):
     
     def process_entry(self, entry):
         entry = self.object_classifier(entry)
-        
         # visual part
         subj_rep = entry['features'][entry['pair_idx'][:, 0]]
         subj_rep = self.subj_fc(subj_rep)
@@ -111,9 +111,13 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         rel_features = torch.cat([rel_[i, :len(index)] for i, index in enumerate(frames)])
         # temporal message passing
         sequences = []
-        for l in obj_class.unique():
+        object_tracker = {}
+        object_labels = []
+        for i,l in enumerate(obj_class.unique()):
             k = torch.where(obj_class.view(-1) == l)[0]
             if len(k) > 0:
+                object_tracker[i]=0
+                object_labels.append(l)
                 sequences.append(k)
                 
         # Temporal message passing
@@ -140,7 +144,7 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         dsg_global_output = torch.zeros_like(rel_features).to(rel_features.device)
         dsg_global_output.scatter_(0, indices_flat, rel_flat)
         
-        return entry, rel_features, sequences, dsg_global_output
+        return entry, rel_features, sequences,object_tracker,object_labels, dsg_global_output
     
     def forward(self, entry, context, future):
         """
@@ -150,7 +154,7 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         :param future: Number of next frames to anticipate
         :return:
         """
-        entry, rel_features, sequences, dsg_global_output = self.process_entry(entry)
+        entry, rel_features, sequences, object_tracker,object_labels,dsg_global_output = self.process_entry(entry)
         
         # -------------------------------------------------------------------------------------------------------------
         # Anticipation Module
@@ -169,6 +173,7 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         future = min(future, total_frames - context)
         while context + 1 <= total_frames:
             future_frame_start_id = entry["im_idx"].unique()[context]
+            prev_context_start_id = entry["im_idx"].unique()[context-1]
             
             if context + future > total_frames > context:
                 future = total_frames - context
@@ -176,8 +181,11 @@ class BaselineWithAnticipationGenLoss(nn.Module):
             future_frame_end_id = entry["im_idx"].unique()[context + future - 1]
             
             context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
+            prev_context_end_idx = int(torch.where(entry["im_idx"] == prev_context_start_id)[0][0])
+            prev_context_idx = entry["im_idx"][:prev_context_end_idx]
             context_idx = entry["im_idx"][:context_end_idx]
             context_len = context_idx.shape[0]
+            prev_context_len = prev_context_idx.shape[0]
             
             future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1]) + 1
             future_idx = entry["im_idx"][context_end_idx:future_end_idx]
@@ -186,13 +194,26 @@ class BaselineWithAnticipationGenLoss(nn.Module):
             context_seq = []
             future_seq = []
             new_future_seq = []
+            object_track = {}
+            object_lab = []
+            obj_ind = 0
+            
             for i, s in enumerate(sequences):
                 context_index = s[(s < context_len)]
                 future_index = s[(s >= context_len) & (s < (context_len + future_len))]
                 future_seq.append(future_index)
                 if len(context_index) != 0:
+                    object_track[obj_ind] = 0
+                    object_lab.append(object_labels[i].item())
                     context_seq.append(context_index)
                     new_future_seq.append(future_index)
+                    obj_ind+=1
+            
+            obj_ind = 0
+            for i, s in enumerate(context_seq):
+                prev_context_index = s[(s >= prev_context_len) & (s < context_len)]
+                if len(prev_context_index) != 0:
+                    object_track[i] = 1
             
             pos_index = []
             for index in context_seq:
@@ -215,91 +236,186 @@ class BaselineWithAnticipationGenLoss(nn.Module):
             sequence_features = self.positional_encoder(sequence_features, pos_index)
             mask_input = sequence_features
             
-            output = []
-            for i in range(future):
-                out = self.anti_temporal_transformer(mask_input, src_key_padding_mask=masks.cuda(), mask=in_mask)
-                if i == 0:
-                    mask2 = (~masks).int()
-                    ind_col = torch.sum(mask2, dim=1) - 1
-                    out2 = []
-                    for j, ind in enumerate(ind_col):
-                        out2.append(out[j, ind, :])
-                    out3 = torch.stack(out2)
-                    out3 = out3.unsqueeze(1)
-                    output.append(out3)
-                    mask_input = torch.cat([mask_input, out3], 1)
-                else:
-                    output.append(out[:, -1, :].unsqueeze(1))
-                    out_last = [out[:, -1, :]]
-                    pred = torch.stack(out_last, dim=1)
-                    mask_input = torch.cat([mask_input, pred], 1)
-                
-                in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(
-                    torch.bool)
-                in_mask = in_mask.cuda()
-                masks = torch.cat([masks, torch.full((masks.shape[0], 1), False, dtype=torch.bool)], dim=1)
-            
-            output = torch.cat(output, dim=1)
-            rel_ = output
-            rel_ = rel_.cuda()
-            rel_flat1 = []
-            
             if self.training:
+                output = []
+                for i in range(future):
+                    out = self.anti_temporal_transformer(mask_input, src_key_padding_mask=masks.cuda(), mask=in_mask)
+                    if i == 0:
+                        mask2 = (~masks).int()
+                        ind_col = torch.sum(mask2, dim=1) - 1
+                        out2 = []
+                        for j, ind in enumerate(ind_col):
+                            out2.append(out[j, ind, :])
+                        out3 = torch.stack(out2)
+                        out3 = out3.unsqueeze(1)
+                        output.append(out3)
+                        mask_input = torch.cat([mask_input, out3], 1)
+                    else:
+                        output.append(out[:, -1, :].unsqueeze(1))
+                        out_last = [out[:, -1, :]]
+                        pred = torch.stack(out_last, dim=1)
+                        mask_input = torch.cat([mask_input, pred], 1)
+                    
+                    in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(
+                        torch.bool)
+                    in_mask = in_mask.cuda()
+                    masks = torch.cat([masks, torch.full((masks.shape[0], 1), False, dtype=torch.bool)], dim=1)
+            
+                output = torch.cat(output, dim=1)
+                rel_ = output
+                rel_ = rel_.cuda()
+                rel_flat1 = []
+            
+            
                 for index, rel in zip(new_future_seq, rel_):
                     if len(index) == 0:
                         continue
                     rel_flat1.extend(rel[:len(index)])
-            else:
-                # Index has repetitions for each object in the future frame
-                # index - for a single frame - an object can occur multiple times
-                # repeat rel values for those indices where it repeats
-                for index, rel in zip(new_future_seq, rel_):
-                    if len(index) == 0:
-                        continue
-                    ob_frame_idx = entry["im_idx"][index]
-                    rel_temp = torch.zeros(len(index), rel.shape[1])
-                    # For each frame in ob_frame_idx, if the value repeats then add the relation value of previous frame
-                    k = 0  # index for rel
-                    for i, frame in enumerate(ob_frame_idx):
-                        if i == 0:
-                            rel_temp[i] = rel[k]
-                            k += 1
-                        elif frame == ob_frame_idx[i - 1]:
-                            rel_temp[i] = rel_temp[i - 1]
-                        else:
-                            rel_temp[i] = rel[k]
-                            k += 1
-                    
-                    rel_flat1.extend(rel_temp)
-            rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
-            rel_flat = torch.tensor(rel_flat1)
-            rel_flat = rel_flat.to('cuda:0')
-            # rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(future_seq,rel_)])
-            indices_flat = torch.cat(new_future_seq).unsqueeze(1).repeat(1, dsg_global_output.shape[1])
-            global_output = torch.zeros_like(dsg_global_output).to(dsg_global_output.device)
-            
-            temp = {"scatter_flag": 0}
-            try:
-                global_output.scatter_(0, indices_flat, rel_flat)
-            except RuntimeError:
+
+                rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
+                rel_flat = torch.tensor(rel_flat1)
+                rel_flat = rel_flat.to('cuda:0')
+                # rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(future_seq,rel_)])
+                indices_flat = torch.cat(new_future_seq).unsqueeze(1).repeat(1, dsg_global_output.shape[1])
+                global_output = torch.zeros_like(dsg_global_output).to(dsg_global_output.device)
+                
+                temp = {"scatter_flag": 0}
+                try:
+                    global_output.scatter_(0, indices_flat, rel_flat)
+                except RuntimeError:
+                    context += 1
+                    temp["scatter_flag"] = 1
+                    result[count] = temp
+                    count += 1
+                    continue
+                # pdb.set_trace()
+                
+                gb_output = global_output[context_len:context_len + future_len]
                 context += 1
-                temp["scatter_flag"] = 1
+                
+                temp["attention_distribution"] = self.a_rel_compress(gb_output)
+                temp["spatial_distribution"] = torch.sigmoid(self.s_rel_compress(gb_output))
+                temp["contacting_distribution"] = torch.sigmoid(self.c_rel_compress(gb_output))
+                temp["global_output"] = gb_output
+                temp["original"] = global_output
+                
                 result[count] = temp
                 count += 1
-                continue
-            # pdb.set_trace()
-            
-            gb_output = global_output[context_len:context_len + future_len]
-            context += 1
-            
-            temp["attention_distribution"] = self.a_rel_compress(gb_output)
-            temp["spatial_distribution"] = torch.sigmoid(self.s_rel_compress(gb_output))
-            temp["contacting_distribution"] = torch.sigmoid(self.c_rel_compress(gb_output))
-            temp["global_output"] = gb_output
-            temp["original"] = global_output
-            
-            result[count] = temp
-            count += 1
+
+            else:
+                output = []
+                latent_mask = torch.tensor(list(object_track.values()))
+                for i in range(future):
+                    out = self.anti_temporal_transformer(mask_input, src_key_padding_mask=masks.cuda(), mask=in_mask)
+                    if i == 0:
+                        mask2 = (~masks).int()
+                        ind_col = torch.sum(mask2, dim=1) - 1
+                        out2 = []
+                        for j, ind in enumerate(ind_col):
+                            out2.append(out[j, ind, :])
+                        out3 = torch.stack(out2)
+                        out3 = out3.unsqueeze(1)
+                        out4 = out3[latent_mask==1]
+                        output.append(out4)
+                        mask_input = torch.cat([mask_input, out3], 1)
+                    else:
+                        out2 = out[:, -1, :].unsqueeze(1)[latent_mask==1]
+                        output.append(out2)
+                        out_last = [out[:, -1, :]]
+                        pred = torch.stack(out_last, dim=1)
+                        mask_input = torch.cat([mask_input, pred], 1)
+                    
+                    in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(
+                        torch.bool)
+                    in_mask = in_mask.cuda()
+                    masks = torch.cat([masks, torch.full((masks.shape[0], 1), False, dtype=torch.bool)], dim=1)
+                
+                output = torch.cat(output, dim=1)
+                rel_ = output
+                rel_ = rel_.cuda()
+                row,column=rel_.shape[0],rel_.shape[1]
+                re=rel_.permute(1,0,2)
+                gb_output=re.reshape(row*column,re.shape[2])
+                if self.mode=='predcls':
+                    obj_lab = entry["labels"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]].unique()
+                    obj = [o.item() for o in obj_lab]
+                    num_obj = len(obj)
+                else: 
+                    obj_lab = entry["pred_labels"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]].unique()
+                    obj = [o.item() for o in obj_lab]
+                    num_obj = len(obj)
+                    
+                
+                im_idx = torch.tensor(list(range(future)))
+                im_idx = im_idx.repeat_interleave(num_obj)
+                
+                pred_lab = [1]
+                pred_lab.extend(obj)
+                pred_labels =[]
+                for i in range(future):
+                    pred_labels.extend(pred_lab)
+                pred_labels = torch.tensor(pred_labels)
+
+                pair_idx=[]
+                for i in range(1,num_obj+1):
+                    pair_idx.append([0,i])
+                pair_idx = torch.tensor(pair_idx)
+                p_i = pair_idx
+                for i in range(future-1):
+                    p_i = p_i+num_obj+1
+                    pair_idx = torch.cat([pair_idx,p_i])
+
+                if self.mode=='predcls':
+                    sc_human = entry["scores"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,0]][0]
+                    sc_obj = entry["scores"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]]
+                    lab_obj = entry["labels"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]]
+                else: 
+                    sc_human = entry["pred_scores"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,0]][0]
+                    sc_obj = entry["pred_scores"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]]
+                    lab_obj = entry["pred_labels"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]]
+
+                sc_obj1 = torch.zeros(num_obj).cuda()
+                for j,ob in enumerate(obj_lab):
+                    for i,ob2 in enumerate(lab_obj):
+                        if ob==ob2:
+                            sc_obj1[j]=max(sc_obj1[j],sc_obj[i])
+
+                
+                sc_human = sc_human.unsqueeze(0)
+                scores = torch.cat([sc_human,sc_obj1])
+                scores = scores.repeat(future)
+
+                box_human = entry["boxes"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,0]][0]
+                box_obj = entry["boxes"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]]
+
+                box_obj1=torch.zeros((num_obj,5)).cuda()
+                for j,ob in enumerate(obj_lab):
+                    for i,ob2 in enumerate(lab_obj):
+                        if ob==ob2:
+                            box_obj1[j]= box_obj[i]
+
+                box_human = box_human.unsqueeze(0)
+                boxes = torch.cat([box_human,box_obj1])
+                boxes = boxes.repeat(future,1)
+                
+                gb_output = gb_output.cuda()
+                temp={}
+                temp["attention_distribution"] = self.a_rel_compress(gb_output)
+                temp["spatial_distribution"] = torch.sigmoid(self.s_rel_compress(gb_output))
+                temp["contacting_distribution"] = torch.sigmoid(self.c_rel_compress(gb_output))
+                temp["global_output"] = gb_output
+                temp["pair_idx"] = pair_idx.cuda()
+                temp["im_idx"] = im_idx.cuda()
+                temp["labels"] = pred_labels.cuda()
+                temp["pred_labels"] = pred_labels.cuda()
+                temp["scores"] = scores.cuda()
+                temp["pred_scores"] = scores.cuda()
+                temp["boxes"] = boxes.cuda()
+
+                result[count] = temp
+                count += 1
+                context+=1
+
         entry["gen_attention_distribution"] = self.gen_a_rel_compress(dsg_global_output)
         entry["gen_spatial_distribution"] = torch.sigmoid(self.gen_s_rel_compress(dsg_global_output))
         entry["gen_contacting_distribution"] = torch.sigmoid(self.gen_c_rel_compress(dsg_global_output))
@@ -307,7 +423,259 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         
         return entry
     
-    # Use this only for long-term evaluation
+    # UNCOMMENT IT IF WE WANT TO REPEAT LATENTS
+    
+    # def forward_single_entry(self, context_fraction, entry):
+    #     """
+    #     Forward method for the baseline
+    #     :param context_fraction:
+    #     :param entry: Dictionary from object classifier
+    #     :return:
+    #     """
+    #     entry, rel_features, sequences, object_tracker,object_labels,dsg_global_output = self.process_entry(entry)
+        
+
+    #     """ ################# changes regarding forecasting #################### """
+    #     count = 0
+    #     total_frames = len(entry["im_idx"].unique())
+    #     context = min(int(math.ceil(context_fraction * total_frames)), total_frames - 1)
+    #     future = total_frames - context
+        
+    #     temp = {}
+    #     future_frame_start_id = entry["im_idx"].unique()[context]
+    #     prev_context_start_id = entry["im_idx"].unique()[context-1]
+        
+    #     if context + future > total_frames > context:
+    #         future = total_frames - context
+        
+    #     future_frame_end_id = entry["im_idx"].unique()[context + future - 1]
+        
+    #     context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
+    #     prev_context_end_idx = int(torch.where(entry["im_idx"] == prev_context_start_id)[0][0])
+    #     prev_context_idx = entry["im_idx"][:prev_context_end_idx]
+    #     context_idx = entry["im_idx"][:context_end_idx]
+    #     context_len = context_idx.shape[0]
+    #     prev_context_len = prev_context_idx.shape[0]
+        
+    #     future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1]) + 1
+    #     future_idx = entry["im_idx"][context_end_idx:future_end_idx]
+    #     future_len = future_idx.shape[0]
+        
+    #     context_seq = []
+    #     future_seq = []
+    #     new_future_seq = []
+    #     object_track = {}
+    #     object_lab = []
+    #     obj_ind = 0
+        
+    #     for i, s in enumerate(sequences):
+    #         context_index = s[(s < context_len)]
+    #         future_index = s[(s >= context_len) & (s < (context_len + future_len))]
+    #         future_seq.append(future_index)
+    #         if len(context_index) != 0:
+    #             object_track[obj_ind] = 0
+    #             object_lab.append(object_labels[i].item())
+    #             context_seq.append(context_index)
+    #             new_future_seq.append(future_index)
+    #             obj_ind+=1
+        
+    #     obj_ind = 0
+    #     for i, s in enumerate(context_seq):
+    #         prev_context_index = s[(s >= prev_context_len) & (s < context_len)]
+    #         if len(prev_context_index) != 0:
+    #             object_track[i] = 1
+
+    #     pos_index = []
+    #     for index in context_seq:
+    #         im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True, sorted=True)
+    #         counts = counts.tolist()
+    #         if im_idx.numel() == 0:
+    #             pos = torch.tensor(
+    #                 [torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
+    #         else:
+    #             pos = torch.cat([torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
+    #         pos_index.append(pos)
+        
+    #     sequence_features = pad_sequence([dsg_global_output[index] for index in context_seq], batch_first=True)
+    #     in_mask = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
+    #                               diagonal=0)).type(torch.bool)
+    #     in_mask = in_mask.cuda()
+    #     masks = (1 - pad_sequence([torch.ones(len(index)) for index in context_seq], batch_first=True)).bool()
+    #     pos_index = [torch.tensor(seq, dtype=torch.long) for seq in pos_index]
+    #     pos_index = pad_sequence(pos_index, batch_first=True) if self.mode == "sgdet" else None
+    #     sequence_features = self.positional_encoder(sequence_features, pos_index)
+    #     mask_input = sequence_features
+        
+    #     output = []
+    #     latent_mask = torch.tensor(list(object_track.values()))
+    #     for i in range(future):
+    #         out = self.anti_temporal_transformer(mask_input, src_key_padding_mask=masks.cuda(), mask=in_mask)
+    #         if i == 0:
+    #             mask2 = (~masks).int()
+    #             ind_col = torch.sum(mask2, dim=1) - 1
+    #             out2 = []
+    #             for j, ind in enumerate(ind_col):
+    #                 out2.append(out[j, ind, :])
+    #             out3 = torch.stack(out2)
+    #             out3 = out3.unsqueeze(1)
+    #             out4 = out3[latent_mask==1]
+    #             output.append(out4)
+    #             mask_input = torch.cat([mask_input, out3], 1)
+    #         else:
+    #             out2 = out[:, -1, :].unsqueeze(1)[latent_mask==1]
+    #             output.append(out2)
+    #             out_last = [out[:, -1, :]]
+    #             pred = torch.stack(out_last, dim=1)
+    #             mask_input = torch.cat([mask_input, pred], 1)
+            
+    #         in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(
+    #             torch.bool)
+    #         in_mask = in_mask.cuda()
+    #         masks = torch.cat([masks, torch.full((masks.shape[0], 1), False, dtype=torch.bool)], dim=1)
+        
+    #     output = torch.cat(output, dim=1)
+    #     rel_ = output
+    #     rel_ = rel_.cuda()
+    #     row,column=rel_.shape[0],rel_.shape[1]
+    #     re=rel_.permute(1,0,2)
+    #     g_o=re.reshape(row*column,re.shape[2])
+    #     if self.mode=='predcls':
+    #         obj_lab = entry["labels"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]].unique()
+    #         obj,obj_ind = entry["labels"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]].sort()
+    #         obj = [o.item() for o in obj]
+    #         num_obj_unique = len(obj_lab)
+    #         num_obj = len(obj)
+    #     else: 
+    #         obj_lab = entry["pred_labels"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]].unique()
+    #         obj,obj_ind = entry["pred_labels"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]].sort()
+    #         obj = [o.item() for o in obj]
+    #         num_obj_unique = len(obj_lab)
+    #         num_obj = len(obj)
+            
+
+    #     gb_output = torch.zeros(len(obj)*column,re.shape[2])
+    #     obj_dict = {}
+    #     for o in obj:
+    #         if o not in obj_dict:
+    #             obj_dict[o]=1
+    #         else:
+    #             obj_dict[o]+=1
+
+    #     start = 0
+    #     end = num_obj_unique
+    #     obj_count = list(obj_dict.values())
+    #     k=0
+    #     for i in range(future):
+    #         gb_out = g_o[start:end]
+    #         for j in range(gb_out.shape[0]):
+    #             for l in range(obj_count[j]):
+    #                 gb_output[k] = gb_out[j]
+    #                 k+=1
+    #         start+=num_obj_unique
+    #         end+=num_obj_unique
+        
+    #     im_idx = torch.tensor(list(range(future)))
+    #     im_idx = im_idx.repeat_interleave(num_obj)
+        
+    #     pred_lab = [1]
+    #     pred_lab.extend(obj)
+    #     pred_labels =[]
+    #     for i in range(future):
+    #         pred_labels.extend(pred_lab)
+    #     pred_labels = torch.tensor(pred_labels)
+
+    #     pair_idx=[]
+    #     for i in range(1,num_obj+1):
+    #         pair_idx.append([0,i])
+    #     pair_idx = torch.tensor(pair_idx)
+    #     p_i = pair_idx
+    #     for i in range(future-1):
+    #         p_i = p_i+num_obj+1
+    #         pair_idx = torch.cat([pair_idx,p_i])
+
+    #     if self.mode=='predcls':
+    #         sc_human = entry["scores"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,0]][0]
+    #         sc_obj = entry["scores"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]]
+    #     else: 
+    #         sc_human = entry["pred_scores"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,0]][0]
+    #         sc_obj = entry["pred_scores"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]]
+        
+    #     sc_obj = torch.index_select(sc_obj,0,torch.tensor(obj_ind))
+    #     sc_human = sc_human.unsqueeze(0)
+    #     scores = torch.cat([sc_human,sc_obj])
+    #     scores = scores.repeat(future)
+
+    #     box_human = entry["boxes"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,0]][0]
+    #     box_obj = entry["boxes"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]]
+
+    #     box_obj = torch.index_select(box_obj,0,torch.tensor(obj_ind))
+    #     box_human = box_human.unsqueeze(0)
+    #     boxes = torch.cat([box_human,box_obj])
+    #     boxes = boxes.repeat(future,1)
+        
+        
+
+    #     # rel_flat1 = []
+        
+    #     # for index, rel in zip(new_future_seq, rel_):
+    #     #     if len(index) == 0:
+    #     #         continue
+    #     #     ob_frame_idx = entry["im_idx"][index]
+    #     #     rel_temp = torch.zeros(len(index), rel.shape[1])
+    #     #     # For each frame in ob_frame_idx, if the value repeats then add the relation value of previous frame
+    #     #     k = 0  # index for rel
+    #     #     for i, frame in enumerate(ob_frame_idx):
+    #     #         if i == 0:
+    #     #             rel_temp[i] = rel[k]
+    #     #             k += 1
+    #     #         elif frame == ob_frame_idx[i - 1]:
+    #     #             rel_temp[i] = rel_temp[i - 1]
+    #     #         else:
+    #     #             rel_temp[i] = rel[k]
+    #     #             k += 1
+            
+    #     #     rel_flat1.extend(rel_temp)
+        
+    #     # rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
+    #     # rel_flat = torch.tensor(rel_flat1)
+    #     # rel_flat = rel_flat.to('cuda:0')
+    #     # # rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(future_seq,rel_)])
+    #     # indices_flat = torch.cat(new_future_seq).unsqueeze(1).repeat(1, dsg_global_output.shape[1])
+    #     # global_output = torch.zeros_like(dsg_global_output).to(dsg_global_output.device)
+        
+    #     # temp = {"scatter_flag": 0}
+    #     # try:
+    #     #     global_output.scatter_(0, indices_flat, rel_flat)
+    #     # except RuntimeError:
+    #     #     context += 1
+    #     #     temp["scatter_flag"] = 1
+    #     #     result[count] = temp
+    #     #     entry["output"] = result
+    #     #     return entry
+    #     # # pdb.set_trace()
+        
+    #     gb_output = gb_output.cuda()
+    #     temp["attention_distribution"] = self.a_rel_compress(gb_output)
+    #     temp["spatial_distribution"] = torch.sigmoid(self.s_rel_compress(gb_output))
+    #     temp["contacting_distribution"] = torch.sigmoid(self.c_rel_compress(gb_output))
+    #     temp["global_output"] = gb_output
+    #     temp["pair_idx"] = pair_idx.cuda()
+    #     temp["im_idx"] = im_idx.cuda()
+    #     temp["labels"] = pred_labels.cuda()
+    #     temp["pred_labels"] = pred_labels.cuda()
+    #     temp["scores"] = scores.cuda()
+    #     temp["pred_scores"] = scores.cuda()
+    #     temp["boxes"] = boxes.cuda()
+        
+    #     # result[count] = temp
+    #     # entry["gen_attention_distribution"] = self.gen_a_rel_compress(dsg_global_output)
+    #     # entry["gen_spatial_distribution"] = torch.sigmoid(self.gen_s_rel_compress(dsg_global_output))
+    #     # entry["gen_contacting_distribution"] = torch.sigmoid(self.gen_c_rel_compress(dsg_global_output))
+    #     # entry["output"] = result
+        
+    #     return temp
+
+
     def forward_single_entry(self, context_fraction, entry):
         """
         Forward method for the baseline
@@ -315,16 +683,18 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         :param entry: Dictionary from object classifier
         :return:
         """
-        entry, rel_features, sequences, dsg_global_output = self.process_entry(entry)
+        entry, rel_features, sequences, object_tracker,object_labels,dsg_global_output = self.process_entry(entry)
         
+
         """ ################# changes regarding forecasting #################### """
         count = 0
         total_frames = len(entry["im_idx"].unique())
         context = min(int(math.ceil(context_fraction * total_frames)), total_frames - 1)
         future = total_frames - context
         
-        result = {}
+        temp = {}
         future_frame_start_id = entry["im_idx"].unique()[context]
+        prev_context_start_id = entry["im_idx"].unique()[context-1]
         
         if context + future > total_frames > context:
             future = total_frames - context
@@ -332,8 +702,11 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         future_frame_end_id = entry["im_idx"].unique()[context + future - 1]
         
         context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
+        prev_context_end_idx = int(torch.where(entry["im_idx"] == prev_context_start_id)[0][0])
+        prev_context_idx = entry["im_idx"][:prev_context_end_idx]
         context_idx = entry["im_idx"][:context_end_idx]
         context_len = context_idx.shape[0]
+        prev_context_len = prev_context_idx.shape[0]
         
         future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1]) + 1
         future_idx = entry["im_idx"][context_end_idx:future_end_idx]
@@ -342,14 +715,27 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         context_seq = []
         future_seq = []
         new_future_seq = []
+        object_track = {}
+        object_lab = []
+        obj_ind = 0
+        
         for i, s in enumerate(sequences):
             context_index = s[(s < context_len)]
             future_index = s[(s >= context_len) & (s < (context_len + future_len))]
             future_seq.append(future_index)
             if len(context_index) != 0:
+                object_track[obj_ind] = 0
+                object_lab.append(object_labels[i].item())
                 context_seq.append(context_index)
                 new_future_seq.append(future_index)
+                obj_ind+=1
         
+        obj_ind = 0
+        for i, s in enumerate(context_seq):
+            prev_context_index = s[(s >= prev_context_len) & (s < context_len)]
+            if len(prev_context_index) != 0:
+                object_track[i] = 1
+
         pos_index = []
         for index in context_seq:
             im_idx, counts = torch.unique(entry["pair_idx"][index][:, 0].view(-1), return_counts=True, sorted=True)
@@ -372,6 +758,7 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         mask_input = sequence_features
         
         output = []
+        latent_mask = torch.tensor(list(object_track.values()))
         for i in range(future):
             out = self.anti_temporal_transformer(mask_input, src_key_padding_mask=masks.cuda(), mask=in_mask)
             if i == 0:
@@ -382,10 +769,12 @@ class BaselineWithAnticipationGenLoss(nn.Module):
                     out2.append(out[j, ind, :])
                 out3 = torch.stack(out2)
                 out3 = out3.unsqueeze(1)
-                output.append(out3)
+                out4 = out3[latent_mask==1]
+                output.append(out4)
                 mask_input = torch.cat([mask_input, out3], 1)
             else:
-                output.append(out[:, -1, :].unsqueeze(1))
+                out2 = out[:, -1, :].unsqueeze(1)[latent_mask==1]
+                output.append(out2)
                 out_last = [out[:, -1, :]]
                 pred = torch.stack(out_last, dim=1)
                 mask_input = torch.cat([mask_input, pred], 1)
@@ -398,57 +787,82 @@ class BaselineWithAnticipationGenLoss(nn.Module):
         output = torch.cat(output, dim=1)
         rel_ = output
         rel_ = rel_.cuda()
-        rel_flat1 = []
-        
-        for index, rel in zip(new_future_seq, rel_):
-            if len(index) == 0:
-                continue
-            ob_frame_idx = entry["im_idx"][index]
-            rel_temp = torch.zeros(len(index), rel.shape[1])
-            # For each frame in ob_frame_idx, if the value repeats then add the relation value of previous frame
-            k = 0  # index for rel
-            for i, frame in enumerate(ob_frame_idx):
-                if i == 0:
-                    rel_temp[i] = rel[k]
-                    k += 1
-                elif frame == ob_frame_idx[i - 1]:
-                    rel_temp[i] = rel_temp[i - 1]
-                else:
-                    rel_temp[i] = rel[k]
-                    k += 1
+        row,column=rel_.shape[0],rel_.shape[1]
+        re=rel_.permute(1,0,2)
+        gb_output=re.reshape(row*column,re.shape[2])
+        if self.mode=='predcls':
+            obj_lab = entry["labels"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]].unique()
+            obj = [o.item() for o in obj_lab]
+            num_obj = len(obj)
+        else: 
+            obj_lab = entry["pred_labels"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]].unique()
+            obj = [o.item() for o in obj_lab]
+            num_obj = len(obj)
             
-            rel_flat1.extend(rel_temp)
         
-        rel_flat1 = [tensor.tolist() for tensor in rel_flat1]
-        rel_flat = torch.tensor(rel_flat1)
-        rel_flat = rel_flat.to('cuda:0')
-        # rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(future_seq,rel_)])
-        indices_flat = torch.cat(new_future_seq).unsqueeze(1).repeat(1, dsg_global_output.shape[1])
-        global_output = torch.zeros_like(dsg_global_output).to(dsg_global_output.device)
+        im_idx = torch.tensor(list(range(future)))
+        im_idx = im_idx.repeat_interleave(num_obj)
         
-        temp = {"scatter_flag": 0}
-        try:
-            global_output.scatter_(0, indices_flat, rel_flat)
-        except RuntimeError:
-            context += 1
-            temp["scatter_flag"] = 1
-            result[count] = temp
-            entry["output"] = result
-            return entry
-        # pdb.set_trace()
+        pred_lab = [1]
+        pred_lab.extend(obj)
+        pred_labels =[]
+        for i in range(future):
+            pred_labels.extend(pred_lab)
+        pred_labels = torch.tensor(pred_labels)
+
+        pair_idx=[]
+        for i in range(1,num_obj+1):
+            pair_idx.append([0,i])
+        pair_idx = torch.tensor(pair_idx)
+        p_i = pair_idx
+        for i in range(future-1):
+            p_i = p_i+num_obj+1
+            pair_idx = torch.cat([pair_idx,p_i])
+
+        if self.mode=='predcls':
+            sc_human = entry["scores"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,0]][0]
+            sc_obj = entry["scores"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]]
+            lab_obj = entry["labels"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]]
+        else: 
+            sc_human = entry["pred_scores"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,0]][0]
+            sc_obj = entry["pred_scores"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]]
+            lab_obj = entry["pred_labels"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]]
+
+        sc_obj1 = torch.zeros(num_obj).cuda()
+        for j,ob in enumerate(obj_lab):
+            for i,ob2 in enumerate(lab_obj):
+                if ob==ob2:
+                    sc_obj1[j]=max(sc_obj1[j],sc_obj[i])
+
         
-        gb_output = global_output[context_len:context_len + future_len]
+        sc_human = sc_human.unsqueeze(0)
+        scores = torch.cat([sc_human,sc_obj1])
+        scores = scores.repeat(future)
+
+        box_human = entry["boxes"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,0]][0]
+        box_obj = entry["boxes"][entry["pair_idx"][prev_context_end_idx:context_end_idx][:,1]]
+
+        box_obj1=torch.zeros((num_obj,5)).cuda()
+        for j,ob in enumerate(obj_lab):
+            for i,ob2 in enumerate(lab_obj):
+                if ob==ob2:
+                    box_obj1[j]= box_obj[i]
+
+        box_human = box_human.unsqueeze(0)
+        boxes = torch.cat([box_human,box_obj1])
+        boxes = boxes.repeat(future,1)
         
+        gb_output = gb_output.cuda()
         temp["attention_distribution"] = self.a_rel_compress(gb_output)
         temp["spatial_distribution"] = torch.sigmoid(self.s_rel_compress(gb_output))
         temp["contacting_distribution"] = torch.sigmoid(self.c_rel_compress(gb_output))
         temp["global_output"] = gb_output
-        temp["original"] = global_output
+        temp["pair_idx"] = pair_idx.cuda()
+        temp["im_idx"] = im_idx.cuda()
+        temp["labels"] = pred_labels.cuda()
+        temp["pred_labels"] = pred_labels.cuda()
+        temp["scores"] = scores.cuda()
+        temp["pred_scores"] = scores.cuda()
+        temp["boxes"] = boxes.cuda()
         
-        result[count] = temp
-        entry["gen_attention_distribution"] = self.gen_a_rel_compress(dsg_global_output)
-        entry["gen_spatial_distribution"] = torch.sigmoid(self.gen_s_rel_compress(dsg_global_output))
-        entry["gen_contacting_distribution"] = torch.sigmoid(self.gen_c_rel_compress(dsg_global_output))
-        entry["output"] = result
-        
-        return entry
+        return temp

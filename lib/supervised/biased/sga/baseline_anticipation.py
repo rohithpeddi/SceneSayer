@@ -6,6 +6,7 @@ from torch.nn.utils.rnn import pad_sequence
 
 from lib.supervised.biased.sga.blocks import EncoderLayer, Encoder, PositionalEncoding, ObjectClassifierMLP
 from lib.word_vectors import obj_edge_vectors
+import pdb
 
 
 class BaselineWithAnticipation(nn.Module):
@@ -201,12 +202,17 @@ class BaselineWithAnticipation(nn.Module):
                     out3 = out3.unsqueeze(1)
                     output.append(out3)
                     mask_input = torch.cat([mask_input, out3], 1)
+                    
                 else:
                     output.append(out[:, -1, :].unsqueeze(1))
                     out_last = [out[:, -1, :]]
                     pred = torch.stack(out_last, dim=1)
                     mask_input = torch.cat([mask_input, pred], 1)
 
+                max_values = torch.max(pos_index, dim=1)[0] + 1
+                max_values = max_values.unsqueeze(1)
+                pos_index = torch.cat((pos_index,max_values),dim=1)
+                mask_input = self.positional_encoder(mask_input, pos_index)
                 in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(
                     torch.bool)
                 in_mask = in_mask.cuda()
@@ -273,7 +279,6 @@ class BaselineWithAnticipation(nn.Module):
                 result[count] = temp
                 count += 1
                 continue
-            # pdb.set_trace()
 
             gb_output = global_output[context_len:context_len + future_len]
             context += 1
@@ -282,6 +287,7 @@ class BaselineWithAnticipation(nn.Module):
             temp["contacting_distribution"] = torch.sigmoid(self.c_rel_compress(gb_output))
             temp["global_output"] = gb_output
             temp["original"] = global_output
+            temp["spatial_latents"] = rel_features[context_len:context_len + future_len]
             result[count] = temp
             count += 1
         entry["output"] = result
@@ -369,7 +375,10 @@ class BaselineWithAnticipation(nn.Module):
                 out_last = [out[:, -1, :]]
                 pred = torch.stack(out_last, dim=1)
                 mask_input = torch.cat([mask_input, pred], 1)
-
+            max_values = torch.max(pos_index, dim=1)[0] + 1
+            max_values = max_values.unsqueeze(1)
+            pos_index = torch.cat((pos_index,max_values),dim=1)
+            mask_input = self.positional_encoder(mask_input, pos_index)
             in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(
                 torch.bool)
             in_mask = in_mask.cuda()
@@ -415,7 +424,7 @@ class BaselineWithAnticipation(nn.Module):
             result[count] = temp
             entry["output"] = result
             return entry
-        # pdb.set_trace()
+        
 
         gb_output = global_output[context_len:context_len + future_len]
 
@@ -424,7 +433,7 @@ class BaselineWithAnticipation(nn.Module):
         temp["contacting_distribution"] = torch.sigmoid(self.c_rel_compress(gb_output))
         temp["global_output"] = gb_output
         temp["original"] = global_output
-
+        temp["spatial_latents"] = rel_features[context_len:context_len + future_len]
         result[count] = temp
         entry["output"] = result
 

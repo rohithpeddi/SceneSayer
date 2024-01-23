@@ -5,15 +5,15 @@ import time
 import numpy as np
 import pandas as pd
 import torch
-
+import pdb
 from lib.object_detector import detector
-from lib.supervised.biased.sga.baseline_anticipation import BaselineWithAnticipation
+from lib.supervised.biased.sga.baseline_anticipation_old import BaselineWithAnticipation
 from train_base import fetch_train_basic_config, prepare_optimizer, save_model, get_sequence_no_tracking, \
-    fetch_loss_functions
+    fetch_transformer_loss_functions
 
 
 def process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_device, dataloader_train):
-    bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_loss_functions()
+    bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_transformer_loss_functions()
     start_time = time.time()
     start = 0
     context = conf.baseline_context
@@ -23,13 +23,14 @@ def process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_devic
 
     get_sequence_no_tracking(entry, conf.mode)
     pred = model(entry, conf.baseline_context, conf.baseline_future)
-    losses = {}
+    losses={}
     if conf.mode == 'sgcls' or conf.mode == 'sgdet':
         losses['object_loss'] = ce_loss(pred['distribution'], pred['labels']).mean()
 
     losses["attention_relation_loss"] = 0
     losses["spatial_relation_loss"] = 0
     losses["contact_relation_loss"] = 0
+    losses["anticipated_latent_loss"] = 0
 
     context = min(context, total_frames - 1)
     future = min(future, total_frames - context)
@@ -121,6 +122,10 @@ def process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_devic
                 losses["spatial_relation_loss"] += (sp_loss * weight).mean()
                 con_loss = bce_loss(contact_distribution, contact_label)
                 losses["contact_relation_loss"] += (con_loss * weight).mean()
+            
+            latent_loss = abs_loss(pred["output"][count]["global_output"],pred["output"][count]["spatial_latents"]).mean(dim=1)
+            losses["anticipated_latent_loss"] += (latent_loss * weight).mean() 
+            
             context += 1
             count += 1
         else:
@@ -130,6 +135,7 @@ def process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_devic
     losses["attention_relation_loss"] = losses["attention_relation_loss"] / count
     losses["spatial_relation_loss"] = losses["spatial_relation_loss"] / count
     losses["contact_relation_loss"] = losses["contact_relation_loss"] / count
+    losses["anticipated_latent_loss"] = losses["anticipated_latent_loss"]/count
     optimizer.zero_grad()
     loss = sum(losses.values())
     loss.backward()
@@ -139,8 +145,8 @@ def process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_devic
     
     if num % 50 == 0:
         print("epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(epoch, num, len(dataloader_train), loss.item()))
-    
-    tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
+
+    tr.append(pd.Series({x: y.item() if isinstance(y,torch.Tensor) else y for x, y in losses.items()}))
     if num % 1000 == 0 and num >= 1000:
         time_per_batch = (time.time() - start_time) / 1000
         print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, num, len(dataloader_train),
@@ -331,13 +337,13 @@ def main():
     if conf.ckpt:
         ckpt = torch.load(conf.ckpt, map_location=gpu_device)
         model.load_state_dict(ckpt[f'{method_name}_state_dict'], strict=False)
-        print(f"Loaded model from checkpoint {conf.ckpt}")
+        print(f"Loaded model from checkpoint {ckpt}")
 
     object_detector = load_object_detector(conf, gpu_device, ag_train_data)
     optimizer, scheduler = prepare_optimizer(conf, model)
 
     tr = []
-    for epoch in range(conf.nepoch):
+    for epoch in range(int(conf.nepoch)):
         print("Begin epoch {:d}".format(epoch))
         assert conf.use_raw_data == True
         print('Training using raw data', flush=True)
@@ -383,4 +389,4 @@ def main():
 if __name__ == '__main__':
     main()
 
-# python train_baseline.py -mode sgdet -method_name baseline_so -use_raw_data -baseline_future 3
+# python train_baseline.py -use_raw_data -mode sgdet -baseline_future 3  -save_path /home/cse/msr/csy227518/scratch/SGG/SGG_task/baseline/sgdet_f3/ -nepoch 5 -method_name baseline_so -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/

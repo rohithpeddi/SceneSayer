@@ -123,7 +123,7 @@ def process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_devic
                 con_loss = bce_loss(contact_distribution, contact_label)
                 losses["contact_relation_loss"] += (con_loss * weight).mean()
             
-            latent_loss = abs_loss(pred["output"][count]["global_output"],pred["output"][count]["spatial_latents"]).mean(dim=1)
+            latent_loss = abs_loss(pred["output"][count]["global_output"],pred["output"][count]["spatial_latents"])
             losses["anticipated_latent_loss"] += (latent_loss * weight).mean() 
             
             context += 1

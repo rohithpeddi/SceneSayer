@@ -400,13 +400,13 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 	db_service = FirebaseService()
 	
-	remove_de_predcls_results()
+	# remove_de_predcls_results()
 
 # process_misread_results()
 
 # process_results()
 # compile_results()
 # print_results()
-# 	model_evaluation_check_anticipation()
+	model_evaluation_check_anticipation()
 
 	# store_versioned_results(3)

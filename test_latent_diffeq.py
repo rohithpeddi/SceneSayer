@@ -197,7 +197,7 @@ def generate_qualitative_results():
     matcher = HungarianMatcher(0.5, 1, 1, 0.5)
     matcher.eval()
 
-    video_id_list = ["0A8CF", "21F9H", "X95D0", "M18XP",  "LUQWY", "QE4YE", "ENOLD"]
+    video_id_list = ["0A8CF", "21F9H", "X95D0", "M18XP", "LUQWY", "QE4YE", "ENOLD"]
     context_fraction_list = [0.3, 0.5, 0.7, 0.9]
     with torch.no_grad():
         for context_fraction in context_fraction_list:

@@ -209,10 +209,11 @@ class BaselineWithAnticipation(nn.Module):
                     pred = torch.stack(out_last, dim=1)
                     mask_input = torch.cat([mask_input, pred], 1)
 
-                max_values = torch.max(pos_index, dim=1)[0] + 1
-                max_values = max_values.unsqueeze(1)
-                pos_index = torch.cat((pos_index,max_values),dim=1)
-                mask_input = self.positional_encoder(mask_input, pos_index)
+                if pos_index is not None:
+                    max_values = torch.max(pos_index, dim=1)[0] + 1
+                    max_values = max_values.unsqueeze(1)
+                    pos_index = torch.cat((pos_index,max_values),dim=1)
+                    mask_input = self.positional_encoder(mask_input, pos_index)
                 in_mask = (1 - torch.tril(torch.ones(mask_input.shape[1], mask_input.shape[1]), diagonal=0)).type(
                     torch.bool)
                 in_mask = in_mask.cuda()

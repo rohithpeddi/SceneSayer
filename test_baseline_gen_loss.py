@@ -3,7 +3,6 @@ import math
 import os
 
 import torch
-import pdb
 
 from lib.object_detector import detector
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
@@ -19,24 +18,11 @@ def evaluate_model_context_fraction(model, entry, gt_annotation, conf, context_f
 	
 	pred = model.forward_single_entry(context_fraction=context_fraction, entry=entry)
 	
-	count = 0
-	total_frames = len(entry["im_idx"].unique())
-	context = min(int(math.ceil(context_fraction * total_frames)), total_frames - 1)
-	future = total_frames - context
+	num_tf = len(entry["im_idx"].unique())
+	num_cf = min(int(math.ceil(context_fraction * num_tf)), num_tf - 1)
+	num_ff = num_tf - num_cf
 	
-	future_frame_start_id = entry["im_idx"].unique()[context]
-	prev_con = entry["im_idx"].unique()[context - 1]
-	future_frame_end_id = entry["im_idx"].unique()[context + future - 1]
-	
-	context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
-	context_idx = entry["im_idx"][:context_end_idx]
-	context_len = context_idx.shape[0]
-	
-	future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1]) + 1
-	future_idx = entry["im_idx"][context_end_idx:future_end_idx]
-	future_len = future_idx.shape[0]
-	
-	gt_future = gt_annotation[context: context + future]
+	gt_future = gt_annotation[num_cf: num_cf + num_ff]
 	
 	evaluators = percentage_evaluators[context_fraction]
 	
@@ -49,52 +35,23 @@ def evaluate_model_context_fraction(model, entry, gt_annotation, conf, context_f
 def evaluate_model_future_frames(model, entry, gt_annotation, conf, num_future_frames, future_evaluators):
 	get_sequence_no_tracking(entry, conf.mode)
 	pred = model(entry, conf.baseline_context, num_future_frames)
-	start = 0
+	
 	count = 0
-	context = conf.baseline_context
-	future = num_future_frames
-	total_frames = len(entry["im_idx"].unique())
+	num_cf = conf.baseline_context
+	num_ff = num_future_frames
 	
-	context = min(context, total_frames - 1)
-	future = min(future, total_frames - context)
-	
-	if (start + context + 1 > total_frames):
-		while (start + context + 1 != total_frames and context > 1):
-			context -= 1
-		future = 1
-	
-	if (start + context + future > total_frames > start + context):
-		future = total_frames - (start + context)
-	while start + context + 1 <= total_frames:
-		
-		future_frame_start_id = entry["im_idx"].unique()[context]
-		prev_con = entry["im_idx"].unique()[context - 1]
-		
-		if (start + context + future > total_frames > start + context):
-			future = total_frames - (start + context)
-		
-		future_frame_end_id = entry["im_idx"].unique()[context + future - 1]
-		
-		context_end_idx = int(torch.where(entry["im_idx"] == future_frame_start_id)[0][0])
-		context_idx = entry["im_idx"][:context_end_idx]
-		context_len = context_idx.shape[0]
-		
-		future_end_idx = int(torch.where(entry["im_idx"] == future_frame_end_id)[0][-1]) + 1
-		future_idx = entry["im_idx"][context_end_idx:future_end_idx]
-		future_len = future_idx.shape[0]
-		
-		gt_future = gt_annotation[start + context:start + context + future]
-		
-		vid_no = gt_annotation[0][0]["frame"].split('.')[0]
-		
+	num_tf = len(entry["im_idx"].unique())
+	num_cf = min(num_cf, num_tf - 1)
+	num_ff = min(num_ff, num_tf - num_cf)
+	while num_cf + 1 <= num_tf:
+		gt_future = gt_annotation[num_cf:num_cf + num_ff]
 		pred_dict = pred["output"][count]
-		
 		evaluators = future_evaluators[num_future_frames]
 		evaluators[0].evaluate_scene_graph(gt_future, pred_dict)
 		evaluators[1].evaluate_scene_graph(gt_future, pred_dict)
 		evaluators[2].evaluate_scene_graph(gt_future, pred_dict)
 		count += 1
-		context += 1
+		num_cf += 1
 
 
 def load_model(conf, dataset, gpu_device, model_name):

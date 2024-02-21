@@ -4,11 +4,12 @@ import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
 
+from lib.supervised.biased.sga.base_transformer import BaseTransformer
 from lib.supervised.biased.sga.blocks import EncoderLayer, Encoder, PositionalEncoding, ObjectClassifierMLP
 from lib.word_vectors import obj_edge_vectors
 
 
-class BaselineWithAnticipation(nn.Module):
+class BaselineWithAnticipation(BaseTransformer):
 	
 	def __init__(
 			self,
@@ -64,71 +65,11 @@ class BaselineWithAnticipation(nn.Module):
 		
 		# temporal encoder
 		temporal_encoder = EncoderLayer(d_model=d_model, dim_feedforward=2048, nhead=8, batch_first=True)
-		self.anticipation_temporal_transformer = Encoder(temporal_encoder, num_layers=3)
+		self.anti_temporal_transformer = Encoder(temporal_encoder, num_layers=3)
 		
 		self.a_rel_compress = nn.Linear(d_model, self.attention_class_num)
 		self.s_rel_compress = nn.Linear(d_model, self.spatial_class_num)
 		self.c_rel_compress = nn.Linear(d_model, self.contact_class_num)
-	
-	def generate_local_predicate_embeddings(self, entry):
-		entry = self.object_classifier(entry)
-		
-		# visual part
-		subj_rep = entry['features'][entry['pair_idx'][:, 0]]
-		subj_rep = self.subj_fc(subj_rep)
-		obj_rep = entry['features'][entry['pair_idx'][:, 1]]
-		obj_rep = self.obj_fc(obj_rep)
-		vr = self.union_func1(entry['union_feat']) + self.conv(entry['spatial_masks'])
-		vr = self.vr_fc(vr.view(-1, 256 * 7 * 7))
-		x_visual = torch.cat((subj_rep, obj_rep, vr), 1)
-		
-		# semantic part
-		subj_class = entry['pred_labels'][entry['pair_idx'][:, 0]]
-		obj_class = entry['pred_labels'][entry['pair_idx'][:, 1]]
-		subj_emb = self.obj_embed(subj_class)
-		obj_emb = self.obj_embed2(obj_class)
-		x_semantic = torch.cat((subj_emb, obj_emb), 1)
-		rel_features = torch.cat((x_visual, x_semantic), dim=1)
-		
-		# Spatial-Temporal Transformer
-		# spatial message passing
-		# im_indices -> centre coordinate of all objects in a video
-		frames = []
-		im_indices = entry["boxes"][entry["pair_idx"][:, 1], 0]
-		for l in im_indices.unique():
-			frames.append(torch.where(im_indices == l)[0])
-		frame_features = pad_sequence([rel_features[index] for index in frames], batch_first=True)
-		masks = (1 - pad_sequence([torch.ones(len(index)) for index in frames], batch_first=True)).bool()
-		rel_ = self.spatial_transformer(frame_features, src_key_padding_mask=masks.cuda())
-		rel_features = torch.cat([rel_[i, :len(index)] for i, index in enumerate(frames)])
-		# temporal message passing
-		sequences = []
-		for l in obj_class.unique():
-			k = torch.where(obj_class.view(-1) == l)[0]
-			if len(k) > 0:
-				sequences.append(k)
-		
-		return entry, rel_features, sequences
-	
-	def fetch_initial_positional_encoding(self, obj_seqs_cf, entry):
-		positional_encoding = []
-		for obj_seq_cf in obj_seqs_cf:
-			im_idx, counts = torch.unique(entry["pair_idx"][obj_seq_cf][:, 0].view(-1), return_counts=True,
-			                              sorted=True)
-			counts = counts.tolist()
-			pos = torch.cat([torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])
-			positional_encoding.append(pos)
-		
-		positional_encoding = [torch.tensor(seq, dtype=torch.long) for seq in positional_encoding]
-		positional_encoding = pad_sequence(positional_encoding, batch_first=True) if self.mode == "sgdet" else None
-		return positional_encoding
-	
-	def update_positional_encoding(self, positional_encoding):
-		if positional_encoding is not None:
-			max_values = torch.max(positional_encoding, dim=1)[0] + 1
-			max_values = max_values.unsqueeze(1)
-			positional_encoding = torch.cat((positional_encoding, max_values), dim=1)
-		return positional_encoding
 	
 	def generate_future_frame_embeddings(self, entry, num_cf, num_ff, obj_seqs_tf, so_rels_feats_tf):
 		ff_start_id = entry["im_idx"].unique()[num_cf]
@@ -158,12 +99,12 @@ class BaselineWithAnticipation(nn.Module):
 		causal_mask = causal_mask.cuda()
 		masks = (1 - pad_sequence([torch.ones(len(index)) for index in obj_seqs_cf], batch_first=True)).bool()
 		
-		positional_encoding = self.fetch_initial_positional_encoding(obj_seqs_cf, entry)
+		positional_encoding = self.fetch_positional_encoding_for_obj_seqs(obj_seqs_cf, entry)
 		so_seqs_feats_cf = self.positional_encoder(so_seqs_feats_cf, positional_encoding)
 		
 		so_seqs_feats_ff = []
 		for i in range(num_ff):
-			so_seqs_feats_cf_temp_attd = self.anticipation_temporal_transformer(
+			so_seqs_feats_cf_temp_attd = self.anti_temporal_transformer(
 				so_seqs_feats_cf,
 				src_key_padding_mask=masks.cuda(),
 				mask=causal_mask
@@ -241,7 +182,7 @@ class BaselineWithAnticipation(nn.Module):
         :param num_ff: Number of next frames to anticipate
         :return:
         """
-		entry, so_rels_feats_tf, obj_seqs_tf = self.generate_local_predicate_embeddings(entry)
+		entry, so_rels_feats_tf, obj_seqs_tf = self.generate_spatial_predicate_embeddings(entry)
 		
 		count = 0
 		result = {}
@@ -283,7 +224,7 @@ class BaselineWithAnticipation(nn.Module):
         :param entry: Dictionary from object classifier
         :return:
         """
-		entry, so_rels_feats_tf, obj_seqs_tf = self.generate_local_predicate_embeddings(entry)
+		entry, so_rels_feats_tf, obj_seqs_tf = self.generate_spatial_predicate_embeddings(entry)
 		
 		result = {}
 		count = 0

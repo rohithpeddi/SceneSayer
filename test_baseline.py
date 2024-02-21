@@ -35,109 +35,103 @@ def fetch_model_context_pred_dict(model, entry, gt_annotation, conf, context_fra
 	ff_end_id = entry["im_idx"].unique()[num_cf + num_ff - 1]
 	
 	objects_ff_start_id = int(torch.where(entry["im_idx"] == ff_start_id)[0][0])
+	boxes_ff_start_id = torch.where(entry["boxes"][:, 0] == ff_start_id)[0][0]
+	boxes_cf_last_start_id = torch.where(entry["boxes"][:, 0] == cf_end_id)[0][0]
+	
+	# Add +1 for all end ids to include the last item when a range is provided
 	objects_ff_end_id = int(torch.where(entry["im_idx"] == ff_end_id)[0][-1]) + 1
+	boxes_ff_end_id = torch.where(entry["boxes"][:, 0] == ff_end_id)[0][-1] + 1
+	
 	objects_ff = entry["im_idx"][objects_ff_start_id:objects_ff_end_id]
+	pred_label_dict = pred["labels"] if conf.mode == 'predcls' else pred["pred_labels"]
+	
+	pred_labels_set_cf_last = set(pred_label_dict[boxes_cf_last_start_id:boxes_ff_start_id].tolist())
+	pred_labels_set_ff = set(pred_label_dict[boxes_ff_start_id:boxes_ff_end_id].tolist())
+	pred_labels_set_cf = set(pred_label_dict[:boxes_ff_start_id].tolist())
+	
+	# ---------------------------------------------------------------------------
+	# Remove objects and pairs that are not in the future frame and only include those that
+	# are present in the last frames of the given context
+	
+	boxes_mask_ff = torch.ones(pred["boxes"][boxes_ff_start_id:boxes_ff_end_id].shape[0])
+	objects_mask_ff = torch.ones(objects_ff.shape[0])
+	
+	im_idx_ff = pred["im_idx"][objects_ff_start_id:objects_ff_end_id]
+	im_idx_ff = im_idx_ff - im_idx_ff.min()
+	
+	# TODO: Correct pair_idx logic
+	pair_idx_ff = pred["pair_idx"][objects_ff_start_id:objects_ff_end_id]
+	reshape_pair = pair_idx_ff.view(-1, 2)
+	min_value = reshape_pair.min()
+	new_pair = reshape_pair - min_value
+	pair_idx_ff = new_pair.view(pair_idx_ff.size())
+	
+	boxes_ff = pred["boxes"][boxes_ff_start_id:boxes_ff_end_id]
+	labels_ff = pred["labels"][boxes_ff_start_id:boxes_ff_end_id]
+	pred_labels_ff = pred["pred_labels"][boxes_ff_start_id:boxes_ff_end_id]
+	scores_ff = pred["scores"][boxes_ff_start_id:boxes_ff_end_id]
+	
+	pred_labels_in_ff_not_in_clf = pred_labels_set_ff - pred_labels_set_cf_last
+	pred_labels_in_cf_not_in_clf = pred_labels_set_cf - pred_labels_set_cf_last
+	pred_labels_not_in_clf = pred_labels_in_ff_not_in_clf.union(pred_labels_in_cf_not_in_clf)
+	for idx, pair in enumerate(pair_idx_ff):
+		if pred_label_dict[pair[1]] in list(pred_labels_not_in_clf):
+			objects_mask_ff[idx] = 0
+			boxes_mask_ff[pair_idx_ff[idx, 1]] = 0
+	
+	im_idx_ff = im_idx_ff[objects_mask_ff == 1]
+	removed_pair_idx_ff = pair_idx_ff[objects_mask_ff == 0]
+	mask_pair_idx_ff = pair_idx_ff[objects_mask_ff == 1]
+	flat_pair = mask_pair_idx_ff.view(-1)
+	
+	decrement_count = torch.zeros_like(flat_pair)
+	# For each removed pair, increment the decrement count for indices greater than the removed index
+	for idx in removed_pair_idx_ff[:, 1]:  # Assuming the second element of each pair is the relevant index
+		decrement_count += (flat_pair > idx).int()
+	
+	new_flat_pair = flat_pair - decrement_count
+	updated_pair_idx_ff = new_flat_pair.view(mask_pair_idx_ff.size())
+	
+	# flat_pair = mask_pair_idx.view(-1)
+	# flat_pair_copy = mask_pair_idx.view(-1).detach().clone()
+	# for pair in removed:
+	# 	idx = pair[1]
+	# 	for i, p in enumerate(flat_pair_copy):
+	# 		if p > idx:
+	# 			flat_pair[i] -= 1
+	# new_pair_idx = flat_pair.view(mask_pair_idx.size())
+	
+	if conf.mode == 'predcls':
+		scores_ff = scores_ff[boxes_mask_ff == 1]
+		labels_ff = labels_ff[boxes_mask_ff == 1]
+	else:
+		pred_scores_ff = pred["pred_scores"][boxes_ff_start_id:boxes_ff_end_id]
+		pred_scores_ff = pred_scores_ff[boxes_mask_ff == 1]
+	
+	pred_labels_ff = pred_labels_ff[boxes_mask_ff == 1]
+	boxes_ff = boxes_ff[boxes_mask_ff == 1]
+	
+	atten = pred["output"][count]['attention_distribution'][objects_mask_ff == 1]
+	spatial = pred["output"][count]['spatial_distribution'][objects_mask_ff == 1]
+	contact = pred["output"][count]['contacting_distribution'][objects_mask_ff == 1]
 	
 	gt_future = gt_annotation[num_cf: num_cf + num_ff]
 	
-	boxes_ff_start_id = torch.where(entry["boxes"][:, 0] == ff_start_id)[0][0]
-	boxes_cf_end_id = torch.where(entry["boxes"][:, 0] == cf_end_id)[0][0]
-	boxes_ff_end_id = torch.where(entry["boxes"][:, 0] == ff_end_id)[0][-1]
+	pred_dict = {
+		'attention_distribution': atten,
+		'spatial_distribution': spatial,
+		'contacting_distribution': contact,
+		'boxes': boxes_ff,
+		'pair_idx': updated_pair_idx_ff,
+		'im_idx': im_idx_ff,
+		'pred_labels': pred_labels_ff
+	}
+	
 	if conf.mode == 'predcls':
-		labels_pred_cf_end = set(pred["labels"][boxes_cf_end_id:boxes_ff_start_id].tolist())
-		labels_pred_ff = set(pred["labels"][boxes_ff_start_id:boxes_ff_end_id + 1].tolist())
-		labels_pred_cf = set(pred["labels"][:boxes_ff_start_id].tolist())
+		pred_dict['labels'] = labels_ff
+		pred_dict['scores'] = scores_ff
 	else:
-		labels_pred_cf_end = set(pred["pred_labels"][boxes_cf_end_id:boxes_ff_start_id].tolist())
-		labels_pred_ff = set(pred["pred_labels"][boxes_ff_start_id:boxes_ff_end_id + 1].tolist())
-		labels_pred_cf = set(pred["pred_labels"][boxes_cf_end_id:boxes_ff_start_id].tolist())
-	
-	ff_boxes_mask = torch.ones(pred["boxes"][boxes_ff_start_id:boxes_ff_end_id + 1].shape[0])
-	ff_objects_mask = torch.ones(objects_ff.shape[0])
-	
-	# ---------------------------------------------------------------------------
-	# Remove objects and pairs that are not in the future frame
-	
-	im_idx = pred["im_idx"][objects_ff_start_id:objects_ff_end_id]
-	im_idx = im_idx - im_idx.min()
-	
-	pair_idx = pred["pair_idx"][objects_ff_start_id:objects_ff_end_id]
-	reshape_pair = pair_idx.view(-1, 2)
-	min_value = reshape_pair.min()
-	new_pair = reshape_pair - min_value
-	pair_idx = new_pair.view(pair_idx.size())
-	
-	boxes = pred["boxes"][boxes_ff_start_id:boxes_ff_end_id + 1]
-	labels = pred["labels"][boxes_ff_start_id:boxes_ff_end_id + 1]
-	pred_labels = pred["pred_labels"][boxes_ff_start_id:boxes_ff_end_id + 1]
-	scores = pred["scores"][boxes_ff_start_id:boxes_ff_end_id + 1]
-	if conf.mode != 'predcls':
-		pred_scores = pred["pred_scores"][boxes_ff_start_id:boxes_ff_end_id + 1]
-	
-	ob1 = labels_pred_ff - labels_pred_cf_end
-	ob2 = labels_pred_cf - labels_pred_cf_end
-	objects = ob1.union(ob2)
-	objects = list(objects)
-	for obj in objects:
-		for idx, pair in enumerate(pred["pair_idx"][objects_ff_start_id:objects_ff_end_id]):
-			if conf.mode == 'predcls':
-				if pred["labels"][pair[1]] == obj:
-					ff_objects_mask[idx] = 0
-					ff_boxes_mask[pair_idx[idx, 1]] = 0
-			else:
-				if pred["pred_labels"][pair[1]] == obj:
-					ff_objects_mask[idx] = 0
-					ff_boxes_mask[pair_idx[idx, 1]] = 0
-	
-	im_idx = im_idx[ff_objects_mask == 1]
-	removed = pair_idx[ff_objects_mask == 0]
-	mask_pair_idx = pair_idx[ff_objects_mask == 1]
-	
-	flat_pair = mask_pair_idx.view(-1)
-	flat_pair_copy = mask_pair_idx.view(-1).detach().clone()
-	for pair in removed:
-		idx = pair[1]
-		for i, p in enumerate(flat_pair_copy):
-			if p > idx:
-				flat_pair[i] -= 1
-	new_pair_idx = flat_pair.view(mask_pair_idx.size())
-	
-	if conf.mode == 'predcls':
-		scores = scores[ff_boxes_mask == 1]
-		labels = labels[ff_boxes_mask == 1]
-	pred_labels = pred_labels[ff_boxes_mask == 1]
-	
-	boxes = boxes[ff_boxes_mask == 1]
-	if conf.mode != 'predcls':
-		pred_scores = pred_scores[ff_boxes_mask == 1]
-	
-	atten = pred["output"][count]['attention_distribution'][ff_objects_mask == 1]
-	spatial = pred["output"][count]['spatial_distribution'][ff_objects_mask == 1]
-	contact = pred["output"][count]['contacting_distribution'][ff_objects_mask == 1]
-	
-	if conf.mode == 'predcls':
-		pred_dict = {'attention_distribution': atten,
-		             'spatial_distribution': spatial,
-		             'contacting_distribution': contact,
-		             'boxes': boxes,
-		             'pair_idx': new_pair_idx,
-		             'im_idx': im_idx,
-		             'labels': labels,
-		             'pred_labels': pred_labels,
-		             'scores': scores
-		             }
-	else:
-		pred_dict = {'attention_distribution': atten,
-		             'spatial_distribution': spatial,
-		             'contacting_distribution': contact,
-		             'boxes': boxes,
-		             'pair_idx': new_pair_idx,
-		             'im_idx': im_idx,
-		             # 'labels':labels,
-		             'pred_labels': pred_labels,
-		             # 'scores':scores,
-		             'pred_scores': pred_scores
-		             }
+		pred_dict['pred_scores'] = pred_scores_ff
 	
 	return gt_future, pred_dict
 

@@ -1,7 +1,6 @@
 from functools import reduce
 
 import numpy as np
-import torch
 import torch.nn as nn
 from lib.fpn.box_intersections_cpu.bbox import bbox_overlaps
 

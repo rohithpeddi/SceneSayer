@@ -42,8 +42,8 @@ def evaluate_model_future_frames(model, entry, gt_annotation, conf, num_future_f
 	
 	num_tf = len(entry["im_idx"].unique())
 	num_cf = min(num_cf, num_tf - 1)
-	num_ff = min(num_ff, num_tf - num_cf)
 	while num_cf + 1 <= num_tf:
+		num_ff = min(num_ff, num_tf - num_cf)
 		gt_future = gt_annotation[num_cf:num_cf + num_ff]
 		pred_dict = pred["output"][count]
 		evaluators = future_evaluators[num_future_frames]

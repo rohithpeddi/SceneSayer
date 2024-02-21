@@ -7,6 +7,7 @@ import torch
 from lib.object_detector import detector
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 from lib.supervised.biased.sga.baseline_anticipation import BaselineWithAnticipation
+from lib.supervised.biased.sga.baseline_anticipation_gen_loss import BaselineWithAnticipationGenLoss
 from test_base import (fetch_transformer_test_basic_config, get_sequence_no_tracking, prepare_prediction_graph,
                        send_future_evaluators_stats_to_firebase, write_future_evaluators_stats,
                        write_percentage_evaluators_stats, send_percentage_evaluators_stats_to_firebase)
@@ -117,38 +118,6 @@ def evaluate_model_context_fraction(model, entry, gt_annotation, conf, context_f
 	evaluators[2].evaluate_scene_graph(gt_future, pred_dict)
 
 
-def fetch_model_context_pred_dict(model, entry, gt_annotation, conf, context_fraction):
-	get_sequence_no_tracking(entry, conf.mode)
-	pred = model.forward_single_entry(context_fraction=context_fraction, entry=entry)
-	num_tf = len(entry["im_idx"].unique())
-	num_cf = min(int(math.ceil(context_fraction * num_tf)), num_tf - 1)
-	num_ff = num_tf - num_cf
-	gt_future, pred_dict = fetch_ff_rep_for_eval(entry, pred, gt_annotation, conf, num_cf, num_ff, count=0)
-	return gt_future, pred_dict
-
-
-def generate_context_qualitative_results(model, entry, gt_annotation, conf, context_fraction,
-                                         percentage_evaluators, video_id, ag_test_data):
-	gt_future, pred_dict = fetch_model_context_pred_dict(model, entry, gt_annotation, conf, context_fraction)
-	
-	evaluators = percentage_evaluators[context_fraction]
-	with_constraint_predictions_map = evaluators[0].fetch_pred_tuples(gt_future, pred_dict)
-	no_constraint_prediction_map = evaluators[1].fetch_pred_tuples(gt_future, pred_dict)
-	
-	prepare_prediction_graph(
-		with_constraint_predictions_map,
-		ag_test_data, video_id, "baseline_so",
-		"with_constraints", conf.mode, context_fraction
-	)
-	
-	prepare_prediction_graph(
-		no_constraint_prediction_map,
-		ag_test_data, video_id, "baseline_so",
-		"no_constraints", conf.mode, context_fraction
-	)
-
-
-# Future frames - Normal Test Evaluation - forward(entry, context, future)
 def evaluate_model_future_frames(model, entry, gt_annotation, conf, num_ff, future_evaluators):
 	get_sequence_no_tracking(entry, conf.mode)
 	pred = model(entry, conf.baseline_context, num_ff)
@@ -169,7 +138,38 @@ def evaluate_model_future_frames(model, entry, gt_annotation, conf, num_ff, futu
 		num_cf += 1
 
 
-def load_model(conf, dataset, gpu_device, model_name):
+def fetch_model_context_pred_dict(model, entry, gt_annotation, conf, context_fraction):
+	get_sequence_no_tracking(entry, conf.mode)
+	pred = model.forward_single_entry(context_fraction=context_fraction, entry=entry)
+	num_tf = len(entry["im_idx"].unique())
+	num_cf = min(int(math.ceil(context_fraction * num_tf)), num_tf - 1)
+	num_ff = num_tf - num_cf
+	gt_future, pred_dict = fetch_ff_rep_for_eval(entry, pred, gt_annotation, conf, num_cf, num_ff, count=0)
+	return gt_future, pred_dict
+
+
+def generate_context_qualitative_results(model, entry, gt_annotation, conf, context_fraction,
+                                         percentage_evaluators, video_id, ag_test_data):
+	gt_future, pred_dict = fetch_model_context_pred_dict(model, entry, gt_annotation, conf, context_fraction)
+	
+	evaluators = percentage_evaluators[context_fraction]
+	with_constraint_predictions_map = evaluators[0].fetch_pred_tuples(gt_future, pred_dict)
+	no_constraint_prediction_map = evaluators[1].fetch_pred_tuples(gt_future, pred_dict)
+	
+	prepare_prediction_graph(
+		with_constraint_predictions_map,
+		ag_test_data, video_id, conf.method_name,
+		"with_constraints", conf.mode, context_fraction
+	)
+	
+	prepare_prediction_graph(
+		no_constraint_prediction_map,
+		ag_test_data, video_id, conf.method_name,
+		"no_constraints", conf.mode, context_fraction
+	)
+
+
+def load_baseline(conf, dataset, gpu_device):
 	model = BaselineWithAnticipation(mode=conf.mode,
 	                                 attention_class_num=len(dataset.attention_relationships),
 	                                 spatial_class_num=len(dataset.spatial_relationships),
@@ -179,12 +179,27 @@ def load_model(conf, dataset, gpu_device, model_name):
 	                                 dec_layer_num=conf.dec_layer).to(device=gpu_device)
 	
 	ckpt = torch.load(conf.ckpt, map_location=gpu_device)
-	model.load_state_dict(ckpt[f'{model_name}_state_dict'], strict=False)
+	model.load_state_dict(ckpt[f'{conf.method_name}_state_dict'], strict=False)
 	print(f"Loaded model from checkpoint {conf.ckpt}")
 	return model
 
 
-def main():
+def load_sgatformer(conf, dataset, gpu_device):
+	model = BaselineWithAnticipationGenLoss(mode=conf.mode,
+	                                        attention_class_num=len(dataset.attention_relationships),
+	                                        spatial_class_num=len(dataset.spatial_relationships),
+	                                        contact_class_num=len(dataset.contacting_relationships),
+	                                        obj_classes=dataset.object_classes,
+	                                        enc_layer_num=conf.enc_layer,
+	                                        dec_layer_num=conf.dec_layer).to(device=gpu_device)
+	
+	ckpt = torch.load(conf.ckpt, map_location=gpu_device)
+	model.load_state_dict(ckpt[f'{conf.method_name}_state_dict'], strict=False)
+	print(f"Loaded model from checkpoint {conf.ckpt}")
+	return model
+
+
+def test_model():
 	(ag_test_data, dataloader_test, gen_evaluators, future_evaluators,
 	 future_evaluators_modified_gt, percentage_evaluators,
 	 percentage_evaluators_modified_gt, gpu_device, conf) = fetch_transformer_test_basic_config()
@@ -201,7 +216,11 @@ def main():
 	print(f"Mode: {mode}")
 	print("----------------------------------------------------------")
 	
-	model = load_model(conf, ag_test_data, gpu_device, model_name)
+	if conf.method_name == "baseline_so":
+		model = load_baseline(conf, ag_test_data, gpu_device)
+	else:
+		model = load_sgatformer(conf, ag_test_data, gpu_device)
+	
 	model.eval()
 	
 	matcher = HungarianMatcher(0.5, 1, 1, 0.5)
@@ -288,7 +307,11 @@ def generate_qualitative_results():
 	print(f"Mode: {mode}")
 	print("----------------------------------------------------------")
 	
-	model = load_model(conf, ag_test_data, gpu_device, model_name)
+	if conf.method_name == "baseline_so":
+		model = load_baseline(conf, ag_test_data, gpu_device)
+	else:
+		model = load_sgatformer(conf, ag_test_data, gpu_device)
+	
 	model.eval()
 	
 	matcher = HungarianMatcher(0.5, 1, 1, 0.5)
@@ -320,8 +343,3 @@ def generate_qualitative_results():
 				generate_context_qualitative_results(model, entry, gt_annotation, conf, context_fraction,
 				                                     percentage_evaluators, video_id, ag_test_data)
 
-
-if __name__ == '__main__':
-	generate_qualitative_results()
-
-""" python test_forecasting.py -mode sgdet -datasize large -data_path /home/cse/msr/csy227518/scratch/Datasets/action_genome/ -model_path forecasting/sgdet_full_context_f3/DSG_masked_9.tar """

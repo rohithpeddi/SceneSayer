@@ -61,7 +61,7 @@ pip install -r sga_requirements.txt
 
 
 
-# NeSysVideoPrediction
+# Neuro Symbolic Scene Graph Anticipation
 Neuro Symbolic Video Prediction/ Action Anticipation
 
 ```

@@ -42,7 +42,6 @@ class obj_decoder(nn.Module):
 		# 1. Construct Tracklet for each context
 		
 		entry = self.object_classifier(entry)
-		""" ################# changes regarding forecasting #################### """
 		start = 0
 		error_count = 0
 		count = 0

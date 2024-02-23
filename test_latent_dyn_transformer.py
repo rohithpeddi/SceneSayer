@@ -322,3 +322,8 @@ def generate_qualitative_results():
 				entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
 				generate_context_qualitative_results(model, entry, gt_annotation, conf, context_fraction,
 				                                     percentage_evaluators, video_id, ag_test_data)
+
+
+if __name__ == '__main__':
+	test_model()
+	# generate_qualitative_results()

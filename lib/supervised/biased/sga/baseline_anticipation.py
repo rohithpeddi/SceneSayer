@@ -231,6 +231,7 @@ class BaselineWithAnticipation(BaseTransformer):
 		num_tf = len(entry["im_idx"].unique())
 		num_cf = min(int(math.ceil(context_fraction * num_tf)), num_tf - 1)
 		num_ff = num_tf - num_cf
+
 		
 		(aligned_so_rels_feats_tf, so_rels_feats_ff_flat,
 		 obj_seqs_ff_flat, num_objects_cf, num_objects_ff) = self.generate_future_frame_embeddings(

@@ -64,8 +64,7 @@ class BaseTransformer(nn.Module):
 		sequences = []
 		for l in obj_class.unique():
 			k = torch.where(obj_class.view(-1) == l)[0]
-			if len(k) > 0:
-				sequences.append(k)
+			sequences.append(k)
 		
 		return entry, rel_features, sequences
 	
@@ -102,7 +101,7 @@ class BaseTransformer(nn.Module):
 		objects_clf_start_id = int(torch.where(entry["im_idx"] == cf_end_id)[0][0])
 		
 		objects_ff_end_id = int(torch.where(entry["im_idx"] == ff_end_id)[0][-1]) + 1
-		
+		obj_labels_tf_unique = entry['pred_labels'][entry['pair_idx'][:, 1]].unique()
 		objects_pcf = entry["im_idx"][:objects_clf_start_id]
 		objects_cf = entry["im_idx"][:objects_ff_start_id]
 		objects_ff = entry["im_idx"][objects_ff_start_id:objects_ff_end_id]
@@ -114,33 +113,31 @@ class BaseTransformer(nn.Module):
 		# 2. Fetch future representations for those objects.
 		# 3. Construct im_idx, pair_idx, and labels for the future frames accordingly.
 		# 4. Send everything along with ground truth for evaluation.
-		
-		obj_seqs_cf = []
+
+		cf_obj_seqs_in_clf = []
 		obj_seqs_ff = []
-		object_track = {}
-		object_lab = []
-		obj_ind = 0
+		object_labels_clf = []
 		for i, s in enumerate(obj_seqs_tf):
+			if len(s) == 0:
+				continue
 			context_index = s[(s < num_objects_cf)]
+			if len(context_index) > 0:
+				prev_context_index = s[(s >= num_objects_pcf) & (s < num_objects_cf)]
+				if len(prev_context_index) > 0:
+					object_labels_clf.append(obj_labels_tf_unique[i])
+					cf_obj_seqs_in_clf.append(context_index)
+
 			future_index = s[(s >= num_objects_cf) & (s < (num_objects_cf + num_objects_ff))]
-			if len(context_index) != 0:
-				object_track[obj_ind] = 0
-				obj_seqs_cf.append(context_index)
-				obj_seqs_ff.append(future_index)
-				obj_ind += 1
+			if len(future_index) > 0:
+				obj_seqs_ff.append(future_index - num_objects_cf)
 		
-		for i, s in enumerate(obj_seqs_cf):
-			prev_context_index = s[(s >= num_objects_pcf) & (s < num_objects_cf)]
-			if len(prev_context_index) != 0:
-				object_track[i] = 1
-		
-		sequence_features = pad_sequence([so_rels_feats_tf[index] for index in obj_seqs_cf], batch_first=True)
+		sequence_features = pad_sequence([so_rels_feats_tf[index] for index in cf_obj_seqs_in_clf], batch_first=True)
 		in_mask = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
 		                          diagonal=0)).type(torch.bool)
 		in_mask = in_mask.cuda()
-		masks = (1 - pad_sequence([torch.ones(len(index)) for index in obj_seqs_cf], batch_first=True)).bool()
+		masks = (1 - pad_sequence([torch.ones(len(index)) for index in cf_obj_seqs_in_clf], batch_first=True)).bool()
 		
-		positional_encoding = self.fetch_positional_encoding_for_obj_seqs(obj_seqs_cf, entry)
+		positional_encoding = self.fetch_positional_encoding_for_obj_seqs(cf_obj_seqs_in_clf, entry)
 		sequence_features = self.positional_encoder(sequence_features, positional_encoding)
 		mask_input = sequence_features
 		

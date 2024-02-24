@@ -8,7 +8,7 @@ from lib.object_detector import detector
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 from lib.supervised.biased.sga.baseline_anticipation import BaselineWithAnticipation
 from lib.supervised.biased.sga.baseline_anticipation_gen_loss import BaselineWithAnticipationGenLoss
-from test_base import (fetch_transformer_test_basic_config, get_sequence_no_tracking, prepare_prediction_graph,
+from test_base import (fetch_transformer_test_basic_config, prepare_prediction_graph,
                        send_future_evaluators_stats_to_firebase, write_future_evaluators_stats,
                        write_percentage_evaluators_stats, send_percentage_evaluators_stats_to_firebase)
 
@@ -22,7 +22,6 @@ def evaluate_model_context_fraction(model, entry, gt_annotation, conf, context_f
 
 
 def evaluate_model_future_frames(model, entry, gt_annotation, conf, num_ff, future_evaluators):
-    get_sequence_no_tracking(entry, conf.mode)
     pred = model(entry, conf.baseline_context, num_ff)
 
     count = 0
@@ -43,7 +42,6 @@ def evaluate_model_future_frames(model, entry, gt_annotation, conf, num_ff, futu
 
 
 def fetch_model_context_pred_dict(model, entry, gt_annotation, conf, context_fraction):
-    get_sequence_no_tracking(entry, conf.mode)
     pred = model.forward_single_entry(context_fraction=context_fraction, entry=entry)
     num_tf = len(entry["im_idx"].unique())
     num_cf = min(int(math.ceil(context_fraction * num_tf)), num_tf - 1)

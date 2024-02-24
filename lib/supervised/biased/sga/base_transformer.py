@@ -68,7 +68,7 @@ class BaseTransformer(nn.Module):
 
         return entry, rel_features, sequences
 
-    def fetch_positional_encoding_for_obj_seqs(self, obj_seqs, entry):
+    def fetch_positional_encoding(self, obj_seqs, entry):
         positional_encoding = []
         for obj_seq in obj_seqs:
             im_idx, counts = torch.unique(entry["pair_idx"][obj_seq][:, 0].view(-1), return_counts=True, sorted=True)
@@ -81,8 +81,18 @@ class BaseTransformer(nn.Module):
             positional_encoding.append(pos)
 
         positional_encoding = [torch.tensor(seq, dtype=torch.long) for seq in positional_encoding]
+        return positional_encoding
+
+    def fetch_positional_encoding_for_gen_obj_seqs(self, obj_seqs, entry):
+        positional_encoding = self.fetch_positional_encoding(obj_seqs, entry)
         positional_encoding = pad_sequence(positional_encoding, batch_first=True) if self.mode == "sgdet" else None
         return positional_encoding
+
+    def fetch_positional_encoding_for_ant_obj_seqs(self, obj_seqs, entry):
+        positional_encoding = self.fetch_positional_encoding(obj_seqs, entry)
+        positional_encoding = pad_sequence([pos_enc.flip(dims=[0]) for pos_enc in positional_encoding],
+                                           batch_first=True).flip(dims=[1])
+        return positional_encoding if self.mode == "sgdet" else None
 
     def update_positional_encoding(self, positional_encoding):
         if positional_encoding is not None:
@@ -90,6 +100,21 @@ class BaseTransformer(nn.Module):
             max_values = max_values.unsqueeze(1)
             positional_encoding = torch.cat((positional_encoding, max_values), dim=1)
         return positional_encoding
+
+    @staticmethod
+    def fetch_masks(so_rel_seqs, obj_seqs):
+        causal_mask = torch.triu(torch.ones(so_rel_seqs.shape[1], so_rel_seqs.shape[1]), diagonal=1).bool().cuda()
+        padding_mask = (1 - pad_sequence([torch.ones(len(obj_seq)).flip(dims=[0])
+                                          for obj_seq in obj_seqs], batch_first=True)).flip(
+            dims=[1]).bool().cuda()
+        return causal_mask, padding_mask
+
+    @staticmethod
+    def fetch_updated_masks(so_rel_seqs, padding_mask):
+        causal_mask = torch.triu(torch.ones(so_rel_seqs.shape[1], so_rel_seqs.shape[1]), diagonal=1).bool().cuda()
+        additional_column = torch.full((padding_mask.shape[0], 1), False, dtype=torch.bool).cuda()
+        padding_mask = torch.cat([padding_mask, additional_column], dim=1)
+        return causal_mask, padding_mask
 
     def generate_future_ff_rels_for_context(self, entry, so_rels_feats_tf, obj_seqs_tf, num_cf, num_tf, num_ff):
         num_ff = min(num_ff, num_tf - num_cf)
@@ -101,6 +126,7 @@ class BaseTransformer(nn.Module):
         objects_clf_start_id = int(torch.where(entry["im_idx"] == cf_end_id)[0][0])
 
         objects_ff_end_id = int(torch.where(entry["im_idx"] == ff_end_id)[0][-1]) + 1
+
         obj_labels_tf_unique = entry['pred_labels'][entry['pair_idx'][:, 1]].unique()
         objects_pcf = entry["im_idx"][:objects_clf_start_id]
         objects_cf = entry["im_idx"][:objects_ff_start_id]
@@ -133,32 +159,21 @@ class BaseTransformer(nn.Module):
 
         so_rels_feats_cf = pad_sequence([so_rels_feats_tf[cf_obj_seq.flip(dims=[0])]
                                          for cf_obj_seq in cf_obj_seqs_in_clf], batch_first=True).flip(dims=[1])
-        causal_mask = torch.triu(torch.ones(so_rels_feats_cf.shape[1], so_rels_feats_cf.shape[1]),
-                                 diagonal=1).bool().cuda()
-        padding_mask = (1 - pad_sequence([torch.ones(len(cf_obj_seq)).flip(dims=[0])
-                                          for cf_obj_seq in cf_obj_seqs_in_clf], batch_first=True)).flip(
-            dims=[1]).bool().cuda()
-
-        # TODO: Change Positional Encoding Scheme
-        positional_encoding = self.fetch_positional_encoding_for_obj_seqs(cf_obj_seqs_in_clf, entry)
+        causal_mask, padding_mask = self.fetch_masks(so_rels_feats_cf, cf_obj_seqs_in_clf)
+        positional_encoding = self.fetch_positional_encoding_for_ant_obj_seqs(cf_obj_seqs_in_clf, entry)
         so_rels_feats_cf = self.positional_encoder(so_rels_feats_cf, positional_encoding)
 
         output = []
         for i in range(num_ff):
-            out = self.anti_temporal_transformer(so_rels_feats_cf, src_key_padding_mask=padding_mask.cuda(),
-                                                 mask=causal_mask)
+            out = self.anti_temporal_transformer(so_rels_feats_cf, src_key_padding_mask=padding_mask, mask=causal_mask)
+
             output.append(out[:, -1, :].unsqueeze(1))
-            out_last = [out[:, -1, :]]
-            pred = torch.stack(out_last, dim=1)
-            so_rels_feats_cf = torch.cat([so_rels_feats_cf, pred], 1)
-            # TODO: Change padding schemes
+            so_rels_feats_ant_one_step = torch.stack([out[:, -1, :]], dim=1)
+
+            so_rels_feats_cf = torch.cat([so_rels_feats_cf, so_rels_feats_ant_one_step], 1)
             positional_encoding = self.update_positional_encoding(positional_encoding)
             so_rels_feats_cf = self.positional_encoder(so_rels_feats_cf, positional_encoding)
-            causal_mask = (1 - torch.tril(torch.ones(so_rels_feats_cf.shape[1], so_rels_feats_cf.shape[1]), diagonal=0)).type(
-                torch.bool)
-            causal_mask = causal_mask.cuda()
-            padding_mask = torch.cat(
-                [padding_mask, torch.full((padding_mask.shape[0], 1), False, dtype=torch.bool)], dim=1)
+            causal_mask, padding_mask = self.fetch_updated_masks(so_rels_feats_cf, padding_mask)
         output = torch.cat(output, dim=1)
 
         # TODO: Change the way the output is handled

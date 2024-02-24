@@ -87,7 +87,7 @@ class BaselineWithAnticipationGenLoss(BaseTransformer):
                                       diagonal=0)).type(torch.bool)
         in_mask_dsg = in_mask_dsg.cuda()
         masks = (1 - pad_sequence([torch.ones(len(index)) for index in sequences], batch_first=True)).bool()
-        positional_encoding = self.fetch_positional_encoding_for_obj_seqs(sequences, entry)
+        positional_encoding = self.fetch_positional_encoding_for_gen_obj_seqs(sequences, entry)
         rel_ = self.gen_temporal_transformer(self.positional_encoder(sequence_features, positional_encoding),
                                              src_key_padding_mask=masks.cuda(), mask=in_mask_dsg)
         

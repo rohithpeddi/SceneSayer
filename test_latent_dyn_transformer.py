@@ -245,7 +245,7 @@ def test_model():
 	
 	test_iter = iter(dataloader_test)
 	model.eval()
-	future_frames_list = [1, 2, 3, 4, 5]
+	future_frames_list = [ 5]
 	context_fractions = [0.3, 0.5, 0.7, 0.9]
 	with torch.no_grad():
 		for b in range(len(dataloader_test)):

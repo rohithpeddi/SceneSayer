@@ -136,10 +136,6 @@ class BaseTransformer(nn.Module):
         num_objects_ff = objects_ff.shape[0]
 
         # 1. Refine object sequences to take only those objects that are present in the current frame.
-        # 2. Fetch future representations for those objects.
-        # 3. Construct im_idx, pair_idx, and labels for the future frames accordingly.
-        # 4. Send everything along with ground truth for evaluation.
-
         cf_obj_seqs_in_clf = []
         obj_seqs_ff = []
         obj_labels_clf = []
@@ -155,7 +151,7 @@ class BaseTransformer(nn.Module):
 
             future_index = s[(s >= num_objects_cf) & (s < (num_objects_cf + num_objects_ff))]
             if len(future_index) > 0:
-                obj_seqs_ff.append(future_index - num_objects_cf)
+                obj_seqs_ff.append(future_index)
 
         so_rels_feats_cf = pad_sequence([so_rels_feats_tf[cf_obj_seq.flip(dims=[0])]
                                          for cf_obj_seq in cf_obj_seqs_in_clf], batch_first=True).flip(dims=[1])
@@ -163,67 +159,50 @@ class BaseTransformer(nn.Module):
         positional_encoding = self.fetch_positional_encoding_for_ant_obj_seqs(cf_obj_seqs_in_clf, entry)
         so_rels_feats_cf = self.positional_encoder(so_rels_feats_cf, positional_encoding)
 
-        output = []
+        # 2. Fetch future representations for those objects.
+        so_rels_feats_ff = []
         for i in range(num_ff):
             out = self.anti_temporal_transformer(so_rels_feats_cf, src_key_padding_mask=padding_mask, mask=causal_mask)
 
-            output.append(out[:, -1, :].unsqueeze(1))
+            so_rels_feats_ff.append(out[:, -1, :].unsqueeze(1))
             so_rels_feats_ant_one_step = torch.stack([out[:, -1, :]], dim=1)
 
             so_rels_feats_cf = torch.cat([so_rels_feats_cf, so_rels_feats_ant_one_step], 1)
             positional_encoding = self.update_positional_encoding(positional_encoding)
             so_rels_feats_cf = self.positional_encoder(so_rels_feats_cf, positional_encoding)
             causal_mask, padding_mask = self.fetch_updated_masks(so_rels_feats_cf, padding_mask)
-        output = torch.cat(output, dim=1)
+        so_rels_feats_ff = torch.cat(so_rels_feats_ff, dim=1)
 
-        # TODO: Change the way the output is handled
-        indices_flat = torch.cat(obj_seqs_ff).unsqueeze(1).repeat(1, so_rels_feats_tf.shape[1])
-        global_output = torch.zeros_like(so_rels_feats_tf).to(so_rels_feats_tf.device)
-
-        # TODO: Correct this code
-        im_idx = torch.tensor(list(range(num_ff)))
-        im_idx = im_idx.repeat_interleave(num_obj)
-
-        pred_labels = [1]
-        pred_labels.extend(obj)
-        pred_labels = torch.tensor(pred_labels)
-        pred_labels = pred_labels.repeat(num_ff)
+        # 3. Construct im_idx, pair_idx, and labels for the future frames accordingly.
+        ff_obj_list = [1] + [obj_label.cpu().item() for obj_label in obj_labels_clf]
+        pred_labels = (torch.tensor(ff_obj_list).repeat(num_ff)).cuda()
+        im_idx = (torch.tensor(list(range(num_ff))).repeat_interleave(len(cf_obj_seqs_in_clf))).cuda()
 
         pair_idx = []
-        for i in range(1, num_obj + 1):
-            pair_idx.append([0, i])
-        pair_idx = torch.tensor(pair_idx)
-        p_i = pair_idx
-        for i in range(num_ff - 1):
-            p_i = p_i + num_obj + 1
-            pair_idx = torch.cat([pair_idx, p_i])
+        ff_sub_idx = [i * (len(cf_obj_seqs_in_clf) + 1) for i in range(num_ff)]
+        for j in ff_sub_idx:
+            for i in range(len(cf_obj_seqs_in_clf)):
+                pair_idx.append([j, i + 1 + j])
 
-        if self.mode == 'predcls':
-            sc_human = entry["scores"][entry["pair_idx"][objects_clf_start_id:objects_ff_start_id][:, 0]][0]
-            sc_obj = entry["scores"][entry["pair_idx"][objects_clf_start_id:objects_ff_start_id][:, 1]]
-        else:
-            sc_human = entry["pred_scores"][entry["pair_idx"][objects_clf_start_id:objects_ff_start_id][:, 0]][0]
-            sc_obj = entry["pred_scores"][entry["pair_idx"][objects_clf_start_id:objects_ff_start_id][:, 1]]
+        pair_idx = torch.tensor(pair_idx).cuda()
+        boxes = torch.tensor([[0.5] * 5 for _ in range(len(pred_labels))]).cuda()
+        scores = torch.tensor([0] * len(pred_labels)).cuda()
 
-        sc_obj = torch.index_select(sc_obj, 0, torch.tensor(obj_ind))
-        sc_human = sc_human.unsqueeze(0)
-        scores = torch.cat([sc_human, sc_obj])
-        scores = scores.repeat(num_ff)
+        obj_range = torch.tensor(list(range(len(cf_obj_seqs_in_clf)))).reshape((-1, 1))
+        onj_range_ff = torch.repeat_interleave(obj_range, num_ff, dim=1)
+        range_list = torch.tensor(list(range(num_ff))) * len(cf_obj_seqs_in_clf)
+        indices_flat = (range_list + onj_range_ff).flatten().cuda()
 
-        box_human = entry["boxes"][entry["pair_idx"][objects_clf_start_id:objects_ff_start_id][:, 0]][0]
-        box_obj = entry["boxes"][entry["pair_idx"][objects_clf_start_id:objects_ff_start_id][:, 1]]
+        so_rels_feats_ff_flat = so_rels_feats_ff.view(-1, so_rels_feats_ff.shape[-1])
+        so_rels_feats_ff_flat_ord = torch.zeros_like(so_rels_feats_ff_flat).cuda()
+        indices_flat = indices_flat.unsqueeze(1).repeat(1, so_rels_feats_ff_flat_ord.shape[1])
+        so_rels_feats_ff_flat_ord.scatter_(0, indices_flat, so_rels_feats_ff_flat)
 
-        box_obj = torch.index_select(box_obj, 0, torch.tensor(obj_ind))
-        box_human = box_human.unsqueeze(0)
-        boxes = torch.cat([box_human, box_obj])
-        boxes = boxes.repeat(num_ff, 1)
-
-        gb_output = gb_output.cuda()
         temp = {
-            "attention_distribution": self.a_rel_compress(gb_output),
-            "spatial_distribution": torch.sigmoid(self.s_rel_compress(gb_output)),
-            "contacting_distribution": torch.sigmoid(self.c_rel_compress(gb_output)),
-            "global_output": gb_output,
+            "attention_distribution": self.a_rel_compress(so_rels_feats_ff_flat_ord),
+            "spatial_distribution": torch.sigmoid(self.s_rel_compress(so_rels_feats_ff_flat_ord)),
+            "contacting_distribution": torch.sigmoid(self.c_rel_compress(so_rels_feats_ff_flat_ord)),
+            "global_output": so_rels_feats_ff_flat_ord,
             "pair_idx": pair_idx.cuda(),
             "im_idx": im_idx.cuda(),
             "labels": pred_labels.cuda(),

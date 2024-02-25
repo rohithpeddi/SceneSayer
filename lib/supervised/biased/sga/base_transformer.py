@@ -208,8 +208,8 @@ class BaseTransformer(nn.Module):
 
         obj_labels_tf = entry["labels"][entry["pair_idx"][:, 1]]
         clf_obj_idx = torch.where(entry["im_idx"] == num_cf - 1)[0]
-        clf_obj_labels = obj_labels_tf[clf_obj_idx]
-        num_clf_obj = clf_obj_labels.unique().shape[0]
+        clf_obj_labels = obj_labels_tf[clf_obj_idx].unique(sorted=True)
+        num_clf_obj = clf_obj_labels.shape[0]
 
         mask_ant = []
         mask_gt = []

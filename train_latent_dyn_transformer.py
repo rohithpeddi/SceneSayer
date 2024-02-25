@@ -92,7 +92,7 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
     cum_ant_attention_relation_loss = 0
     cum_ant_spatial_relation_loss = 0
     cum_ant_contact_relation_loss = 0
-    # cum_ant_latent_loss = 0
+    cum_ant_latent_loss = 0
 
     num_cf = conf.baseline_context
     num_tf = len(entry["im_idx"].unique())
@@ -101,23 +101,23 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
         ant_spatial_distribution = ant_output[count]["spatial_distribution"]
         ant_contact_distribution = ant_output[count]["contacting_distribution"]
         ant_attention_distribution = ant_output[count]["attention_distribution"]
-        # ant_global_output = ant_output[count]["global_output"]
+        ant_global_output = ant_output[count]["global_output"]
 
-        mask_ant = ant_output[count]["mask_ant"]
-        mask_gt = ant_output[count]["mask_gt"]
+        mask_ant = ant_output[count]["mask_ant"].cpu().numpy()
+        mask_gt = ant_output[count]["mask_gt"].cpu().numpy()
 
         if len(mask_ant) == 0:
             assert len(mask_gt) == 0
         else:
             loss_count += 1
             ant_attention_relation_loss = ce_loss(ant_attention_distribution[mask_ant], attention_label[mask_gt]).mean()
-            # try:
-            #     ant_anticipated_latent_loss = conf.hp_recon_loss * abs_loss(ant_global_output[mask_ant],
-            #                                                                 global_output[mask_gt]).mean()
-            # except:
-            #     ant_anticipated_latent_loss = 0
-            #     print(ant_global_output.shape, mask_ant.shape, global_output.shape, mask_gt.shape)
-            #     print(mask_ant)
+            try:
+                ant_anticipated_latent_loss = conf.hp_recon_loss * abs_loss(ant_global_output[mask_ant],
+                                                                            global_output[mask_gt]).mean()
+            except:
+                ant_anticipated_latent_loss = 0
+                print(ant_global_output.shape, mask_ant.shape, global_output.shape, mask_gt.shape)
+                print(mask_ant)
 
             if not conf.bce_loss:
                 ant_spatial_relation_loss = mlm_loss(ant_spatial_distribution[mask_ant], spatial_label[mask_gt]).mean()
@@ -128,7 +128,7 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
             cum_ant_attention_relation_loss += ant_attention_relation_loss
             cum_ant_spatial_relation_loss += ant_spatial_relation_loss
             cum_ant_contact_relation_loss += ant_contact_relation_loss
-            # cum_ant_latent_loss += ant_anticipated_latent_loss
+            cum_ant_latent_loss += ant_anticipated_latent_loss
         num_cf += 1
         count += 1
 
@@ -136,7 +136,7 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
         losses["anticipated_attention_relation_loss"] = cum_ant_spatial_relation_loss / loss_count
         losses["anticipated_spatial_relation_loss"] = cum_ant_spatial_relation_loss / loss_count
         losses["anticipated_contact_relation_loss"] = cum_ant_contact_relation_loss / loss_count
-        # losses["anticipated_latent_loss"] = cum_ant_latent_loss / loss_count
+        losses["anticipated_latent_loss"] = cum_ant_latent_loss / loss_count
 
     if loss_count > 0 or has_gen_loss or has_object_loss:
         optimizer.zero_grad()

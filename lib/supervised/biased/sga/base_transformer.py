@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
@@ -187,7 +188,7 @@ class BaseTransformer(nn.Module):
 		
 		pair_idx = torch.tensor(pair_idx).cuda()
 		boxes = torch.tensor([[0.5] * 5 for _ in range(len(pred_labels))]).cuda()
-		scores = torch.tensor([0] * len(pred_labels)).cuda()
+		scores = torch.tensor([1] * len(pred_labels)).cuda()
 		
 		obj_range = torch.tensor(list(range(len(cf_obj_seqs_in_clf)))).reshape((-1, 1))
 		onj_range_ff = torch.repeat_interleave(obj_range, num_ff, dim=1)
@@ -199,36 +200,32 @@ class BaseTransformer(nn.Module):
 		indices_flat = indices_flat.unsqueeze(1).repeat(1, so_rels_feats_ff_flat_ord.shape[1])
 		so_rels_feats_ff_flat_ord.scatter_(0, indices_flat, so_rels_feats_ff_flat)
 		
-		obj = entry["pair_idx"][:, 1]
-		if not self.testing:
-			labels_obj = entry["labels"][obj]
-		else:
-			pred_labels_obj = entry["pred_labels"][obj]
-			labels_obj = entry["labels"][obj]
+		# ------------------- Construct mask_ant and mask_gt -------------------
+		# mask_ant: indices in only anticipated frames
+		# mask_gt: indices in all frames
+		# ----------------------------------------------------------------------
 		
-		mask_ant = torch.tensor([], dtype=torch.long).cuda()
-		mask_gt = torch.tensor([], dtype=torch.long).cuda()
-		for j in range(n - i):
-			if testing:
-				a, b = np.array(pred_labels_obj[rng[j]: rng[j + 1]].cpu()), np.array(
-					labels_obj[rng[j + i]: rng[j + i + 1]].cpu())
-			else:
-				a, b = np.array(labels_obj[rng[j]: rng[j + 1]].cpu()), np.array(
-					labels_obj[rng[j + i]: rng[j + i + 1]].cpu())
-			intersection = np.intersect1d(a, b, return_indices=False)
-			ind1 = np.array([])
-			ind2 = np.array([])
-			for element in intersection:
-				tmp1, tmp2 = np.where(a == element)[0], np.where(b == element)[0]
-				mn = min(tmp1.shape[0], tmp2.shape[0])
-				ind1 = np.concatenate((ind1, tmp1[: mn]))
-				ind2 = np.concatenate((ind2, tmp2[: mn]))
-			ind1 = torch.tensor(ind1, dtype=torch.long, device=rng.device)
-			ind2 = torch.tensor(ind2, dtype=torch.long, device=rng.device)
-			ind1 += rng[j]
-			ind2 += rng[j + i]
-			mask_ant = torch.cat((mask_ant, ind1))
-			mask_gt = torch.cat((mask_gt, ind2))
+		obj_labels_tf = entry["labels"][entry["pair_idx"][:, 1]]
+		clf_obj_idx = torch.where(entry["im_idx"] == num_cf - 1)
+		clf_obj_labels = obj_labels_tf[clf_obj_idx]
+		num_clf_obj = clf_obj_labels.shape[0]
+		
+		mask_ant = []
+		mask_gt = []
+		for ff_id in range(1, num_ff):
+			ff_obj_idx = torch.where(entry["im_idx"] == num_cf + ff_id)
+			ff_obj_labels = obj_labels_tf[ff_obj_idx]
+			
+			np_clf_obj_labels = clf_obj_labels.cpu().numpy()
+			np_ff_obj_labels = ff_obj_labels.cpu().numpy()
+			
+			int_obj_labels, ff_idx_obj_in_clf, clf_idx_obj_in_ff = np.intersect1d(np_clf_obj_labels, np_ff_obj_labels,
+			                                                                      return_indices=True)
+			mask_ant.append((ff_id - 1) * num_clf_obj + ff_idx_obj_in_clf)
+			mask_gt.append(ff_obj_idx[clf_idx_obj_in_ff])
+		
+		mask_ant = torch.tensor(mask_ant).cuda()
+		mask_gt = torch.tensor(mask_gt).cuda()
 		
 		temp = {
 			"attention_distribution": self.a_rel_compress(so_rels_feats_ff_flat_ord),
@@ -247,4 +244,3 @@ class BaseTransformer(nn.Module):
 		}
 		
 		return temp
-

@@ -116,7 +116,6 @@ class BaseTransformer(nn.Module):
         return padding_mask
 
     def generate_future_ff_rels_for_context(self, entry, so_rels_feats_tf, obj_seqs_tf, num_cf, num_tf, num_ff):
-        # Add code to get mask_curr and mask_gt outputs
         num_ff = min(num_ff, num_tf - num_cf)
         ff_start_id = entry["im_idx"].unique()[num_cf]
         ff_end_id = entry["im_idx"].unique()[num_cf + num_ff - 1]

@@ -117,6 +117,7 @@ class BaseTransformer(nn.Module):
 		return causal_mask, padding_mask
 	
 	def generate_future_ff_rels_for_context(self, entry, so_rels_feats_tf, obj_seqs_tf, num_cf, num_tf, num_ff):
+		# Add code to get mask_curr and mask_gt outputs
 		num_ff = min(num_ff, num_tf - num_cf)
 		ff_start_id = entry["im_idx"].unique()[num_cf]
 		ff_end_id = entry["im_idx"].unique()[num_cf + num_ff - 1]
@@ -198,6 +199,37 @@ class BaseTransformer(nn.Module):
 		indices_flat = indices_flat.unsqueeze(1).repeat(1, so_rels_feats_ff_flat_ord.shape[1])
 		so_rels_feats_ff_flat_ord.scatter_(0, indices_flat, so_rels_feats_ff_flat)
 		
+		obj = entry["pair_idx"][:, 1]
+		if not self.testing:
+			labels_obj = entry["labels"][obj]
+		else:
+			pred_labels_obj = entry["pred_labels"][obj]
+			labels_obj = entry["labels"][obj]
+		
+		mask_ant = torch.tensor([], dtype=torch.long).cuda()
+		mask_gt = torch.tensor([], dtype=torch.long).cuda()
+		for j in range(n - i):
+			if testing:
+				a, b = np.array(pred_labels_obj[rng[j]: rng[j + 1]].cpu()), np.array(
+					labels_obj[rng[j + i]: rng[j + i + 1]].cpu())
+			else:
+				a, b = np.array(labels_obj[rng[j]: rng[j + 1]].cpu()), np.array(
+					labels_obj[rng[j + i]: rng[j + i + 1]].cpu())
+			intersection = np.intersect1d(a, b, return_indices=False)
+			ind1 = np.array([])
+			ind2 = np.array([])
+			for element in intersection:
+				tmp1, tmp2 = np.where(a == element)[0], np.where(b == element)[0]
+				mn = min(tmp1.shape[0], tmp2.shape[0])
+				ind1 = np.concatenate((ind1, tmp1[: mn]))
+				ind2 = np.concatenate((ind2, tmp2[: mn]))
+			ind1 = torch.tensor(ind1, dtype=torch.long, device=rng.device)
+			ind2 = torch.tensor(ind2, dtype=torch.long, device=rng.device)
+			ind1 += rng[j]
+			ind2 += rng[j + i]
+			mask_ant = torch.cat((mask_ant, ind1))
+			mask_gt = torch.cat((mask_gt, ind2))
+		
 		temp = {
 			"attention_distribution": self.a_rel_compress(so_rels_feats_ff_flat_ord),
 			"spatial_distribution": torch.sigmoid(self.s_rel_compress(so_rels_feats_ff_flat_ord)),
@@ -209,7 +241,9 @@ class BaseTransformer(nn.Module):
 			"pred_labels": pred_labels.cuda(),
 			"scores": scores.cuda(),
 			"pred_scores": scores.cuda(),
-			"boxes": boxes.cuda()
+			"boxes": boxes.cuda(),
+			"mask_ant": mask_ant,
+			"mask_gt": mask_gt,
 		}
 		
 		return temp

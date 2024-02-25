@@ -100,24 +100,24 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
 		ant_attention_distribution = ant_output[count]["attention_distribution"]
 		ant_global_output = ant_output[count]["global_output"]
 		
-		mask_curr = ant_output[count]["mask_curr"]
+		mask_ant = ant_output[count]["mask_ant"]
 		mask_gt = ant_output[count]["mask_gt"]
-		losses["anticipated_attention_relation_loss"] = ce_loss(ant_attention_distribution[mask_curr],
+		losses["anticipated_attention_relation_loss"] = ce_loss(ant_attention_distribution[mask_ant],
 		                                                        attention_label[mask_gt]).mean()
 		
 		if not conf.bce_loss:
 			losses["anticipated_latent_loss"] += conf.hp_recon_loss * abs_loss(
-				ant_global_output[mask_curr], global_output[mask_gt])
-			losses["anticipated_spatial_relation_loss"] += mlm_loss(ant_spatial_distribution[mask_curr],
+				ant_global_output[mask_ant], global_output[mask_gt])
+			losses["anticipated_spatial_relation_loss"] += mlm_loss(ant_spatial_distribution[mask_ant],
 			                                                        spatial_label[mask_gt])
-			losses["anticipated_contact_relation_loss"] += mlm_loss(ant_contact_distribution[mask_curr],
+			losses["anticipated_contact_relation_loss"] += mlm_loss(ant_contact_distribution[mask_ant],
 			                                                        contact_label[mask_gt])
 		else:
 			losses["anticipated_latent_loss"] += conf.hp_recon_loss * abs_loss(
-				ant_global_output[mask_curr], global_output[mask_gt])
-			losses["anticipated_spatial_relation_loss"] += bce_loss(ant_spatial_distribution[mask_curr],
+				ant_global_output[mask_ant], global_output[mask_gt])
+			losses["anticipated_spatial_relation_loss"] += bce_loss(ant_spatial_distribution[mask_ant],
 			                                                        spatial_label[mask_gt])
-			losses["anticipated_contact_relation_loss"] += bce_loss(ant_contact_distribution[mask_curr],
+			losses["anticipated_contact_relation_loss"] += bce_loss(ant_contact_distribution[mask_ant],
 			                                                        contact_label[mask_gt])
 		num_cf += 1
 		count += 1

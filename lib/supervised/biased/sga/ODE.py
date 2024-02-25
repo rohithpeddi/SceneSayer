@@ -238,17 +238,19 @@ class ODE(nn.Module):
         entry["rng"] = frames_ranges
         times_unique = torch.cat((times_unique, times_extend)).to(device=global_output.device)
         for i in range(1, window + 1):
-            mask_preds = torch.tensor([], dtype=torch.long, device=frames_ranges.device)
-            mask_gt = torch.tensor([], dtype=torch.long, device=frames_ranges.device)
+            # masks for final output latents used during loss evaluation
+            mask_preds = torch.tensor([], dtype=torch.long, device=frames_ranges.device)   
+            mask_gt = torch.tensor([], dtype=torch.long, device=frames_ranges.device)    
             gt = gt_annotation.copy()
             for j in range(num_frames - i):
                 if testing:
                     a, b = np.array(pred_labels_obj[frames_ranges[j] : frames_ranges[j + 1]].cpu()), np.array(labels_obj[frames_ranges[j + i] : frames_ranges[j + i + 1]].cpu())
                 else:
                     a, b = np.array(labels_obj[frames_ranges[j] : frames_ranges[j + 1]].cpu()), np.array(labels_obj[frames_ranges[j + i] : frames_ranges[j + i + 1]].cpu())
+                # persistent object labels
                 intersection = np.intersect1d(a, b,  return_indices = False)
-                ind1 = np.array([])
-                ind2 = np.array([])
+                ind1 = np.array([])        # indices of object labels from last context frame in the intersection
+                ind2 = np.array([])        # indices of object labels that persist in the ith frame after the last context frame
                 for element in intersection:
                     tmp1, tmp2 = np.where(a == element)[0], np.where(b == element)[0]
                     mn = min(tmp1.shape[0], tmp2.shape[0])
@@ -261,9 +263,11 @@ class ODE(nn.Module):
                         if "class" not in detection.keys() or detection["class"] in intersection:
                             L.append(ctr)
                         ctr += 1
+                    # stores modified ground truth
                     gt[i + j] = [gt[i + j][ind] for ind in L]
                 ind1 = torch.tensor(ind1, dtype=torch.long, device=frames_ranges.device)
                 ind2 = torch.tensor(ind2, dtype=torch.long, device=frames_ranges.device)
+                # offset by subject-object pair position
                 ind1 += frames_ranges[j]
                 ind2 += frames_ranges[j + i]
                 mask_preds = torch.cat((mask_preds, ind1))

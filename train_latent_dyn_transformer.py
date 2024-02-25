@@ -109,8 +109,14 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
         else:
             loss_count += 1
             ant_attention_relation_loss = ce_loss(ant_attention_distribution[mask_ant], attention_label[mask_gt]).mean()
-            ant_anticipated_latent_loss = conf.hp_recon_loss * abs_loss(ant_global_output[mask_ant],
-                                                                        global_output[mask_gt]).mean()
+            try:
+                ant_anticipated_latent_loss = conf.hp_recon_loss * abs_loss(ant_global_output[mask_ant],
+                                                                            global_output[mask_gt]).mean()
+            except:
+                ant_anticipated_latent_loss = 0
+                print(ant_global_output.shape, mask_ant.shape, global_output.shape, mask_gt.shape)
+                print(mask_ant)
+
             if not conf.bce_loss:
                 ant_spatial_relation_loss = mlm_loss(ant_spatial_distribution[mask_ant], spatial_label[mask_gt]).mean()
                 ant_contact_relation_loss = mlm_loss(ant_contact_distribution[mask_ant], contact_label[mask_gt]).mean()
@@ -137,8 +143,11 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
         optimizer.step()
         print(
-            "Has Gen Loss: {}, Has Ant Loss: {}, epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(has_gen_loss, loss_count,
-                epoch, num_video, len(dataloader_train), loss.item()))
+            "Has Gen Loss: {}, Has Ant Loss: {}, epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(has_gen_loss,
+                                                                                                     loss_count,
+                                                                                                     epoch, num_video,
+                                                                                                     len(dataloader_train),
+                                                                                                     loss.item()))
     else:
         print(f"No loss to backpropagate for video: {num_video}")
     num_video += 1

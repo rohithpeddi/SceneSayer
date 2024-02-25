@@ -205,8 +205,6 @@ class SDE(nn.Module):
 		                      spatial_class_num=spatial_class_num,
 		                      contact_class_num=contact_class_num,
 		                      obj_classes=obj_classes)
-		self.gen_num = np.zeros(1750)
-		self.ant_num = np.zeros((3, 1750))
 		self.ctr = 0
 	
 	def forward(self, entry, testing=False):
@@ -251,7 +249,6 @@ class SDE(nn.Module):
 		entry["times"] = torch.repeat_interleave(times_unique.to(device=global_output.device), frame_ranges[1:] - frame_ranges[: -1])
 		entry["rng"] = frame_ranges
 		times_unique = torch.cat((times_unique, times_extend)).to(device=global_output.device)
-		# self.gen_num[self.ctr] = num_preds
 		for i in range(1, window + 1):
 			mask_preds = torch.tensor([], dtype=torch.long, device=frame_ranges.device)
 			mask_gt = torch.tensor([], dtype=torch.long, device=frame_ranges.device)
@@ -287,7 +284,6 @@ class SDE(nn.Module):
 				mask_gt = torch.cat((mask_gt, ind2))
 			entry["mask_curr_%d" % i] = mask_preds
 			entry["mask_gt_%d" % i] = mask_gt
-			# self.ant_num[i - 1, self.ctr] = mask_preds.size(0)
 			if testing:
 				"""pair_idx_test = pair_idx[mask_preds]
                 _, inverse_indices = torch.unique(pair_idx_test, sorted=True, return_inverse=True)

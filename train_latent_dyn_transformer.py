@@ -14,7 +14,7 @@ from lib.supervised.biased.sga.dsgdetr_gen_ant import DsgDetrGenAnt
 from lib.supervised.biased.sga.sttran_ant import STTranAnt
 from lib.supervised.biased.sga.sttran_gen_ant import STTranGenAnt
 from train_base import fetch_train_basic_config, prepare_optimizer, save_model, fetch_transformer_loss_functions, \
-	get_sequence_no_tracking
+	get_sequence_no_tracking, load_model_from_checkpoint
 
 
 def fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size):
@@ -94,6 +94,7 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
 	
 	num_cf = conf.baseline_context
 	num_tf = len(entry["im_idx"].unique())
+	loss_count = 0
 	while num_cf + 1 <= num_tf:
 		ant_spatial_distribution = ant_output[count]["spatial_distribution"]
 		ant_contact_distribution = ant_output[count]["contacting_distribution"]
@@ -102,30 +103,37 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
 		
 		mask_ant = ant_output[count]["mask_ant"]
 		mask_gt = ant_output[count]["mask_gt"]
-		losses["anticipated_attention_relation_loss"] = ce_loss(ant_attention_distribution[mask_ant],
-		                                                        attention_label[mask_gt]).mean()
-		
-		if not conf.bce_loss:
-			losses["anticipated_latent_loss"] += conf.hp_recon_loss * abs_loss(
-				ant_global_output[mask_ant], global_output[mask_gt])
-			losses["anticipated_spatial_relation_loss"] += mlm_loss(ant_spatial_distribution[mask_ant],
-			                                                        spatial_label[mask_gt])
-			losses["anticipated_contact_relation_loss"] += mlm_loss(ant_contact_distribution[mask_ant],
-			                                                        contact_label[mask_gt])
+
+		if len(mask_ant) == 0:
+			assert len(mask_gt) == 0
 		else:
-			losses["anticipated_latent_loss"] += conf.hp_recon_loss * abs_loss(
-				ant_global_output[mask_ant], global_output[mask_gt])
-			losses["anticipated_spatial_relation_loss"] += bce_loss(ant_spatial_distribution[mask_ant],
-			                                                        spatial_label[mask_gt])
-			losses["anticipated_contact_relation_loss"] += bce_loss(ant_contact_distribution[mask_ant],
-			                                                        contact_label[mask_gt])
+			loss_count += 1
+			losses["anticipated_attention_relation_loss"] = ce_loss(ant_attention_distribution[mask_ant],
+																	attention_label[mask_gt]).mean()
+
+			if not conf.bce_loss:
+				losses["anticipated_latent_loss"] += conf.hp_recon_loss * abs_loss(
+					ant_global_output[mask_ant], global_output[mask_gt])
+				losses["anticipated_spatial_relation_loss"] += mlm_loss(ant_spatial_distribution[mask_ant],
+																		spatial_label[mask_gt]).mean()
+				losses["anticipated_contact_relation_loss"] += mlm_loss(ant_contact_distribution[mask_ant],
+																		contact_label[mask_gt]).mean()
+			else:
+				losses["anticipated_latent_loss"] += conf.hp_recon_loss * abs_loss(
+					ant_global_output[mask_ant], global_output[mask_gt])
+				losses["anticipated_spatial_relation_loss"] += bce_loss(ant_spatial_distribution[mask_ant],
+																		spatial_label[mask_gt]).mean()
+				losses["anticipated_contact_relation_loss"] += bce_loss(ant_contact_distribution[mask_ant],
+																		contact_label[mask_gt]).mean()
 		num_cf += 1
 		count += 1
 	
-	losses["anticipated_attention_relation_loss"] = losses["anticipated_attention_relation_loss"] / count
-	losses["anticipated_spatial_relation_loss"] = losses["anticipated_spatial_relation_loss"] / count
-	losses["anticipated_contact_relation_loss"] = losses["anticipated_contact_relation_loss"] / count
-	losses["anticipated_latent_loss"] = losses["anticipated_latent_loss"] / count
+	losses["anticipated_attention_relation_loss"] = losses["anticipated_attention_relation_loss"] / loss_count
+	losses["anticipated_spatial_relation_loss"] = losses["anticipated_spatial_relation_loss"] / loss_count
+	losses["anticipated_contact_relation_loss"] = losses["anticipated_contact_relation_loss"] / loss_count
+	losses["anticipated_latent_loss"] = losses["anticipated_latent_loss"] / loss_count
+
+	# print(f"Loss Count:{loss_count}, count: {count}")
 	
 	optimizer.zero_grad()
 	loss = sum(losses.values())
@@ -179,10 +187,7 @@ def load_sttran_ant(conf, dataset, gpu_device):
 	                  obj_classes=dataset.object_classes,
 	                  enc_layer_num=conf.enc_layer,
 	                  dec_layer_num=conf.dec_layer).to(device=gpu_device)
-	
-	ckpt = torch.load(conf.ckpt, map_location=gpu_device)
-	model.load_state_dict(ckpt[f'{conf.method_name}_state_dict'], strict=False)
-	print(f"Loaded model from checkpoint {conf.ckpt}")
+	model = load_model_from_checkpoint(model, conf, gpu_device)
 	return model
 
 
@@ -194,10 +199,7 @@ def load_sttran_gen_ant(conf, dataset, gpu_device):
 	                     obj_classes=dataset.object_classes,
 	                     enc_layer_num=conf.enc_layer,
 	                     dec_layer_num=conf.dec_layer).to(device=gpu_device)
-	
-	ckpt = torch.load(conf.ckpt, map_location=gpu_device)
-	model.load_state_dict(ckpt[f'{conf.method_name}_state_dict'], strict=False)
-	print(f"Loaded model from checkpoint {conf.ckpt}")
+	model = load_model_from_checkpoint(model, conf, gpu_device)
 	return model
 
 
@@ -209,10 +211,7 @@ def load_dsgdetr_ant(conf, dataset, gpu_device):
 	                   obj_classes=dataset.object_classes,
 	                   enc_layer_num=conf.enc_layer,
 	                   dec_layer_num=conf.dec_layer).to(device=gpu_device)
-	
-	ckpt = torch.load(conf.ckpt, map_location=gpu_device)
-	model.load_state_dict(ckpt[f'{conf.method_name}_state_dict'], strict=False)
-	print(f"Loaded model from checkpoint {conf.ckpt}")
+	model = load_model_from_checkpoint(model, conf, gpu_device)
 	return model
 
 
@@ -224,10 +223,7 @@ def load_dsgdetr_gen_ant(conf, dataset, gpu_device):
 	                      obj_classes=dataset.object_classes,
 	                      enc_layer_num=conf.enc_layer,
 	                      dec_layer_num=conf.dec_layer).to(device=gpu_device)
-	
-	ckpt = torch.load(conf.ckpt, map_location=gpu_device)
-	model.load_state_dict(ckpt[f'{conf.method_name}_state_dict'], strict=False)
-	print(f"Loaded model from checkpoint {conf.ckpt}")
+	model = load_model_from_checkpoint(model, conf, gpu_device)
 	return model
 
 

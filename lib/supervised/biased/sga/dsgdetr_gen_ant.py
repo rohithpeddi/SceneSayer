@@ -126,6 +126,10 @@ class DsgDetrGenAnt(BaseTransformer):
 		result[count] = self.generate_future_ff_rels_for_context(entry, spa_temp_so_rels_feats_tf,
 		                                                         obj_seqs_tf, num_cf, num_tf, num_ff)
 		entry["output"] = result
+		entry["global_output"] = spa_temp_so_rels_feats_tf
+		entry["gen_attention_distribution"] = self.gen_a_rel_compress(spa_temp_so_rels_feats_tf)
+		entry["gen_spatial_distribution"] = torch.sigmoid(self.gen_s_rel_compress(spa_temp_so_rels_feats_tf))
+		entry["gen_contacting_distribution"] = torch.sigmoid(self.gen_c_rel_compress(spa_temp_so_rels_feats_tf))
 		
 		return entry
 	
@@ -162,6 +166,7 @@ class DsgDetrGenAnt(BaseTransformer):
 		entry["gen_attention_distribution"] = self.gen_a_rel_compress(spa_temp_so_rels_feats_tf)
 		entry["gen_spatial_distribution"] = torch.sigmoid(self.gen_s_rel_compress(spa_temp_so_rels_feats_tf))
 		entry["gen_contacting_distribution"] = torch.sigmoid(self.gen_c_rel_compress(spa_temp_so_rels_feats_tf))
+		entry["global_output"] = spa_temp_so_rels_feats_tf
 		entry["output"] = result
 		
 		return entry

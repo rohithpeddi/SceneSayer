@@ -83,8 +83,7 @@ class DsgDetrAnt(BaseTransformer):
         :param entry: Dictionary from object classifier
         :return:
         """
-		(entry, spa_so_rels_feats_tf, obj_seqs_tf,
-		 object_labels, spa_temp_so_rels_feats_tf) = self.generate_spatial_predicate_embeddings(entry)
+		(entry, spa_so_rels_feats_tf, obj_seqs_tf) = self.generate_spatial_predicate_embeddings(entry)
 		
 		result = {}
 		count = 0
@@ -92,9 +91,10 @@ class DsgDetrAnt(BaseTransformer):
 		num_cf = min(int(math.ceil(context_fraction * num_tf)), num_tf - 1)
 		num_ff = num_tf - num_cf
 		
-		result[count] = self.generate_future_ff_rels_for_context(entry, spa_temp_so_rels_feats_tf, obj_seqs_tf, num_cf,
+		result[count] = self.generate_future_ff_rels_for_context(entry, spa_so_rels_feats_tf, obj_seqs_tf, num_cf,
 		                                                         num_tf, num_ff)
 		entry["output"] = result
+		entry["global_output"] = spa_so_rels_feats_tf
 		return entry
 	
 	def forward(self, entry, num_cf, num_ff):
@@ -114,8 +114,7 @@ class DsgDetrAnt(BaseTransformer):
         :param num_ff: Number of next frames to anticipate
         :return:
         """
-		(entry, spa_so_rels_feats_tf, obj_seqs_tf,
-		 spa_temp_so_rels_feats_tf) = self.generate_spatial_predicate_embeddings(entry)
+		(entry, spa_so_rels_feats_tf, obj_seqs_tf) = self.generate_spatial_predicate_embeddings(entry)
 		
 		count = 0
 		result = {}
@@ -123,11 +122,11 @@ class DsgDetrAnt(BaseTransformer):
 		num_cf = min(num_cf, num_tf - 1)
 		while num_cf + 1 <= num_tf:
 			num_ff = min(num_ff, num_tf - num_cf)
-			result[count] = self.generate_future_ff_rels_for_context(entry, spa_temp_so_rels_feats_tf, obj_seqs_tf,
+			result[count] = self.generate_future_ff_rels_for_context(entry, spa_so_rels_feats_tf, obj_seqs_tf,
 			                                                         num_cf, num_tf, num_ff)
 			count += 1
 			num_cf += 1
 		
 		entry["output"] = result
-		
+		entry["global_output"] = spa_so_rels_feats_tf
 		return entry

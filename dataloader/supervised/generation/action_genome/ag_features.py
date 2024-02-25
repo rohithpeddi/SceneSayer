@@ -39,11 +39,13 @@ class AGFeatures(Dataset):
 		
 		if features_path is not None:
 			self.features_path = features_path
+			print(f"Loaded features from {self.features_path}")
 		else:
 			self.features_path = os.path.join(self.root_path, const.FEATURES, const.SUPERVISED, self.data_split)
 			
 		if additional_data_path is not None:
 			self.additional_data_path = additional_data_path
+			print(f"Loaded additional data from {self.additional_data_path}")
 		else:
 			self.additional_data_path = os.path.join(self.root_path, const.FEATURES, const.SUPERVISED, const.ADDITIONAL, self.data_split)
 

@@ -48,8 +48,8 @@ def calculate_gen_losses(conf, pred, losses, ce_loss, mlm_loss, bce_loss, attent
 	return losses
 
 
-def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu_device, dataloader_train, gt_annotation,
-                        matcher, frame_size):
+def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu_device, dataloader_train,
+                        gt_annotation, matcher, frame_size):
 	start_time = time.time()
 	
 	bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_transformer_loss_functions()
@@ -57,8 +57,6 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
 	count = 0
 	num_cf = conf.baseline_context
 	num_ff = conf.baseline_future
-	num_tf = len(entry["im_idx"].unique())
-	
 	fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size)
 	pred = model(entry, num_cf, num_ff)
 	
@@ -94,8 +92,8 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
 		                              attention_label, spatial_label, contact_label)
 	
 	# ----------------- Loss calculation for anticipated outputs -----------------
-	
-	num_cf = min(num_cf, num_tf - 1)
+	num_cf = conf.baseline_context
+	num_tf = len(entry["im_idx"].unique())
 	while num_cf + 1 <= num_tf:
 		ant_spatial_distribution = ant_global_output[count]["spatial_distribution"]
 		ant_contact_distribution = ant_global_output[count]["contacting_distribution"]
@@ -136,7 +134,8 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
 	num_video += 1
 	
 	if num_video % 50 == 0:
-		print("epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(epoch, num_video, len(dataloader_train), loss.item()))
+		print(
+			"epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(epoch, num_video, len(dataloader_train), loss.item()))
 	
 	tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
 	if num_video % 1000 == 0 and num_video >= 1000:
@@ -144,20 +143,22 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
 		print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, num_video, len(dataloader_train),
 		                                                                    time_per_batch,
 		                                                                    len(dataloader_train) * time_per_batch / 60))
-		
 		mn = pd.concat(tr[-1000:], axis=1).mean(1)
 		print(mn)
 	return num_video
 
 
 def process_test_video(conf, entry, model, gt_annotation, evaluator, matcher, frame_size):
+	# ----------------- Make predictions -----------------
 	fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size)
 	num_ff = conf.baseline_future
 	num_cf = conf.baseline_context
-	
 	pred = model(entry, num_cf, num_ff)
 	
+	# ----------------- Evaluate the anticipated scene graphs -----------------
 	count = 0
+	num_ff = conf.baseline_future
+	num_cf = conf.baseline_context
 	num_tf = len(entry["im_idx"].unique())
 	num_cf = min(num_cf, num_tf - 1)
 	while num_cf + 1 <= num_tf:
@@ -345,3 +346,7 @@ def train_model():
 		evaluator.print_stats()
 		evaluator.reset_result()
 		scheduler.step(score)
+
+
+if __name__ == "__main__":
+	train_model()

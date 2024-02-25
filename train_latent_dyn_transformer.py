@@ -73,7 +73,9 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
             contact_label[i, pred["contacting_gt"][i]] = 1
 
     losses = {}
+    has_object_loss = False
     if conf.mode == 'sgcls' or conf.mode == 'sgdet':
+        has_object_loss = True
         losses['object_loss'] = ce_loss(pred['distribution'], pred['labels']).mean()
 
     has_gen_loss = False
@@ -136,15 +138,15 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
         losses["anticipated_contact_relation_loss"] = cum_ant_contact_relation_loss / loss_count
         losses["anticipated_latent_loss"] = cum_ant_latent_loss / loss_count
 
-    if loss_count > 0 or has_gen_loss:
+    if loss_count > 0 or has_gen_loss or has_object_loss:
         optimizer.zero_grad()
         loss = sum(losses.values())
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
         optimizer.step()
         print(
-            "Has Gen Loss: {}, Has Ant Loss: {}, epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(has_gen_loss,
-                                                                                                     loss_count,
+            "Gen Loss: {}, Ant Loss: {}, Object Loss:{}, epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(has_gen_loss,
+                                                                                                     loss_count, has_object_loss,
                                                                                                      epoch, num_video,
                                                                                                      len(dataloader_train),
                                                                                                      loss.item()))

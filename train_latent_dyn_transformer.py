@@ -60,9 +60,6 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
 	fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size)
 	pred = model(entry, num_cf, num_ff)
 	
-	global_output = pred["global_output"]
-	ant_global_output = pred["output"]
-	
 	attention_label = torch.tensor(pred["attention_gt"], dtype=torch.long).to(device=gpu_device).squeeze()
 	if not conf.bce_loss:
 		spatial_label = -torch.ones([len(pred["spatial_gt"]), 6], dtype=torch.long).to(device=gpu_device)
@@ -92,28 +89,32 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
 		                              attention_label, spatial_label, contact_label)
 	
 	# ----------------- Loss calculation for anticipated outputs -----------------
+	global_output = pred["global_output"]
+	ant_output = pred["output"]
+	
 	num_cf = conf.baseline_context
 	num_tf = len(entry["im_idx"].unique())
 	while num_cf + 1 <= num_tf:
-		ant_spatial_distribution = ant_global_output[count]["spatial_distribution"]
-		ant_contact_distribution = ant_global_output[count]["contacting_distribution"]
-		ant_attention_distribution = ant_global_output[count]["attention_distribution"]
+		ant_spatial_distribution = ant_output[count]["spatial_distribution"]
+		ant_contact_distribution = ant_output[count]["contacting_distribution"]
+		ant_attention_distribution = ant_output[count]["attention_distribution"]
+		ant_global_output = ant_output[count]["global_output"]
 		
-		mask_curr = ant_global_output[count]["mask_curr"]
-		mask_gt = ant_global_output[count]["mask_gt"]
+		mask_curr = ant_output[count]["mask_curr"]
+		mask_gt = ant_output[count]["mask_gt"]
 		losses["anticipated_attention_relation_loss"] = ce_loss(ant_attention_distribution[mask_curr],
 		                                                        attention_label[mask_gt]).mean()
 		
 		if not conf.bce_loss:
 			losses["anticipated_latent_loss"] += conf.hp_recon_loss * abs_loss(
-				ant_global_output[count][mask_curr], global_output[mask_gt])
+				ant_global_output[mask_curr], global_output[mask_gt])
 			losses["anticipated_spatial_relation_loss"] += mlm_loss(ant_spatial_distribution[mask_curr],
 			                                                        spatial_label[mask_gt])
 			losses["anticipated_contact_relation_loss"] += mlm_loss(ant_contact_distribution[mask_curr],
 			                                                        contact_label[mask_gt])
 		else:
 			losses["anticipated_latent_loss"] += conf.hp_recon_loss * abs_loss(
-				ant_global_output[count][mask_curr], global_output[mask_gt])
+				ant_global_output[mask_curr], global_output[mask_gt])
 			losses["anticipated_spatial_relation_loss"] += bce_loss(ant_spatial_distribution[mask_curr],
 			                                                        spatial_label[mask_gt])
 			losses["anticipated_contact_relation_loss"] += bce_loss(ant_contact_distribution[mask_curr],

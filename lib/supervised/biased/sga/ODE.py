@@ -195,8 +195,6 @@ class ODE(nn.Module):
                               spatial_class_num=spatial_class_num,
                               contact_class_num=contact_class_num,
                               obj_classes=obj_classes)
-        self.gen_num = np.zeros(1750)
-        self.ant_num = np.zeros((3, 1750))
         self.ctr = 0
 
     def forward(self, entry, testing = False):
@@ -216,11 +214,11 @@ class ODE(nn.Module):
         indices = torch.reshape((im_idx[ : -1] != im_idx[1 : ]).nonzero(), (-1, )) + 1
         curr_id = 0
         times_unique = torch.unique(times).float()
-        n = len(gt_annotation)
+        num_frames = len(gt_annotation)
         window = self.max_window
         if self.max_window == -1:
-            window = n - 1
-        window = min(window, n - 1)
+            window = num_frames - 1
+        window = min(window, num_frames - 1)
         times_extend = torch.Tensor([times_unique[-1] + i + 1 for i in range(window)])
         global_output = entry["global_output"]
         anticipated_vals = torch.zeros(window, 0, self.d_model, device=global_output.device)
@@ -234,17 +232,16 @@ class ODE(nn.Module):
                 frames_ranges = torch.cat((frames_ranges[ : i], torch.tensor([frames_ranges[i] for j in range(diff - 1)]).to(device=im_idx.device), frames_ranges[i : ]))
         if im_idx[0] > 0:
             frames_ranges = torch.cat((torch.tensor([0 for j in range(im_idx[0])]).to(device=im_idx.device), frames_ranges))
-        if frames_ranges.size(0) != n + 1:
-            frames_ranges = torch.cat((frames_ranges, torch.tensor([num_preds for j in range(n + 1 - frames_ranges.size(0))]).to(device=im_idx.device)))
+        if frames_ranges.size(0) != num_frames + 1:
+            frames_ranges = torch.cat((frames_ranges, torch.tensor([num_preds for j in range(num_frames + 1 - frames_ranges.size(0))]).to(device=im_idx.device)))
         entry["times"] = torch.repeat_interleave(times_unique.to(device=global_output.device), frames_ranges[1 : ] - frames_ranges[ : -1])
         entry["rng"] = frames_ranges
         times_unique = torch.cat((times_unique, times_extend)).to(device=global_output.device)
-        #self.gen_num[self.ctr] = num_preds
         for i in range(1, window + 1):
             mask_preds = torch.tensor([], dtype=torch.long, device=frames_ranges.device)
             mask_gt = torch.tensor([], dtype=torch.long, device=frames_ranges.device)
             gt = gt_annotation.copy()
-            for j in range(n - i):
+            for j in range(num_frames - i):
                 if testing:
                     a, b = np.array(pred_labels_obj[frames_ranges[j] : frames_ranges[j + 1]].cpu()), np.array(labels_obj[frames_ranges[j + i] : frames_ranges[j + i + 1]].cpu())
                 else:
@@ -273,7 +270,6 @@ class ODE(nn.Module):
                 mask_gt = torch.cat((mask_gt, ind2))
             entry["mask_curr_%d" %i] = mask_preds
             entry["mask_gt_%d" %i] = mask_gt
-            #self.ant_num[i - 1, self.ctr] = mask_preds.size(0)
             if testing:
                 """pair_idx_test = pair_idx[mask_preds]
                 _, inverse_indices = torch.unique(pair_idx_test, sorted=True, return_inverse=True)
@@ -309,7 +305,7 @@ class ODE(nn.Module):
         #self.ctr += 1
         #anticipated_latent_loss = 0
         #targets = entry["detached_outputs"] 
-        for i in range(n - 1):
+        for i in range(num_frames - 1):
             end = frames_ranges[i + 1]
             if curr_id == end:
                 continue
@@ -345,25 +341,25 @@ class ODE(nn.Module):
         pair_idx = entry["pair_idx"]
         frames_ranges = entry["rng"]
         times = torch.unique(torch.tensor(entry["frame_idx"], dtype = torch.float32)).to(device=im_idx.device)
-        n = len(entry["gt_annotation"])
+        num_frames = len(entry["gt_annotation"])
         pred = {}
-        end = int(np.ceil(n * context_fraction) - 1)
+        end = int(np.ceil(num_frames * context_fraction) - 1)
         while end > 0 and frames_ranges[end] == frames_ranges[end + 1]:
             end -= 1
-        if end == n - 1 or frames_ranges[end] == frames_ranges[end + 1]:
-            return n, pred
+        if end == num_frames - 1 or frames_ranges[end] == frames_ranges[end + 1]:
+            return num_frames, pred
         ret = odeint(self.diff_func, entry["global_output"][frames_ranges[end] : frames_ranges[end + 1]], times[end : ], method='explicit_adams', options=dict(max_order=4, step_size=1))[1 : ]
         pred["attention_distribution"] = torch.flatten(self.dsgdetr.a_rel_compress(ret), start_dim=0, end_dim=1)
         pred["spatial_distribution"] = torch.flatten(torch.sigmoid(self.dsgdetr.s_rel_compress(ret)), start_dim=0, end_dim=1)
         pred["contacting_distribution"] = torch.flatten(torch.sigmoid(self.dsgdetr.c_rel_compress(ret)), start_dim=0, end_dim=1)
         if self.mode == "predcls":
-            pred["scores"] = entry["scores"][torch.min(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) : torch.max(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) + 1].repeat(n - end - 1)
-            pred["labels"] = entry["labels"][torch.min(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) : torch.max(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) + 1].repeat(n - end - 1)
+            pred["scores"] = entry["scores"][torch.min(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) : torch.max(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) + 1].repeat(num_frames - end - 1)
+            pred["labels"] = entry["labels"][torch.min(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) : torch.max(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) + 1].repeat(num_frames - end - 1)
         else:
-            pred["pred_scores"] = entry["pred_scores"][torch.min(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) : torch.max(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) + 1].repeat(n - end - 1)
-            pred["pred_labels"] = entry["pred_labels"][torch.min(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) : torch.max(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) + 1].repeat(n - end - 1)
-        pred["im_idx"]  = torch.tensor([i for i in range(n - end - 1) for j in range(frames_ranges[end + 1] - frames_ranges[end])], dtype=torch.int32).to(device=frames_ranges.device)
+            pred["pred_scores"] = entry["pred_scores"][torch.min(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) : torch.max(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) + 1].repeat(num_frames - end - 1)
+            pred["pred_labels"] = entry["pred_labels"][torch.min(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) : torch.max(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) + 1].repeat(num_frames - end - 1)
+        pred["im_idx"]  = torch.tensor([i for i in range(num_frames - end - 1) for j in range(frames_ranges[end + 1] - frames_ranges[end])], dtype=torch.int32).to(device=frames_ranges.device)
         mx = torch.max(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) - torch.min(pair_idx[frames_ranges[end] : frames_ranges[end + 1]]) + 1
-        pred["pair_idx"] = (pair_idx[frames_ranges[end] : frames_ranges[end + 1]] - torch.min(pair_idx[frames_ranges[end] : frames_ranges[end + 1]])).repeat(n - end - 1, 1) + mx * torch.reshape(pred["im_idx"], (-1, 1))
-        pred["boxes"] = torch.ones(mx * (n - end - 1), 5).to(device=im_idx.device) / 2
+        pred["pair_idx"] = (pair_idx[frames_ranges[end] : frames_ranges[end + 1]] - torch.min(pair_idx[frames_ranges[end] : frames_ranges[end + 1]])).repeat(num_frames - end - 1, 1) + mx * torch.reshape(pred["im_idx"], (-1, 1))
+        pred["boxes"] = torch.ones(mx * (num_frames - end - 1), 5).to(device=im_idx.device) / 2
         return end + 1, pred

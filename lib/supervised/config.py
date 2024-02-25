@@ -36,6 +36,8 @@ class Config(object):
         self.baseline_context = 3
         self.baseline_future = 5
         
+        self.hp_recon_loss = 1.0
+        
         self.use_raw_data = False
         
         self.parser = self.setup_parser()

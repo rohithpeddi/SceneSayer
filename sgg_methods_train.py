@@ -33,7 +33,6 @@ logger = get_logger(__name__)
 
 
 def prepare_optimizer(model):
-    # optimizer
     if conf.optimizer == const.ADAMW:
         optimizer = AdamW(model.parameters(), lr=conf.lr)
     elif conf.optimizer == const.ADAM:

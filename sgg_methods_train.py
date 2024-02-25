@@ -11,7 +11,10 @@ import copy
 
 from tqdm import tqdm
 
-from dataloader.supervised.generation.action_genome.ag_features import AGFeatures, cuda_collate_fn
+from dataloader.supervised.generation.action_genome.ag_features import AGFeatures
+from dataloader.supervised.generation.action_genome.ag_features import cuda_collate_fn as ag_features_cuda_collate_fn
+from dataloader.supervised.generation.action_genome.ag_dataset import AG
+from dataloader.supervised.generation.action_genome.ag_dataset import cuda_collate_fn as ag_data_cuda_collate_fn
 from constants import Constants as const
 from lib.supervised.config import Config
 from lib.supervised.evaluation_recall import BasicSceneGraphEvaluator
@@ -49,12 +52,13 @@ def train_dsg_detr():
     from lib.supervised.biased.dsgdetr.dsgdetr import DsgDETR
     from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
     from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
+    from lib.object_detector import detector
 
     model = DsgDETR(mode=conf.mode,
-                    attention_class_num=len(ag_features_train.attention_relationships),
-                    spatial_class_num=len(ag_features_train.spatial_relationships),
-                    contact_class_num=len(ag_features_train.contacting_relationships),
-                    obj_classes=ag_features_train.object_classes,
+                    attention_class_num=len(ag_train_data.attention_relationships),
+                    spatial_class_num=len(ag_train_data.spatial_relationships),
+                    contact_class_num=len(ag_train_data.contacting_relationships),
+                    obj_classes=ag_train_data.object_classes,
                     enc_layer_num=conf.enc_layer,
                     dec_layer_num=conf.dec_layer).to(device=gpu_device)
 
@@ -68,16 +72,44 @@ def train_dsg_detr():
     matcher = HungarianMatcher(0.5, 1, 1, 0.5)
     matcher.eval()
 
+    object_detector = detector(
+        train=True,
+        object_classes=ag_train_data.object_classes,
+        use_SUPPLY=True,
+        mode=conf.mode
+    ).to(device=gpu_device)
+    object_detector.eval()
+    print("Finished loading object detector", flush=True)
+
+    if conf.optimizer == const.ADAMW:
+        optimizer = AdamW(model.parameters(), lr=conf.lr)
+    elif conf.optimizer == const.ADAM:
+        optimizer = optim.Adam(model.parameters(), lr=conf.lr)
+    elif conf.optimizer == const.SGD:
+        optimizer = optim.SGD(model.parameters(), lr=conf.lr, momentum=0.9, weight_decay=0.01)
+    else:
+        raise NotImplementedError
+
+    scheduler = ReduceLROnPlateau(optimizer, "max", patience=1, factor=0.5, verbose=True, threshold=1e-4,
+                                  threshold_mode="abs", min_lr=1e-7)
+
     for epoch in range(conf.nepoch):
         model.train()
+        train_iter = iter(dataloader_train)
         start = time.time()
         counter = 0
-        for train_entry in tqdm(dataloader_train):
-            gt_annotation = train_entry[const.GT_ANNOTATION]
-            frame_size = train_entry[const.FRAME_SIZE]
-
-            get_sequence_with_tracking(train_entry, gt_annotation, matcher, frame_size, conf.mode)
-            pred = model(train_entry)
+        for b in range(len(dataloader_train)):
+            data = next(train_iter)
+            im_data = copy.deepcopy(data[0].cuda(0))
+            im_info = copy.deepcopy(data[1].cuda(0))
+            gt_boxes = copy.deepcopy(data[2].cuda(0))
+            num_boxes = copy.deepcopy(data[3].cuda(0))
+            gt_annotation = ag_train_data.gt_annotations[data[4]]
+            frame_size = (im_info[0][:2] / im_info[0, 2]).cpu().data
+            with torch.no_grad():
+                entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+            get_sequence_with_tracking(entry, gt_annotation, matcher, frame_size, conf.mode)
+            pred = model(entry)
 
             attention_distribution = pred[const.ATTENTION_DISTRIBUTION]
             spatial_distribution = pred[const.SPATIAL_DISTRIBUTION]
@@ -170,10 +202,10 @@ def train_sttran():
     from lib.supervised.biased.sttran.sttran import STTran
 
     model = STTran(mode=conf.mode,
-                   attention_class_num=len(ag_features_train.attention_relationships),
-                   spatial_class_num=len(ag_features_train.spatial_relationships),
-                   contact_class_num=len(ag_features_train.contacting_relationships),
-                   obj_classes=ag_features_train.object_classes,
+                   attention_class_num=len(ag_train_data.attention_relationships),
+                   spatial_class_num=len(ag_train_data.spatial_relationships),
+                   contact_class_num=len(ag_train_data.contacting_relationships),
+                   obj_classes=ag_train_data.object_classes,
                    enc_layer_num=conf.enc_layer,
                    dec_layer_num=conf.dec_layer).to(device=gpu_device)
 
@@ -278,49 +310,86 @@ if __name__ == '__main__':
     # Set the preferred device
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    ag_features_train = AGFeatures(
-        mode=conf.mode,
-        data_split=const.TRAIN,
-        device=device,
-        data_path=conf.data_path,
-        is_compiled_together=False,
-        filter_nonperson_box_frame=True,
-        filter_small_box=False if conf.mode == const.PREDCLS else True
-    )
+    if not conf.use_raw_data:
+        ag_train_data = AGFeatures(
+            mode=conf.mode,
+            data_split=const.TRAIN,
+            device=device,
+            data_path=conf.data_path,
+            is_compiled_together=False,
+            filter_nonperson_box_frame=True,
+            filter_small_box=False if conf.mode == const.PREDCLS else True,
+            features_path=conf.features_path,
+            additional_data_path=conf.additional_data_path
+        )
 
-    dataloader_train = DataLoader(
-        ag_features_train,
-        shuffle=True,
-        collate_fn=cuda_collate_fn,
-        pin_memory=False
-    )
+        ag_test_data = AGFeatures(
+            mode=conf.mode,
+            data_split=const.TEST,
+            device=device,
+            data_path=conf.data_path,
+            is_compiled_together=False,
+            filter_nonperson_box_frame=True,
+            filter_small_box=False if conf.mode == const.PREDCLS else True,
+            features_path=conf.features_path,
+            additional_data_path=conf.additional_data_path
+        )
 
-    ag_features_test = AGFeatures(
-        mode=conf.mode,
-        data_split=const.TEST,
-        device=device,
-        data_path=conf.data_path,
-        is_compiled_together=False,
-        filter_nonperson_box_frame=True,
-        filter_small_box=False if conf.mode == const.PREDCLS else True
-    )
+        dataloader_train = DataLoader(
+            ag_train_data,
+            shuffle=True,
+            collate_fn=ag_features_cuda_collate_fn,
+            pin_memory=False,
+            num_workers=0
+        )
 
-    dataloader_test = DataLoader(
-        ag_features_test,
-        shuffle=False,
-        collate_fn=cuda_collate_fn,
-        pin_memory=False
-    )
+        dataloader_test = DataLoader(
+            ag_test_data,
+            shuffle=False,
+            collate_fn=ag_features_cuda_collate_fn,
+            pin_memory=False
+        )
+    else:
+        ag_train_data = AG(
+            phase="train",
+            datasize=conf.datasize,
+            data_path=conf.data_path,
+            filter_nonperson_box_frame=True,
+            filter_small_box=False if conf.mode == 'predcls' else True
+        )
+
+        ag_test_data = AG(
+            phase="test",
+            datasize=conf.datasize,
+            data_path=conf.data_path,
+            filter_nonperson_box_frame=True,
+            filter_small_box=False if conf.mode == 'predcls' else True
+        )
+
+        dataloader_train = DataLoader(
+            ag_train_data,
+            shuffle=True,
+            collate_fn=ag_data_cuda_collate_fn,
+            pin_memory=True,
+            num_workers=0
+        )
+
+        dataloader_test = DataLoader(
+            ag_test_data,
+            shuffle=False,
+            collate_fn=ag_data_cuda_collate_fn,
+            pin_memory=False
+        )
 
     gpu_device = torch.device("cuda:0")
 
     evaluator = BasicSceneGraphEvaluator(
         mode=conf.mode,
-        AG_object_classes=ag_features_train.object_classes,
-        AG_all_predicates=ag_features_train.relationship_classes,
-        AG_attention_predicates=ag_features_train.attention_relationships,
-        AG_spatial_predicates=ag_features_train.spatial_relationships,
-        AG_contacting_predicates=ag_features_train.contacting_relationships,
+        AG_object_classes=ag_train_data.object_classes,
+        AG_all_predicates=ag_train_data.relationship_classes,
+        AG_attention_predicates=ag_train_data.attention_relationships,
+        AG_spatial_predicates=ag_train_data.spatial_relationships,
+        AG_contacting_predicates=ag_train_data.contacting_relationships,
         iou_threshold=0.5,
         save_file=os.path.join(conf.save_path, const.PROGRESS_TEXT_FILE),
         constraint='with'

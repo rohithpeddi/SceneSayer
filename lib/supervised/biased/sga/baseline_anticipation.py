@@ -153,8 +153,9 @@ class BaselineWithAnticipation(nn.Module):
 		result = {}
 		num_tf = len(entry["im_idx"].unique())
 		num_cf = min(num_cf, num_tf - 1)
-		num_ff = min(num_ff, num_tf - num_cf)
+
 		while num_cf + 1 <= num_tf:
+			num_ff = min(num_ff, num_tf - num_cf)
 			ff_start_id = entry["im_idx"].unique()[num_cf]
 			ff_end_id = entry["im_idx"].unique()[num_cf + num_ff - 1]
 			

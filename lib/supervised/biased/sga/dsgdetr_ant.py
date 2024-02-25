@@ -62,11 +62,13 @@ class DsgDetrAnt(BaseTransformer):
 		self.obj_embed2.weight.data = embed_vecs.clone()
 		
 		d_model = 1936
-		self.positional_encoder = PositionalEncoding(d_model, max_len=400)
 		
 		# spatial encoder
 		spatial_encoder = EncoderLayer(d_model=d_model, dim_feedforward=2048, nhead=8, batch_first=True)
 		self.spatial_transformer = Encoder(spatial_encoder, num_layers=1)
+		
+		# Anticipation Positional Encoding
+		self.anti_positional_encoder = PositionalEncoding(d_model, max_len=400)
 		
 		# temporal encoder
 		temporal_encoder = EncoderLayer(d_model=d_model, dim_feedforward=2048, nhead=8, batch_first=True)

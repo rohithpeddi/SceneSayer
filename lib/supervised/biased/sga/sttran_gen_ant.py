@@ -64,15 +64,19 @@ class STTranGenAnt(BaseTransformer):
 		self.obj_embed2.weight.data = embed_vecs.clone()
 		
 		d_model = 1936
-		self.positional_encoder = PositionalEncoding(d_model, max_len=400)
-		
 		# Spatial encoder
 		spatial_encoder = EncoderLayer(d_model=d_model, dim_feedforward=2048, nhead=8, batch_first=True)
 		self.spatial_transformer = Encoder(spatial_encoder, num_layers=1)
 		
+		# Generation Positional Encoding
+		self.gen_positional_encoder = PositionalEncoding(d_model, max_len=400)
+		
 		# Generation temporal encoder
 		gen_temporal_encoder = EncoderLayer(d_model=d_model, dim_feedforward=2048, nhead=8, batch_first=True)
 		self.gen_temporal_transformer = Encoder(gen_temporal_encoder, num_layers=3)
+		
+		# Anticipation Positional Encoding
+		self.anti_positional_encoder = PositionalEncoding(d_model, max_len=400)
 		
 		# Anticipation temporal encoder
 		anti_temporal_encoder = EncoderLayer(d_model=d_model, dim_feedforward=2048, nhead=8, batch_first=True)
@@ -90,13 +94,12 @@ class STTranGenAnt(BaseTransformer):
 		entry, spa_rels_feats_tf, sequences = self.generate_spatial_predicate_embeddings(entry)
 		# Temporal message passing
 		sequence_features = pad_sequence([spa_rels_feats_tf[index] for index in sequences], batch_first=True)
-		in_mask_dsg = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
-		                              diagonal=0)).type(torch.bool)
-		in_mask_dsg = in_mask_dsg.cuda()
-		masks = (1 - pad_sequence([torch.ones(len(index)) for index in sequences], batch_first=True)).bool()
+		causal_mask = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
+		                              diagonal=0)).type(torch.bool).cuda()
+		padding_mask = (1 - pad_sequence([torch.ones(len(index)) for index in sequences], batch_first=True)).bool().cuda()
 		positional_encoding = self.fetch_positional_encoding_for_gen_obj_seqs(sequences, entry)
-		rel_ = self.gen_temporal_transformer(self.positional_encoder(sequence_features, positional_encoding),
-		                                     src_key_padding_mask=masks.cuda(), mask=in_mask_dsg)
+		rel_ = self.gen_temporal_transformer(self.gen_positional_encoder(sequence_features, positional_encoding),
+		                                     src_key_padding_mask=padding_mask, mask=causal_mask)
 		
 		rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(sequences, rel_)])
 		indices_flat = torch.cat(sequences).unsqueeze(1).repeat(1, spa_rels_feats_tf.shape[1])

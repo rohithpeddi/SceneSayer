@@ -103,19 +103,17 @@ class BaseTransformer(nn.Module):
         return positional_encoding
 
     @staticmethod
-    def fetch_masks(so_rel_seqs, obj_seqs):
-        causal_mask = torch.triu(torch.ones(so_rel_seqs.shape[1], so_rel_seqs.shape[1]), diagonal=1).bool().cuda()
+    def fetch_masks(obj_seqs):
         padding_mask = (1 - pad_sequence([torch.ones(len(obj_seq)).flip(dims=[0])
                                           for obj_seq in obj_seqs], batch_first=True)).flip(
             dims=[1]).bool().cuda()
-        return causal_mask, padding_mask
+        return padding_mask
 
     @staticmethod
-    def fetch_updated_masks(so_rel_seqs, padding_mask):
-        causal_mask = torch.triu(torch.ones(so_rel_seqs.shape[1], so_rel_seqs.shape[1]), diagonal=1).bool().cuda()
+    def fetch_updated_masks(padding_mask):
         additional_column = torch.full((padding_mask.shape[0], 1), False, dtype=torch.bool).cuda()
         padding_mask = torch.cat([padding_mask, additional_column], dim=1)
-        return causal_mask, padding_mask
+        return padding_mask
 
     def generate_future_ff_rels_for_context(self, entry, so_rels_feats_tf, obj_seqs_tf, num_cf, num_tf, num_ff):
         # Add code to get mask_curr and mask_gt outputs
@@ -154,25 +152,29 @@ class BaseTransformer(nn.Module):
             future_index = s[(s >= num_objects_cf) & (s < (num_objects_cf + num_objects_ff))]
             if len(future_index) > 0:
                 obj_seqs_ff.append(future_index)
-
+        
+        # ------------------- Masks for anticipation transformer -------------------
+        # Causal mask is not required for anticipation transformer. It is required for the generation transformer.
+        # In anticipation transformer we only take the last output from the transformer, so mask is not required.
+        
         so_rels_feats_cf = pad_sequence([so_rels_feats_tf[cf_obj_seq.flip(dims=[0])]
                                          for cf_obj_seq in cf_obj_seqs_in_clf], batch_first=True).flip(dims=[1])
-        causal_mask, padding_mask = self.fetch_masks(so_rels_feats_cf, cf_obj_seqs_in_clf)
+        padding_mask = self.fetch_masks(cf_obj_seqs_in_clf)
         positional_encoding = self.fetch_positional_encoding_for_ant_obj_seqs(cf_obj_seqs_in_clf, entry)
-        so_rels_feats_cf = self.positional_encoder(so_rels_feats_cf, positional_encoding)
+        so_rels_feats_cf = self.anti_positional_encoder(so_rels_feats_cf, positional_encoding)
 
         # 2. Fetch future representations for those objects.
         so_rels_feats_ff = []
         for i in range(num_ff):
-            out = self.anti_temporal_transformer(so_rels_feats_cf, src_key_padding_mask=padding_mask, mask=causal_mask)
+            out = self.anti_temporal_transformer(so_rels_feats_cf, src_key_padding_mask=padding_mask)
 
             so_rels_feats_ff.append(out[:, -1, :].unsqueeze(1))
             so_rels_feats_ant_one_step = torch.stack([out[:, -1, :]], dim=1)
 
             so_rels_feats_cf = torch.cat([so_rels_feats_cf, so_rels_feats_ant_one_step], 1)
             positional_encoding = self.update_positional_encoding(positional_encoding)
-            so_rels_feats_cf = self.positional_encoder(so_rels_feats_cf, positional_encoding)
-            causal_mask, padding_mask = self.fetch_updated_masks(so_rels_feats_cf, padding_mask)
+            so_rels_feats_cf = self.anti_positional_encoder(so_rels_feats_cf, positional_encoding)
+            padding_mask = self.fetch_updated_masks(padding_mask)
         so_rels_feats_ff = torch.cat(so_rels_feats_ff, dim=1)
 
         # 3. Construct im_idx, pair_idx, and labels for the future frames accordingly.

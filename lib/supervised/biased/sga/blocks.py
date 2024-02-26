@@ -560,7 +560,7 @@ class ObjectClassifierTransformer(nn.Module):
 				
 				entry['pred_scores'], entry['pred_labels'] = torch.max(entry['distribution'][:, 1:], dim=1)
 				entry['pred_labels'] = entry['pred_labels'] + 2
-				# use the infered object labels for new pair idx
+				# use the inferred object labels for new pair idx
 				HUMAN_IDX = torch.zeros([b, 1], dtype=torch.int64).to(box_idx.device)
 				global_idx = torch.arange(0, entry['boxes'].shape[0])
 				
@@ -756,7 +756,6 @@ class ObjectClassifierMLP(nn.Module):
 				entry[const.DISTRIBUTION] = self.decoder_lin(obj_features)
 				entry[const.PRED_LABELS] = entry[const.LABELS]
 			else:
-				
 				obj_embed = entry[const.DISTRIBUTION] @ self.obj_embed.weight
 				pos_embed = self.pos_embed(center_size(entry[const.BOXES][:, 1:]))
 				obj_features = torch.cat((entry[const.FEATURES], obj_embed, pos_embed),
@@ -847,3 +846,37 @@ class ObjectClassifierMLP(nn.Module):
 				                      1).data.cpu().numpy()
 				entry[const.SPATIAL_MASKS] = torch.tensor(draw_union_boxes(pair_rois, 27) - 0.5).to(box_idx.device)
 			return entry
+
+
+class ObjectAnt(nn.Module):
+	
+	def __init__(
+			self,
+			mode='sgdet',
+			obj_classes=None,
+			decoder_layer_num=2,
+	):
+		super(ObjectAnt, self).__init__()
+		self.obj_classes = obj_classes
+		self.decoder_layer_num = decoder_layer_num
+		self.mode = mode
+		
+		assert mode in ('sgdet', 'sgcls', 'predcls')
+		
+		self.object_classifier = ObjectClassifierTransformer(mode=self.mode, obj_classes=self.obj_classes)
+		
+		self.d_model = 1936
+	
+	# Define heads for object prediction, bounding box prediction
+	
+	def forward(self, entry, num_cf, num_ff):
+		"""
+		entry["features"] will be a sequence of object features.
+		(1) Define a positional encoding scheme for the object features.
+		(2)
+		:param entry:
+		:param num_cf:
+		:param num_ff:
+		:return:
+		"""
+		entry = self.object_classifier(entry)

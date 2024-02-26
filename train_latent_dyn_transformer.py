@@ -151,7 +151,7 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
                                                                                                      len(dataloader_train),
                                                                                                      loss.item()))
     else:
-        print(f"No loss to backpropagate for video: {num_video}")
+        print(f"No loss to back-propagate for video: {num_video}")
     num_video += 1
 
     tr.append(pd.Series({x: y.item() for x, y in losses.items()}))

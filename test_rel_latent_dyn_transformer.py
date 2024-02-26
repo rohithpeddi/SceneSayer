@@ -10,10 +10,10 @@ from test_base import (fetch_transformer_test_basic_config, prepare_prediction_g
                        send_future_evaluators_stats_to_firebase, write_future_evaluators_stats,
                        write_percentage_evaluators_stats, send_percentage_evaluators_stats_to_firebase)
 from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
-from lib.supervised.biased.sga.sttran_ant import STTranAnt
-from lib.supervised.biased.sga.sttran_gen_ant import STTranGenAnt
-from lib.supervised.biased.sga.dsgdetr_ant import DsgDetrAnt
-from lib.supervised.biased.sga.dsgdetr_gen_ant import DsgDetrGenAnt
+from lib.supervised.biased.sga.rel.rel_sttran_ant import STTranAnt
+from lib.supervised.biased.sga.rel.rel_sttran_gen_ant import STTranGenAnt
+from lib.supervised.biased.sga.rel.rel_dsgdetr_ant import DsgDetrAnt
+from lib.supervised.biased.sga.rel.rel_dsgdetr_gen_ant import DsgDetrGenAnt
 
 
 def fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size):

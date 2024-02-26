@@ -9,10 +9,10 @@ import torch
 from lib.object_detector import detector
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
-from lib.supervised.biased.sga.dsgdetr_ant import DsgDetrAnt
-from lib.supervised.biased.sga.dsgdetr_gen_ant import DsgDetrGenAnt
-from lib.supervised.biased.sga.sttran_ant import STTranAnt
-from lib.supervised.biased.sga.sttran_gen_ant import STTranGenAnt
+from lib.supervised.biased.sga.rel.rel_dsgdetr_ant import DsgDetrAnt
+from lib.supervised.biased.sga.rel.rel_dsgdetr_gen_ant import DsgDetrGenAnt
+from lib.supervised.biased.sga.rel.rel_sttran_ant import STTranAnt
+from lib.supervised.biased.sga.rel.rel_sttran_gen_ant import STTranGenAnt
 from train_base import fetch_train_basic_config, prepare_optimizer, save_model, fetch_transformer_loss_functions, \
     get_sequence_no_tracking, load_model_from_checkpoint
 

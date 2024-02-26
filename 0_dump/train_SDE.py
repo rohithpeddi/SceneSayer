@@ -14,7 +14,7 @@ from constants import Constants as const
 
 from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.biased.sga.SDE import SDE as SDE
+from lib.supervised.biased.sga.rel.sde import SDE as SDE
 
 from train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions
 

@@ -1,10 +1,9 @@
 import os
-import csv
 
 import numpy as np
 import torch
 from time import time
-from lib.supervised.biased.sga.ODE import ODE as ODE
+from lib.supervised.biased.sga.rel.ode import ODE as ODE
 
 from constants import Constants as const
 from tqdm import tqdm

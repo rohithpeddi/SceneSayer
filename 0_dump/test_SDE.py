@@ -3,7 +3,7 @@ import torch
 
 from test_base import fetch_diffeq_test_basic_config
 from time import time
-from lib.supervised.biased.sga.SDE import SDE as SDE
+from lib.supervised.biased.sga.rel.sde import SDE as SDE
 
 from constants import Constants as const
 from tqdm import tqdm

@@ -3,13 +3,13 @@ import os
 import numpy as np
 import torch
 from time import time
-from lib.supervised.biased.sga.ODE import ODE as ODE
+from lib.supervised.biased.sga.rel.ode import ODE as ODE
 
 from constants import Constants as const
 from tqdm import tqdm
 from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.biased.sga.SDE import SDE
+from lib.supervised.biased.sga.rel.sde import SDE
 from test_base import (fetch_diffeq_test_basic_config, write_future_evaluators_stats, write_percentage_evaluators_stats, \
                        write_gen_evaluators_stats, evaluate_anticipated_future_frame_scene_graph,
                        send_future_evaluators_stats_to_firebase, prepare_prediction_graph,

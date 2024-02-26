@@ -201,16 +201,18 @@ class BaseTransformer(nn.Module):
         # ----------------------------------------------------------------------
 
         obj_idx_tf = entry["pair_idx"][:, 1]
-        obj_labels_tf = entry["labels"][obj_idx_tf] if self.training else entry["pred_labels"][obj_idx_tf]
+        pred_obj_labels_tf = entry["pred_labels"][obj_idx_tf]
+        gt_obj_labels_tf = entry["labels"][obj_idx_tf]
+        # obj_labels_tf = entry["labels"][obj_idx_tf] if self.training else entry["pred_labels"][obj_idx_tf]
         clf_obj_idx = torch.where(entry["im_idx"] == num_cf - 1)[0]
-        clf_obj_labels = obj_labels_tf[clf_obj_idx].unique(sorted=True)
+        clf_obj_labels = pred_obj_labels_tf[clf_obj_idx].unique(sorted=True)
         num_clf_obj = clf_obj_labels.shape[0]
 
         mask_ant = []
         mask_gt = []
         for ff_id in range(num_ff):
             ff_obj_idx = torch.where(entry["im_idx"] == num_cf + ff_id)[0]
-            ff_obj_labels = obj_labels_tf[ff_obj_idx]
+            ff_obj_labels = gt_obj_labels_tf[ff_obj_idx]
 
             np_clf_obj_labels = clf_obj_labels.cpu().numpy()
             np_ff_obj_labels = ff_obj_labels.cpu().numpy()
@@ -230,6 +232,9 @@ class BaseTransformer(nn.Module):
 
         mask_ant = torch.tensor(mask_ant_flat).cuda()
         mask_gt = mask_gt_flat
+
+        assert mask_ant.shape[0] == mask_gt.shape[0]
+        assert mask_ant.shape[0] <= so_rels_feats_ff_flat_ord.shape[0]
 
         temp = {
             "attention_distribution": self.a_rel_compress(so_rels_feats_ff_flat_ord),

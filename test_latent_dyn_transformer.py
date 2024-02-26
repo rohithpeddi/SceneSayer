@@ -219,6 +219,7 @@ def test_model():
                                              conf, num_future_frames, future_evaluators)
             
             for context_fraction in context_fractions:
+                entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
                 evaluate_model_context_fraction(model, matcher, entry, gt_annotation, frame_size,
                                                 conf, context_fraction, percentage_evaluators)
             

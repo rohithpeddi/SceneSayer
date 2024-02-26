@@ -296,12 +296,6 @@ def train_model():
 
     (model, object_detector, future_frame_loss_num,
      mode, method_name, matcher) = load_common_config(conf, ag_test_data, gpu_device)
-
-    if conf.ckpt:
-        ckpt = torch.load(conf.ckpt, map_location=gpu_device)
-        model.load_state_dict(ckpt[f'{method_name}_state_dict'], strict=False)
-        print(f"Loaded model from checkpoint {ckpt}")
-
     optimizer, scheduler = prepare_optimizer(conf, model)
 
     tr = []

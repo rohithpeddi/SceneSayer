@@ -129,10 +129,8 @@ class BaseTransformer(nn.Module):
         obj_labels_tf_unique = entry['pred_labels'][entry['pair_idx'][:, 1]].unique()
         objects_pcf = entry["im_idx"][:objects_clf_start_id]
         objects_cf = entry["im_idx"][:objects_ff_start_id]
-        objects_ff = entry["im_idx"][objects_ff_start_id:objects_ff_end_id]
         num_objects_cf = objects_cf.shape[0]
         num_objects_pcf = objects_pcf.shape[0]
-        num_objects_ff = objects_ff.shape[0]
 
         # 1. Refine object sequences to take only those objects that are present in the current frame.
         cf_obj_seqs_in_clf = []
@@ -148,14 +146,10 @@ class BaseTransformer(nn.Module):
                     obj_labels_clf.append(obj_labels_tf_unique[i])
                     cf_obj_seqs_in_clf.append(context_index)
 
-            future_index = s[(s >= num_objects_cf) & (s < (num_objects_cf + num_objects_ff))]
-            if len(future_index) > 0:
-                obj_seqs_ff.append(future_index)
-        
         # ------------------- Masks for anticipation transformer -------------------
         # Causal mask is not required for anticipation transformer. It is required for the generation transformer.
         # In anticipation transformer we only take the last output from the transformer, so mask is not required.
-        
+
         so_rels_feats_cf = pad_sequence([so_rels_feats_tf[cf_obj_seq.flip(dims=[0])]
                                          for cf_obj_seq in cf_obj_seqs_in_clf], batch_first=True).flip(dims=[1])
         padding_mask = self.fetch_masks(cf_obj_seqs_in_clf)
@@ -206,7 +200,8 @@ class BaseTransformer(nn.Module):
         # mask_gt: indices in all frames
         # ----------------------------------------------------------------------
 
-        obj_labels_tf = entry["labels"][entry["pair_idx"][:, 1]]
+        obj_idx_tf = entry["pair_idx"][:, 1]
+        obj_labels_tf = entry["labels"][obj_idx_tf] if self.training else entry["pred_labels"][obj_idx_tf]
         clf_obj_idx = torch.where(entry["im_idx"] == num_cf - 1)[0]
         clf_obj_labels = obj_labels_tf[clf_obj_idx].unique(sorted=True)
         num_clf_obj = clf_obj_labels.shape[0]

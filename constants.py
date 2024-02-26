@@ -273,7 +273,8 @@ class ResultConstants:
 	CONTEXT_FRACTION = "context_fraction"
 	RESULT_DETAILS = "result_details"
 	
-	RESULTS = "results"
+	RESULTS = "results_eccv"
+	# RESULTS = "results"
 	RESULT_ID = "result_id"
 	DATE = "date"
 	

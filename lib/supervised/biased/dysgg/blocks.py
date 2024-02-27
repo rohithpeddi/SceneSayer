@@ -454,7 +454,8 @@ class ObjectClassifierTransformer(nn.Module):
 					pos_index = []
 					for index in indices[1:]:
 						# pdb.set_trace()
-						im_idx, counts = torch.unique(entry["boxes"][index][:, 0].view(-1), return_counts=True, sorted=True)
+						im_idx, counts = torch.unique(entry["boxes"][index][:, 0].view(-1), return_counts=True,
+						                              sorted=True)
 						counts = counts.tolist()
 						pos = torch.cat(
 							[torch.LongTensor([im] * count) for im, count in zip(range(len(counts)), counts)])

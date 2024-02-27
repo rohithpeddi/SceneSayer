@@ -185,3 +185,13 @@ def get_sequence_no_tracking(entry, task="sgcls"):
             indices[0] = torch.tensor([])
         entry["indices"] = indices
         return
+
+
+def load_model_from_checkpoint(model, conf, gpu_device):
+    if conf.ckpt is not None:
+        ckpt = torch.load(conf.ckpt, map_location=gpu_device)
+        model.load_state_dict(ckpt[f'{conf.method_name}_state_dict'], strict=False)
+        print(f"Loaded model from checkpoint {conf.ckpt}")
+    else:
+        print("No checkpoint to load from...... Training from scratch.")
+    return model

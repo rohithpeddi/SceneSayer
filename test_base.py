@@ -66,7 +66,9 @@ def generate_test_dataset_metadata(conf, device):
 		data_path=conf.data_path,
 		is_compiled_together=False,
 		filter_nonperson_box_frame=True,
-		filter_small_box=False if conf.mode == const.PREDCLS else True
+		filter_small_box=False if conf.mode == const.PREDCLS else True,
+		features_path="/data/rohith/ag/features_mod/supervised/test/",
+		additional_data_path="/data/rohith/ag/features_mod/supervised/additional/test/"
 	)
 	
 	dataloader_test = DataLoader(
@@ -178,7 +180,9 @@ def fetch_transformer_test_basic_config():
 			data_path=conf.data_path,
 			is_compiled_together=False,
 			filter_nonperson_box_frame=True,
-			filter_small_box=False if conf.mode == const.PREDCLS else True
+			filter_small_box=False if conf.mode == const.PREDCLS else True,
+			features_path="/data/rohith/ag/features_mod/supervised/test/",
+			additional_data_path="/data/rohith/ag/features_mod/supervised/additional/test/"
 		)
 		
 		dataloader_test = DataLoader(

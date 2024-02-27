@@ -153,8 +153,9 @@ class BaselineWithAnticipation(nn.Module):
 		result = {}
 		num_tf = len(entry["im_idx"].unique())
 		num_cf = min(num_cf, num_tf - 1)
-		num_ff = min(num_ff, num_tf - num_cf)
+
 		while num_cf + 1 <= num_tf:
+			num_ff = min(num_ff, num_tf - num_cf)
 			ff_start_id = entry["im_idx"].unique()[num_cf]
 			ff_end_id = entry["im_idx"].unique()[num_cf + num_ff - 1]
 			
@@ -176,7 +177,8 @@ class BaselineWithAnticipation(nn.Module):
 					obj_seqs_cf.append(obj_seq_cf)
 					obj_seqs_ff.append(obj_seq_ff)
 			
-			so_seqs_feats_cf = pad_sequence([so_rels_feats_tf[obj_seq_cf] for obj_seq_cf in obj_seqs_cf], batch_first=True)
+			so_seqs_feats_cf = pad_sequence([so_rels_feats_tf[obj_seq_cf] for obj_seq_cf in obj_seqs_cf],
+			                                batch_first=True)
 			causal_mask = (1 - torch.tril(torch.ones(so_seqs_feats_cf.shape[1], so_seqs_feats_cf.shape[1]),
 			                              diagonal=0)).type(torch.bool)
 			causal_mask = causal_mask.cuda()

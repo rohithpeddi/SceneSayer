@@ -34,7 +34,9 @@ class Config(object):
         self.additional_data_path = None
         
         self.baseline_context = 3
-        self.baseline_future = 5
+        self.baseline_future = 3
+        
+        self.hp_recon_loss = 1.0
         
         self.use_raw_data = False
         
@@ -63,7 +65,7 @@ class Config(object):
         parser.add_argument('-features_path', default=None, type=str)
         parser.add_argument('-additional_data_path', default=None, type=str)
         parser.add_argument('-baseline_context', default=3, type=int)
-        parser.add_argument('-baseline_future', default=5, type=int)
+        parser.add_argument('-baseline_future', default=3, type=int)
         parser.add_argument('-use_raw_data', action='store_true')
         parser.add_argument('-data_path', default='/data/rohith/ag', type=str)
         parser.add_argument('-datasize', dest='datasize', help='mini dataset or whole', default='large', type=str)

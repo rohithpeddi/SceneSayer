@@ -159,39 +159,3 @@ def save_model(model, epoch, checkpoint_save_file_path, checkpoint_name, model_n
     print("Saved the checkpoint after {} epochs".format(epoch))
 
 
-def get_sequence_no_tracking(entry, task="sgcls"):
-    if task == "predcls":
-        indices = []
-        for i in entry["labels"].unique():
-            indices.append(torch.where(entry["labels"] == i)[0])
-        entry["indices"] = indices
-        return
-
-    if task == "sgdet" or task == "sgcls":
-        # for sgdet, use the predicted object classes, as a special case of
-        # the proposed method, comment this out for general coase tracking.
-        indices = [[]]
-        # indices[0] store single-element sequence, to save memory
-        pred_labels = torch.argmax(entry["distribution"], 1)
-        for i in pred_labels.unique():
-            index = torch.where(pred_labels == i)[0]
-            if len(index) == 1:
-                indices[0].append(index)
-            else:
-                indices.append(index)
-        if len(indices[0]) > 0:
-            indices[0] = torch.cat(indices[0])
-        else:
-            indices[0] = torch.tensor([])
-        entry["indices"] = indices
-        return
-
-
-def load_model_from_checkpoint(model, conf, gpu_device):
-    if conf.ckpt is not None:
-        ckpt = torch.load(conf.ckpt, map_location=gpu_device)
-        model.load_state_dict(ckpt[f'{conf.method_name}_state_dict'], strict=False)
-        print(f"Loaded model from checkpoint {conf.ckpt}")
-    else:
-        print("No checkpoint to load from...... Training from scratch.")
-    return model

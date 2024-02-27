@@ -2,7 +2,7 @@ import math
 
 import torch.nn as nn
 
-from lib.supervised.biased.sga.base_transformer import BaseTransformer
+from lib.supervised.biased.sga.rel.rel_base_transformer import RelBaseTransformer
 from lib.supervised.biased.sga.blocks import EncoderLayer, Encoder, PositionalEncoding, ObjectClassifierMLP
 from lib.word_vectors import obj_edge_vectors
 
@@ -14,7 +14,7 @@ from lib.word_vectors import obj_edge_vectors
 """
 
 
-class STTranAnt(BaseTransformer):
+class RelSTTranAnt(RelBaseTransformer):
 	
 	def __init__(
 			self,
@@ -27,7 +27,7 @@ class STTranAnt(BaseTransformer):
 			enc_layer_num=None,
 			dec_layer_num=None
 	):
-		super(STTranAnt, self).__init__()
+		super(RelSTTranAnt, self).__init__()
 		
 		self.obj_classes = obj_classes
 		self.rel_classes = rel_classes

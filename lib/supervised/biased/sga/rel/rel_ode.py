@@ -174,12 +174,12 @@ class get_derivatives(nn.Module):
         return out
 
 
-class ODE(nn.Module):
+class RelODE(nn.Module):
 
     def __init__(self, mode, attention_class_num=None, spatial_class_num=None, contact_class_num=None, obj_classes=None,
                  rel_classes=None,
                  enc_layer_num=None, dec_layer_num=None, max_window=None):
-        super(ODE, self).__init__()
+        super(RelODE, self).__init__()
         self.mode = mode
         self.diff_func = get_derivatives()
         self.obj_classes = obj_classes

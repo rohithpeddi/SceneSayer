@@ -4,7 +4,7 @@ from torch import nn
 from torch.nn.utils.rnn import pad_sequence
 
 
-class BaseTransformer(nn.Module):
+class RelBaseTransformer(nn.Module):
 
     def __init__(
             self,
@@ -17,7 +17,7 @@ class BaseTransformer(nn.Module):
             enc_layer_num=None,
             dec_layer_num=None
     ):
-        super(BaseTransformer, self).__init__()
+        super(RelBaseTransformer, self).__init__()
 
         self.mode = mode
         self.attention_class_num = attention_class_num

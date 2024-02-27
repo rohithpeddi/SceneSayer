@@ -1,28 +1,12 @@
 import copy
 import math
-import os
 
 import torch
 
-from lib.object_detector import detector
-from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from test_base import (fetch_transformer_test_basic_config, prepare_prediction_graph, get_sequence_no_tracking,
+from test_base import (fetch_transformer_test_basic_config, prepare_prediction_graph,
                        send_future_evaluators_stats_to_firebase, write_future_evaluators_stats,
                        write_percentage_evaluators_stats, send_percentage_evaluators_stats_to_firebase)
-from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
-from lib.supervised.biased.sga.rel.rel_sttran_ant import STTranAnt
-from lib.supervised.biased.sga.rel.rel_sttran_gen_ant import STTranGenAnt
-from lib.supervised.biased.sga.rel.rel_dsgdetr_ant import DsgDetrAnt
-from lib.supervised.biased.sga.rel.rel_dsgdetr_gen_ant import DsgDetrGenAnt
-
-
-def fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size):
-    if conf.method_name in ["sttran_ant", "sttran_gen_ant"]:
-        get_sequence_no_tracking(entry, conf)
-    elif conf.method_name in ["dsgdetr_ant", "dsgdetr_gen_ant"]:
-        get_sequence_with_tracking(entry, gt_annotation, matcher, frame_size, conf.mode)
-    else:
-        raise ValueError(f"Method name {conf.method_name} not recognized")
+from transformer_base_scripts import load_common_config, fetch_sequences_after_tracking
 
 
 def evaluate_model_context_fraction(model, matcher, entry, gt_annotation, frame_size,
@@ -88,107 +72,6 @@ def generate_context_qualitative_results(model, matcher, entry, gt_annotation, f
         ag_test_data, video_id, conf.method_name,
         "no_constraints", conf.mode, context_fraction
     )
-
-
-def load_sttran_ant(conf, dataset, gpu_device):
-    model = STTranAnt(mode=conf.mode,
-                      attention_class_num=len(dataset.attention_relationships),
-                      spatial_class_num=len(dataset.spatial_relationships),
-                      contact_class_num=len(dataset.contacting_relationships),
-                      obj_classes=dataset.object_classes,
-                      enc_layer_num=conf.enc_layer,
-                      dec_layer_num=conf.dec_layer).to(device=gpu_device)
-    
-    ckpt = torch.load(conf.ckpt, map_location=gpu_device)
-    model.load_state_dict(ckpt[f'{conf.method_name}_state_dict'], strict=False)
-    print(f"Loaded model from checkpoint {conf.ckpt}")
-    return model
-
-
-def load_sttran_gen_ant(conf, dataset, gpu_device):
-    model = STTranGenAnt(mode=conf.mode,
-                         attention_class_num=len(dataset.attention_relationships),
-                         spatial_class_num=len(dataset.spatial_relationships),
-                         contact_class_num=len(dataset.contacting_relationships),
-                         obj_classes=dataset.object_classes,
-                         enc_layer_num=conf.enc_layer,
-                         dec_layer_num=conf.dec_layer).to(device=gpu_device)
-    
-    ckpt = torch.load(conf.ckpt, map_location=gpu_device)
-    model.load_state_dict(ckpt[f'{conf.method_name}_state_dict'], strict=False)
-    print(f"Loaded model from checkpoint {conf.ckpt}")
-    return model
-
-
-def load_dsgdetr_ant(conf, dataset, gpu_device):
-    model = DsgDetrAnt(mode=conf.mode,
-                       attention_class_num=len(dataset.attention_relationships),
-                       spatial_class_num=len(dataset.spatial_relationships),
-                       contact_class_num=len(dataset.contacting_relationships),
-                       obj_classes=dataset.object_classes,
-                       enc_layer_num=conf.enc_layer,
-                       dec_layer_num=conf.dec_layer).to(device=gpu_device)
-    
-    ckpt = torch.load(conf.ckpt, map_location=gpu_device)
-    model.load_state_dict(ckpt[f'{conf.method_name}_state_dict'], strict=False)
-    print(f"Loaded model from checkpoint {conf.ckpt}")
-    return model
-
-
-def load_dsgdetr_gen_ant(conf, dataset, gpu_device):
-    model = DsgDetrGenAnt(mode=conf.mode,
-                          attention_class_num=len(dataset.attention_relationships),
-                          spatial_class_num=len(dataset.spatial_relationships),
-                          contact_class_num=len(dataset.contacting_relationships),
-                          obj_classes=dataset.object_classes,
-                          enc_layer_num=conf.enc_layer,
-                          dec_layer_num=conf.dec_layer).to(device=gpu_device)
-    
-    ckpt = torch.load(conf.ckpt, map_location=gpu_device)
-    model.load_state_dict(ckpt[f'{conf.method_name}_state_dict'], strict=False)
-    print(f"Loaded model from checkpoint {conf.ckpt}")
-    return model
-
-
-def load_common_config(conf, ag_test_data, gpu_device):
-    method_name = conf.method_name
-    checkpoint_name = os.path.basename(conf.ckpt).split('.')[0]
-    future_frame_loss_num = checkpoint_name.split('_')[-3]
-    mode = checkpoint_name.split('_')[-5]
-    
-    print("----------------------------------------------------------")
-    print(f"Method name: {method_name}")
-    print(f"Checkpoint name: {checkpoint_name}")
-    print(f"Future frame loss num: {future_frame_loss_num}")
-    print(f"Mode: {mode}")
-    print("----------------------------------------------------------")
-    
-    if conf.method_name == "sttran_ant":
-        model = load_sttran_ant(conf, ag_test_data, gpu_device)
-    elif conf.method_name == "sttran_gen_ant":
-        model = load_sttran_gen_ant(conf, ag_test_data, gpu_device)
-    elif conf.method_name == "dsgdetr_ant":
-        model = load_dsgdetr_ant(conf, ag_test_data, gpu_device)
-    elif conf.method_name == "dsgdetr_gen_ant":
-        model = load_dsgdetr_gen_ant(conf, ag_test_data, gpu_device)
-    else:
-        raise ValueError(f"Method name {conf.method_name} not recognized")
-    
-    model.eval()
-    
-    matcher = HungarianMatcher(0.5, 1, 1, 0.5)
-    matcher.eval()
-    
-    object_detector = detector(
-        train=False,
-        object_classes=ag_test_data.object_classes,
-        use_SUPPLY=True,
-        mode=conf.mode
-    ).to(device=gpu_device)
-    object_detector.eval()
-    object_detector.is_train = False
-    
-    return model, object_detector, future_frame_loss_num, mode, method_name, matcher
 
 
 def test_model():

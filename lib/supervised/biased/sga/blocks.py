@@ -863,9 +863,9 @@ class ObjectAnt(nn.Module):
 		
 		assert mode in ('sgdet', 'sgcls', 'predcls')
 		
-		self.object_classifier = ObjectClassifierTransformer(mode=self.mode, obj_classes=self.obj_classes)
-		
 		self.d_model = 1936
+		
+		# MLP decoders for object classification, bounding box prediction, and object representation reconstruction losses.
 	
 	# Define heads for object prediction, bounding box prediction
 	

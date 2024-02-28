@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
@@ -30,14 +29,17 @@ class ObjBaseTransformer(nn.Module):
 		
 		assert mode in ('sgdet', 'sgcls', 'predcls')
 	
+	# 1. Compute features of future anticipated objects
+	# 2. Compute corresponding union futures
+	# 3. Prepare corresponding im_idx, pair_idx, pred_labels, boxes, and scores
+	
 	def generate_spatial_predicate_embeddings(self, entry):
-		entry = self.object_classifier(entry)
-		
-		# 1. Compute features of future anticipated objects
-		# 2. Compute corresponding union futures
-		# 3. Prepare corresponding im_idx, pair_idx, pred_labels, boxes, and scores
-		
-		# visual part
+		"""
+		Entry can correspond to output of all the frames in the video
+		:param entry:
+		:return:
+		"""
+		# Visual Part
 		subj_rep = entry['features'][entry['pair_idx'][:, 0]]
 		subj_rep = self.subj_fc(subj_rep)
 		obj_rep = entry['features'][entry['pair_idx'][:, 1]]
@@ -52,28 +54,58 @@ class ObjBaseTransformer(nn.Module):
 		subj_emb = self.obj_embed(subj_class)
 		obj_emb = self.obj_embed2(obj_class)
 		x_semantic = torch.cat((subj_emb, obj_emb), 1)
-		rel_features = torch.cat((x_visual, x_semantic), dim=1)
+		spa_so_rels_feats = torch.cat((x_visual, x_semantic), dim=1)
 		
 		# Spatial-Temporal Transformer
-		# spatial message passing
-		# im_indices -> centre coordinate of all objects in a video
+		# Spatial message passing
+		# im_indices -> centre coordinate of all objects excluding subjects in a video
 		frames = []
 		im_indices = entry["boxes"][entry["pair_idx"][:, 1], 0]
 		for l in im_indices.unique():
 			frames.append(torch.where(im_indices == l)[0])
-		frame_features = pad_sequence([rel_features[index] for index in frames], batch_first=True)
+		frame_features = pad_sequence([spa_so_rels_feats[index] for index in frames], batch_first=True)
 		masks = (1 - pad_sequence([torch.ones(len(index)) for index in frames], batch_first=True)).bool()
 		rel_ = self.spatial_transformer(frame_features, src_key_padding_mask=masks.cuda())
-		rel_features = torch.cat([rel_[i, :len(index)] for i, index in enumerate(frames)])
-		# temporal message passing
-		sequences = []
+		spa_so_rels_feats = torch.cat([rel_[i, :len(index)] for i, index in enumerate(frames)])
+		
+		# Temporal message passing
+		obj_seqs = []
 		for l in obj_class.unique():
 			k = torch.where(obj_class.view(-1) == l)[0]
-			sequences.append(k)
+			obj_seqs.append(k)
 		
-		return entry, rel_features, sequences
+		return entry, spa_so_rels_feats, obj_seqs
 	
-	def fetch_positional_encoding(self, obj_seqs, entry):
+	def generate_spatio_temporal_predicate_embeddings(self, entry, spa_so_rels_feats, obj_seqs, temporal_transformer):
+		"""
+			Generate spatio-temporal predicate embeddings
+			Case-1: For generation temporal transformer
+				entry would correspond to output of all the frames in the video
+				temporal_transformer: Would be generation temporal transformer
+
+			Case-2: For anticipation temporal transformer
+				entry would correspond to output of all frames that are in the context and the anticipated future frames
+				temporal_transformer: Would be anticipation temporal transformer
+		"""
+		# Temporal message passing
+		sequence_features = pad_sequence([spa_so_rels_feats[index] for index in obj_seqs], batch_first=True)
+		padding_mask, causal_mask = self.fetch_temporal_masks(obj_seqs, sequence_features)
+		
+		positional_encoding = self.fetch_positional_encoding_for_gen_obj_seqs(obj_seqs, entry)
+		sequence_features = self.gen_positional_encoder(sequence_features, positional_encoding)
+		rel_ = temporal_transformer(sequence_features, src_key_padding_mask=padding_mask, mask=causal_mask)
+		
+		rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(obj_seqs, rel_)])
+		indices_flat = torch.cat(obj_seqs).unsqueeze(1).repeat(1, spa_so_rels_feats.shape[1])
+		
+		assert len(indices_flat) == len(entry["pair_idx"])
+		spa_temp_rels_feats = torch.zeros_like(spa_so_rels_feats).to(spa_so_rels_feats.device)
+		spa_temp_rels_feats.scatter_(0, indices_flat, rel_flat)
+		
+		return entry, spa_so_rels_feats, obj_seqs, spa_temp_rels_feats
+	
+	@staticmethod
+	def fetch_positional_encoding(obj_seqs, entry):
 		positional_encoding = []
 		for obj_seq in obj_seqs:
 			im_idx, counts = torch.unique(entry["pair_idx"][obj_seq][:, 0].view(-1), return_counts=True, sorted=True)
@@ -93,158 +125,13 @@ class ObjBaseTransformer(nn.Module):
 		positional_encoding = pad_sequence(positional_encoding, batch_first=True) if self.mode == "sgdet" else None
 		return positional_encoding
 	
-	def fetch_positional_encoding_for_ant_obj_seqs(self, obj_seqs, entry):
-		positional_encoding = self.fetch_positional_encoding(obj_seqs, entry)
-		positional_encoding = pad_sequence([pos_enc.flip(dims=[0]) for pos_enc in positional_encoding],
-		                                   batch_first=True).flip(dims=[1])
-		return positional_encoding if self.mode == "sgdet" else None
-	
-	def update_positional_encoding(self, positional_encoding):
-		if positional_encoding is not None:
-			max_values = torch.max(positional_encoding, dim=1)[0] + 1
-			max_values = max_values.unsqueeze(1)
-			positional_encoding = torch.cat((positional_encoding, max_values), dim=1)
-		return positional_encoding
-	
 	@staticmethod
-	def fetch_masks(obj_seqs):
-		padding_mask = (1 - pad_sequence([torch.ones(len(obj_seq)).flip(dims=[0])
-		                                  for obj_seq in obj_seqs], batch_first=True)).flip(
-			dims=[1]).bool().cuda()
-		return padding_mask
+	def fetch_temporal_masks(obj_seqs, sequence_features):
+		causal_mask = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
+		                              diagonal=0)).type(torch.bool).cuda()
+		padding_mask = (
+				1 - pad_sequence([torch.ones(len(index)) for index in obj_seqs], batch_first=True)).bool().cuda()
+		return padding_mask, causal_mask
 	
-	@staticmethod
-	def fetch_updated_masks(padding_mask):
-		additional_column = torch.full((padding_mask.shape[0], 1), False, dtype=torch.bool).cuda()
-		padding_mask = torch.cat([padding_mask, additional_column], dim=1)
-		return padding_mask
-	
-	def generate_future_ff_rels_for_context(self, entry, so_rels_feats_tf, obj_seqs_tf, num_cf, num_tf, num_ff):
-		num_ff = min(num_ff, num_tf - num_cf)
-		ff_start_id = entry["im_idx"].unique()[num_cf]
-		cf_end_id = entry["im_idx"].unique()[num_cf - 1]
-		
-		objects_ff_start_id = int(torch.where(entry["im_idx"] == ff_start_id)[0][0])
-		objects_clf_start_id = int(torch.where(entry["im_idx"] == cf_end_id)[0][0])
-		
-		obj_labels_tf_unique = entry['pred_labels'][entry['pair_idx'][:, 1]].unique()
-		objects_pcf = entry["im_idx"][:objects_clf_start_id]
-		objects_cf = entry["im_idx"][:objects_ff_start_id]
-		num_objects_cf = objects_cf.shape[0]
-		num_objects_pcf = objects_pcf.shape[0]
-		
-		# 1. Refine object sequences to take only those objects that are present in the current frame.
-		cf_obj_seqs_in_clf = []
-		obj_labels_clf = []
-		for i, s in enumerate(obj_seqs_tf):
-			if len(s) == 0:
-				continue
-			context_index = s[(s < num_objects_cf)]
-			if len(context_index) > 0:
-				prev_context_index = s[(s >= num_objects_pcf) & (s < num_objects_cf)]
-				if len(prev_context_index) > 0:
-					obj_labels_clf.append(obj_labels_tf_unique[i])
-					cf_obj_seqs_in_clf.append(context_index)
-		
-		# ------------------- Masks for anticipation transformer -------------------
-		# Causal mask is not required for anticipation transformer. It is required for the generation transformer.
-		# In anticipation transformer we only take the last output from the transformer, so mask is not required.
-		
-		so_rels_feats_cf = pad_sequence([so_rels_feats_tf[cf_obj_seq.flip(dims=[0])]
-		                                 for cf_obj_seq in cf_obj_seqs_in_clf], batch_first=True).flip(dims=[1])
-		padding_mask = self.fetch_masks(cf_obj_seqs_in_clf)
-		positional_encoding = self.fetch_positional_encoding_for_ant_obj_seqs(cf_obj_seqs_in_clf, entry)
-		so_rels_feats_cf = self.anti_positional_encoder(so_rels_feats_cf, positional_encoding)
-		
-		# 2. Fetch future representations for those objects.
-		so_rels_feats_ff = []
-		for i in range(num_ff):
-			out = self.anti_temporal_transformer(so_rels_feats_cf, src_key_padding_mask=padding_mask)
-			
-			so_rels_feats_ff.append(out[:, -1, :].unsqueeze(1))
-			so_rels_feats_ant_one_step = torch.stack([out[:, -1, :]], dim=1)
-			
-			so_rels_feats_cf = torch.cat([so_rels_feats_cf, so_rels_feats_ant_one_step], 1)
-			positional_encoding = self.update_positional_encoding(positional_encoding)
-			so_rels_feats_cf = self.anti_positional_encoder(so_rels_feats_cf, positional_encoding)
-			padding_mask = self.fetch_updated_masks(padding_mask)
-		so_rels_feats_ff = torch.cat(so_rels_feats_ff, dim=1)
-		
-		# 3. Construct im_idx, pair_idx, and labels for the future frames accordingly.
-		ff_obj_list = [1] + [obj_label.cpu().item() for obj_label in obj_labels_clf]
-		pred_labels = (torch.tensor(ff_obj_list).repeat(num_ff)).cuda()
-		im_idx = (torch.tensor(list(range(num_ff))).repeat_interleave(len(cf_obj_seqs_in_clf))).cuda()
-		
-		pair_idx = []
-		ff_sub_idx = [i * (len(cf_obj_seqs_in_clf) + 1) for i in range(num_ff)]
-		for j in ff_sub_idx:
-			for i in range(len(cf_obj_seqs_in_clf)):
-				pair_idx.append([j, i + 1 + j])
-		
-		pair_idx = torch.tensor(pair_idx).cuda()
-		boxes = torch.tensor([[0.5] * 5 for _ in range(len(pred_labels))]).cuda()
-		scores = torch.tensor([1] * len(pred_labels)).cuda()
-		
-		obj_range = torch.tensor(list(range(len(cf_obj_seqs_in_clf)))).reshape((-1, 1))
-		onj_range_ff = torch.repeat_interleave(obj_range, num_ff, dim=1)
-		range_list = torch.tensor(list(range(num_ff))) * len(cf_obj_seqs_in_clf)
-		indices_flat = (range_list + onj_range_ff).flatten().cuda()
-		
-		so_rels_feats_ff_flat = so_rels_feats_ff.view(-1, so_rels_feats_ff.shape[-1])
-		so_rels_feats_ff_flat_ord = torch.zeros_like(so_rels_feats_ff_flat).cuda()
-		indices_flat = indices_flat.unsqueeze(1).repeat(1, so_rels_feats_ff_flat_ord.shape[1])
-		so_rels_feats_ff_flat_ord.scatter_(0, indices_flat, so_rels_feats_ff_flat)
-		
-		# ------------------- Construct mask_ant and mask_gt -------------------
-		# mask_ant: indices in only anticipated frames
-		# mask_gt: indices in all frames
-		# ----------------------------------------------------------------------
-		
-		obj_idx_tf = entry["pair_idx"][:, 1]
-		obj_labels_tf = entry["labels"][obj_idx_tf] if self.training else entry["pred_labels"][obj_idx_tf]
-		clf_obj_idx = torch.where(entry["im_idx"] == num_cf - 1)[0]
-		clf_obj_labels = obj_labels_tf[clf_obj_idx].unique(sorted=True)
-		num_clf_obj = clf_obj_labels.shape[0]
-		
-		mask_ant = []
-		mask_gt = []
-		for ff_id in range(num_ff):
-			ff_obj_idx = torch.where(entry["im_idx"] == num_cf + ff_id)[0]
-			ff_obj_labels = obj_labels_tf[ff_obj_idx]
-			
-			np_clf_obj_labels = clf_obj_labels.cpu().numpy()
-			np_ff_obj_labels = ff_obj_labels.cpu().numpy()
-			
-			int_obj_labels, ff_idx_obj_in_clf, clf_idx_obj_in_ff = np.intersect1d(np_clf_obj_labels, np_ff_obj_labels,
-			                                                                      return_indices=True)
-			mask_ant.append(ff_id * num_clf_obj + ff_idx_obj_in_clf)
-			mask_gt.append(ff_obj_idx[clf_idx_obj_in_ff])
-		
-		mask_ant_flat = []
-		for sublist in mask_ant:
-			mask_ant_flat.extend(sublist)
-		
-		mask_gt_flat = torch.tensor([], dtype=torch.int).cuda()
-		for sublist in mask_gt:
-			mask_gt_flat = torch.cat((mask_gt_flat, sublist.cuda()))
-		
-		mask_ant = torch.tensor(mask_ant_flat).cuda()
-		mask_gt = mask_gt_flat
-		
-		temp = {
-			"attention_distribution": self.a_rel_compress(so_rels_feats_ff_flat_ord),
-			"spatial_distribution": torch.sigmoid(self.s_rel_compress(so_rels_feats_ff_flat_ord)),
-			"contacting_distribution": torch.sigmoid(self.c_rel_compress(so_rels_feats_ff_flat_ord)),
-			"global_output": so_rels_feats_ff_flat_ord,
-			"pair_idx": pair_idx.cuda(),
-			"im_idx": im_idx.cuda(),
-			"labels": pred_labels.cuda(),
-			"pred_labels": pred_labels.cuda(),
-			"scores": scores.cuda(),
-			"pred_scores": scores.cuda(),
-			"boxes": boxes.cuda(),
-			"mask_ant": mask_ant,
-			"mask_gt": mask_gt,
-		}
-		
-		return temp
+	def generate_future_ff_obj_for_context(self, entry, num_cf, num_tf, num_ff):
+		pass

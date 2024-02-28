@@ -2,10 +2,9 @@ import math
 
 import torch
 import torch.nn as nn
-from torch.nn.utils.rnn import pad_sequence
 
-from lib.supervised.biased.sga.rel.rel_base_transformer import RelBaseTransformer
 from lib.supervised.biased.sga.blocks import EncoderLayer, Encoder, PositionalEncoding, ObjectClassifierMLP
+from lib.supervised.biased.sga.rel.rel_base_transformer import RelBaseTransformer
 from lib.word_vectors import obj_edge_vectors
 
 """
@@ -90,26 +89,6 @@ class RelSTTranGenAnt(RelBaseTransformer):
 		self.gen_s_rel_compress = nn.Linear(d_model, self.spatial_class_num)
 		self.gen_c_rel_compress = nn.Linear(d_model, self.contact_class_num)
 	
-	def generate_spatio_temporal_predicate_embeddings(self, entry):
-		entry, spa_rels_feats_tf, sequences = self.generate_spatial_predicate_embeddings(entry)
-		# Temporal message passing
-		sequence_features = pad_sequence([spa_rels_feats_tf[index] for index in sequences], batch_first=True)
-		causal_mask = (1 - torch.tril(torch.ones(sequence_features.shape[1], sequence_features.shape[1]),
-		                              diagonal=0)).type(torch.bool).cuda()
-		padding_mask = (1 - pad_sequence([torch.ones(len(index)) for index in sequences], batch_first=True)).bool().cuda()
-		positional_encoding = self.fetch_positional_encoding_for_gen_obj_seqs(sequences, entry)
-		rel_ = self.gen_temporal_transformer(self.gen_positional_encoder(sequence_features, positional_encoding),
-		                                     src_key_padding_mask=padding_mask, mask=causal_mask)
-		
-		rel_flat = torch.cat([rel[:len(index)] for index, rel in zip(sequences, rel_)])
-		indices_flat = torch.cat(sequences).unsqueeze(1).repeat(1, spa_rels_feats_tf.shape[1])
-		
-		assert len(indices_flat) == len(entry["pair_idx"])
-		spa_temp_rels_feats_tf = torch.zeros_like(spa_rels_feats_tf).to(spa_rels_feats_tf.device)
-		spa_temp_rels_feats_tf.scatter_(0, indices_flat, rel_flat)
-		
-		return entry, spa_rels_feats_tf, sequences, spa_temp_rels_feats_tf
-	
 	def forward_single_entry(self, context_fraction, entry):
 		"""
         Forward method for the baseline
@@ -117,7 +96,7 @@ class RelSTTranGenAnt(RelBaseTransformer):
         :param entry: Dictionary from object classifier
         :return:
         """
-				
+		
 		(entry, spa_so_rels_feats_tf,
 		 obj_seqs_tf, spa_temp_so_rels_feats_tf) = self.generate_spatio_temporal_predicate_embeddings(entry)
 		

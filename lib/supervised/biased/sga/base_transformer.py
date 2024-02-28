@@ -118,13 +118,10 @@ class BaseTransformer(nn.Module):
     def generate_future_ff_rels_for_context(self, entry, so_rels_feats_tf, obj_seqs_tf, num_cf, num_tf, num_ff):
         num_ff = min(num_ff, num_tf - num_cf)
         ff_start_id = entry["im_idx"].unique()[num_cf]
-        ff_end_id = entry["im_idx"].unique()[num_cf + num_ff - 1]
         cf_end_id = entry["im_idx"].unique()[num_cf - 1]
 
         objects_ff_start_id = int(torch.where(entry["im_idx"] == ff_start_id)[0][0])
         objects_clf_start_id = int(torch.where(entry["im_idx"] == cf_end_id)[0][0])
-
-        objects_ff_end_id = int(torch.where(entry["im_idx"] == ff_end_id)[0][-1]) + 1
 
         obj_labels_tf_unique = entry['pred_labels'][entry['pair_idx'][:, 1]].unique()
         objects_pcf = entry["im_idx"][:objects_clf_start_id]
@@ -134,7 +131,6 @@ class BaseTransformer(nn.Module):
 
         # 1. Refine object sequences to take only those objects that are present in the current frame.
         cf_obj_seqs_in_clf = []
-        obj_seqs_ff = []
         obj_labels_clf = []
         for i, s in enumerate(obj_seqs_tf):
             if len(s) == 0:
@@ -186,9 +182,9 @@ class BaseTransformer(nn.Module):
         scores = torch.tensor([1] * len(pred_labels)).cuda()
 
         obj_range = torch.tensor(list(range(len(cf_obj_seqs_in_clf)))).reshape((-1, 1))
-        onj_range_ff = torch.repeat_interleave(obj_range, num_ff, dim=1)
+        obj_range_ff = torch.repeat_interleave(obj_range, num_ff, dim=1)
         range_list = torch.tensor(list(range(num_ff))) * len(cf_obj_seqs_in_clf)
-        indices_flat = (range_list + onj_range_ff).flatten().cuda()
+        indices_flat = (range_list + obj_range_ff).flatten().cuda()
 
         so_rels_feats_ff_flat = so_rels_feats_ff.view(-1, so_rels_feats_ff.shape[-1])
         so_rels_feats_ff_flat_ord = torch.zeros_like(so_rels_feats_ff_flat).cuda()
@@ -199,42 +195,43 @@ class BaseTransformer(nn.Module):
         # mask_ant: indices in only anticipated frames
         # mask_gt: indices in all frames
         # ----------------------------------------------------------------------
+        if self.training:
+            obj_idx_tf = entry["pair_idx"][:, 1]
+            pred_obj_labels_tf = entry["pred_labels"][obj_idx_tf]
+            gt_obj_labels_tf = entry["pred_labels"][obj_idx_tf]
+            # obj_labels_tf = entry["labels"][obj_idx_tf] if self.training else entry["pred_labels"][obj_idx_tf]
+            assert cf_end_id.cpu().numpy() in entry["im_idx"].cpu().numpy()
+            clf_obj_idx = torch.where(entry["im_idx"] == cf_end_id)[0]
+            clf_obj_labels = pred_obj_labels_tf[clf_obj_idx].unique(sorted=True)
+            num_clf_obj = clf_obj_labels.shape[0]
 
-        obj_idx_tf = entry["pair_idx"][:, 1]
-        pred_obj_labels_tf = entry["pred_labels"][obj_idx_tf]
-        gt_obj_labels_tf = entry["labels"][obj_idx_tf]
-        # obj_labels_tf = entry["labels"][obj_idx_tf] if self.training else entry["pred_labels"][obj_idx_tf]
-        clf_obj_idx = torch.where(entry["im_idx"] == num_cf - 1)[0]
-        clf_obj_labels = pred_obj_labels_tf[clf_obj_idx].unique(sorted=True)
-        num_clf_obj = clf_obj_labels.shape[0]
+            mask_ant = []
+            mask_gt = []
+            for ff_id in range(num_ff):
+                ff_obj_idx = torch.where(entry["im_idx"] == num_cf + ff_id)[0]
+                ff_obj_labels = gt_obj_labels_tf[ff_obj_idx]
 
-        mask_ant = []
-        mask_gt = []
-        for ff_id in range(num_ff):
-            ff_obj_idx = torch.where(entry["im_idx"] == num_cf + ff_id)[0]
-            ff_obj_labels = gt_obj_labels_tf[ff_obj_idx]
+                np_clf_obj_labels = clf_obj_labels.cpu().numpy()
+                np_ff_obj_labels = ff_obj_labels.cpu().numpy()
 
-            np_clf_obj_labels = clf_obj_labels.cpu().numpy()
-            np_ff_obj_labels = ff_obj_labels.cpu().numpy()
+                int_obj_labels, ff_idx_obj_in_clf, clf_idx_obj_in_ff = np.intersect1d(np_clf_obj_labels, np_ff_obj_labels,
+                                                                                      return_indices=True)
+                mask_ant.append(ff_id * num_clf_obj + ff_idx_obj_in_clf)
+                mask_gt.append(ff_obj_idx[clf_idx_obj_in_ff])
 
-            int_obj_labels, ff_idx_obj_in_clf, clf_idx_obj_in_ff = np.intersect1d(np_clf_obj_labels, np_ff_obj_labels,
-                                                                                  return_indices=True)
-            mask_ant.append(ff_id * num_clf_obj + ff_idx_obj_in_clf)
-            mask_gt.append(ff_obj_idx[clf_idx_obj_in_ff])
+            mask_ant_flat = []
+            for sublist in mask_ant:
+                mask_ant_flat.extend(sublist)
 
-        mask_ant_flat = []
-        for sublist in mask_ant:
-            mask_ant_flat.extend(sublist)
+            mask_gt_flat = torch.tensor([], dtype=torch.int).cuda()
+            for sublist in mask_gt:
+                mask_gt_flat = torch.cat((mask_gt_flat, sublist.cuda()))
 
-        mask_gt_flat = torch.tensor([], dtype=torch.int).cuda()
-        for sublist in mask_gt:
-            mask_gt_flat = torch.cat((mask_gt_flat, sublist.cuda()))
+            mask_ant = torch.tensor(mask_ant_flat).cuda()
+            mask_gt = mask_gt_flat
 
-        mask_ant = torch.tensor(mask_ant_flat).cuda()
-        mask_gt = mask_gt_flat
-
-        assert mask_ant.shape[0] == mask_gt.shape[0]
-        assert mask_ant.shape[0] <= so_rels_feats_ff_flat_ord.shape[0]
+            assert mask_ant.shape[0] == mask_gt.shape[0]
+            assert mask_ant.shape[0] <= so_rels_feats_ff_flat_ord.shape[0]
 
         temp = {
             "attention_distribution": self.a_rel_compress(so_rels_feats_ff_flat_ord),
@@ -248,8 +245,10 @@ class BaseTransformer(nn.Module):
             "scores": scores.cuda(),
             "pred_scores": scores.cuda(),
             "boxes": boxes.cuda(),
-            "mask_ant": mask_ant,
-            "mask_gt": mask_gt,
         }
+
+        if self.training:
+            temp["mask_ant"] = mask_ant
+            temp["mask_gt"] = mask_gt
 
         return temp

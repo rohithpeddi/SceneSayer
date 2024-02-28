@@ -303,28 +303,28 @@ def train_model():
         print("Begin epoch {:d}".format(epoch))
         assert conf.use_raw_data == True
         print('Training using raw data', flush=True)
-        train_iter = iter(dataloader_train)
-        object_detector.is_train = True
-        model.train()
-        object_detector.train_x = True
-        num = 0
-        start_time = time.time()
-        for b in range(len(dataloader_train)):
-            data = next(train_iter)
-            im_data = copy.deepcopy(data[0].cuda(0))
-            im_info = copy.deepcopy(data[1].cuda(0))
-            gt_boxes = copy.deepcopy(data[2].cuda(0))
-            num_boxes = copy.deepcopy(data[3].cuda(0))
-            gt_annotation = ag_train_data.gt_annotations[data[4]]
-            frame_size = (im_info[0][:2] / im_info[0, 2]).cpu().data
-
-            with torch.no_grad():
-                entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-            num = process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_device, dataloader_train,
-                                      gt_annotation, matcher, frame_size, start_time)
-        print(f"Finished training an epoch {epoch}")
-        save_model(model, epoch, checkpoint_save_file_path, checkpoint_name, method_name)
-        print(f"Saving model after epoch {epoch}")
+        # train_iter = iter(dataloader_train)
+        # object_detector.is_train = True
+        # model.train()
+        # object_detector.train_x = True
+        # num = 0
+        # start_time = time.time()
+        # for b in range(len(dataloader_train)):
+        #     data = next(train_iter)
+        #     im_data = copy.deepcopy(data[0].cuda(0))
+        #     im_info = copy.deepcopy(data[1].cuda(0))
+        #     gt_boxes = copy.deepcopy(data[2].cuda(0))
+        #     num_boxes = copy.deepcopy(data[3].cuda(0))
+        #     gt_annotation = ag_train_data.gt_annotations[data[4]]
+        #     frame_size = (im_info[0][:2] / im_info[0, 2]).cpu().data
+        #
+        #     with torch.no_grad():
+        #         entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+        #     num = process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_device, dataloader_train,
+        #                               gt_annotation, matcher, frame_size, start_time)
+        # print(f"Finished training an epoch {epoch}")
+        # save_model(model, epoch, checkpoint_save_file_path, checkpoint_name, method_name)
+        # print(f"Saving model after epoch {epoch}")
         test_iter = iter(dataloader_test)
         model.eval()
         object_detector.is_train = False
@@ -340,8 +340,7 @@ def train_model():
 
                 entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
                 process_test_video(conf, entry, model, gt_annotation, evaluator, matcher, frame_size)
-                if b % 50 == 0:
-                    print(f"Finished processing {b} of {len(dataloader_test)} batches")
+                print(f"Finished processing {b} of {len(dataloader_test)} videos")
         score = np.mean(evaluator.result_dict[conf.mode + "_recall"][20])
         evaluator.print_stats()
         evaluator.reset_result()

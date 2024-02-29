@@ -12,6 +12,7 @@ from lib.word_vectors import obj_edge_vectors
 2. No Tracking
 3. Uses spatial temporal transformer for generating embeddings
 4. Uses temporal transformer for anticipation
+5. Uses generation transformer for classification of current inputs
 """
 
 

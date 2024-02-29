@@ -134,43 +134,17 @@ class ObjBaseTransformer(nn.Module):
 				1 - pad_sequence([torch.ones(len(index)) for index in obj_seqs], batch_first=True)).bool().cuda()
 		return padding_mask, causal_mask
 	
-	def generate_future_ff_obj_for_context(self, entry, num_cf, num_tf, num_ff):
-		"""
-		1. Fetch object representation from the object classifier.
-		2. Use object decoder to fetch representations for future frames in an auto-regressive manner.
-		3. Construct entry for the future frames that include
-			a. im_idx
-			b. pair_idx
-			c. pred_labels
-			d. boxes
-			e. scores
-			f. union_feat
-			g. spatial_masks
-		4. Construct masks for object level losses
-			a. Bounding box regression loss
-			b. Object classification loss
-		:param entry:
-		:param num_cf:
-		:param num_tf:
-		:param num_ff:
-		:return:
-		"""
-		entry_cf_ff = {}
-		entry = self.object_classifier(entry)
-		while num_cf + 1 <= num_tf:
-			num_ff = min(num_ff, num_tf - num_cf)
-			
-			# ------------------- Fetch future object representations from object decoder -------------------
-			
-			# ------------------- Construct entry for the future frames -------------------
-			
-			# ------------------- Construct masks for object level losses  -------------------
-			
-			num_cf += 1
-		
-		return entry_cf_ff
-	
 	def generate_future_ff_rels_for_context(self, entry, entry_cf_ff, num_cf, num_tf, num_ff):
+		"""
+		1. Pass the entry through object classification layer.
+		2. Generate representations for objects in the future frames
+		3. Construct complete entry for these items and add them as values to the keys in the entry
+		4. Generate spatial embeddings for all frames
+		5. Generate spatial embeddings for objects in future frames
+		6. Augment the context spatial embeddings and future frame spatial embeddings
+		7. Generate temporal embeddings for relations in future frames
+		8. Pass them through linear layers to get the final output and maintaining same code for losses.
+		"""
 		entry_cf_ff, spa_so_rels_feats_cf_ff, obj_seqs_cf_ff = self.generate_spatial_predicate_embeddings(entry_cf_ff)
 		entry_cf_ff, spa_so_rels_feats_cf_ff, obj_seqs_cf_ff, spa_temp_rels_feats_cf_ff = self.generate_spatio_temporal_predicate_embeddings(
 			entry_cf_ff, spa_so_rels_feats_cf_ff, obj_seqs_cf_ff, self.anti_temporal_transformer)

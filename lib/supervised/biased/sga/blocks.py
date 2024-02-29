@@ -848,15 +848,15 @@ class ObjectClassifierMLP(nn.Module):
 			return entry
 
 
-class ObjectAnt(nn.Module):
+class ObjectAnticipation(nn.Module):
 	
 	def __init__(
 			self,
 			mode='sgdet',
 			obj_classes=None,
-			decoder_layer_num=2,
+			decoder_layer_num=1,
 	):
-		super(ObjectAnt, self).__init__()
+		super(ObjectAnticipation, self).__init__()
 		self.obj_classes = obj_classes
 		self.decoder_layer_num = decoder_layer_num
 		self.mode = mode
@@ -865,18 +865,52 @@ class ObjectAnt(nn.Module):
 		
 		self.d_model = 1936
 		
+		self.obj_anti_positional_encoder = PositionalEncoding(2376, 0.1, 600 if mode == "sgdet" else 400)
+		
+		# Learnable queries for object anticipation decoder
+		self.obj_class_queries = nn.Parameter(torch.randn(self.obj_classes, 1, self.d_model))
+		
+		# Decoder Layers for the transformer
+		decoder_layer = TransformerDecoderLayer(d_model=self.d_model, dim_feedforward=1024, nhead=8)
+		self.decoder = TransformerDecoder(decoder_layer, num_layers=self.decoder_layer_num)
+		
 		# MLP decoders for object classification, and object representation reconstruction losses.
+		self.presence_prediction = nn.Sequential(
+			nn.Linear(self.d_model, 1024),
+			nn.BatchNorm1d(1024),
+			nn.ReLU(),
+			nn.Linear(1024, len(self.classes)))
 	
-	# Define heads for object prediction, bounding box prediction
-	
-	def forward(self, entry, num_cf, num_ff):
+	def forward(self, entry, num_cf, num_tf, num_ff):
 		"""
-		entry["features"] will be a sequence of object features.
-		(1) Define a positional encoding scheme for the object features.
-		(2)
-		:param entry:
-		:param num_cf:
-		:param num_ff:
-		:return:
+			1. Fetch object representation from the object classifier.
+			2. Use object decoder to fetch representations for future frames in an auto-regressive manner.
+			3. Construct entry for the future frames that include
+				a. im_idx
+				b. pair_idx
+				c. pred_labels
+				d. boxes
+				e. scores
+				f. union_feat
+				g. spatial_masks
+			4. Construct masks for object level losses
+				a. Bounding box regression loss
+				b. Object classification loss
+			:param num_tf:
+			:param entry:
+			:param num_cf:
+			:param num_ff:
+			:return:
 		"""
-		entry = self.object_classifier(entry)
+		entry_cf_ff = {}
+		while num_cf + 1 <= num_tf:
+			num_ff = min(num_ff, num_tf - num_cf)
+			
+			# ------------------- Fetch future object representations from object decoder -------------------
+			
+			# ------------------- Construct entry for the future frames -------------------
+			
+			# ------------------- Construct masks for object level losses  -------------------
+			
+			num_cf += 1
+		pass

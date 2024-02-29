@@ -1,14 +1,15 @@
 from torch import nn
 
-from lib.supervised.biased.sga.blocks import ObjectClassifierMLP, EncoderLayer, Encoder, PositionalEncoding, ObjectAnt
+from lib.supervised.biased.sga.blocks import ObjectClassifierMLP, EncoderLayer, Encoder, PositionalEncoding, ObjectAnticipation
 from lib.supervised.biased.sga.obj.obj_base_transformer import ObjBaseTransformer
 from lib.word_vectors import obj_edge_vectors
 
 """
-1. ObjectClassifierTransformer
-2. Enabled Tracking for past sequences
-3. Uses spatial transformer for generating embeddings
+1. ObjectClassifierMLP
+2. No Tracking
+3. Uses spatial transformer for embeddings
 4. Uses temporal transformer for anticipation
+5. Uses object anticipation decoder for generating future embeddings
 """
 
 
@@ -35,9 +36,7 @@ class ObjSTTranAnt(ObjBaseTransformer):
 		self.num_features = 1936
 		
 		self.object_classifier = ObjectClassifierMLP(mode=self.mode, obj_classes=self.obj_classes)
-		
-		self.obj_anti_positional_encoder = PositionalEncoding(2376, 0.1, 600 if mode == "sgdet" else 400)
-		self.obj_anti_temporal_transformer = ObjectAnt(mode=self.mode, obj_classes=self.obj_classes)
+		self.obj_anti_temporal_transformer = ObjectAnticipation(mode=self.mode, obj_classes=self.obj_classes)
 		
 		self.union_func1 = nn.Conv2d(1024, 256, 1, 1)
 		self.conv = nn.Sequential(
@@ -77,38 +76,18 @@ class ObjSTTranAnt(ObjBaseTransformer):
 		self.c_rel_compress = nn.Linear(d_model, self.contact_class_num)
 	
 	def forward(self, entry, num_cf, num_ff):
-		"""
-		1. Pass the entry through object classification layer.
-		2. Generate representations for objects in the future frames
-		3. Construct complete entry for these items and add them as values to the keys in the entry
-		4. Generate spatial embeddings for all frames
-		5. Generate spatial embeddings for objects in future frames
-		6. Augment the context spatial embeddings and future frame spatial embeddings
-		7. Generate temporal embeddings for relations in future frames
-		8. Pass them through linear layers to get the final output and maintaining same code for losses.
-		:param entry:
-		:param num_cf:
-		:param num_ff:
-		:return:
-		"""
-		
 		entry = self.object_classifier(entry)
-		
-		# -----------------------------------------------------------------------------
-		# Generate representations for objects in the future frames
-		
 		count = 0
 		result = {}
 		num_tf = len(entry["im_idx"].unique())
 		num_cf = min(num_cf, num_tf - 1)
 		while num_cf + 1 <= num_tf:
 			num_ff = min(num_ff, num_tf - num_cf)
-			entry_cf_ff = self.generate_future_ff_obj_for_context(entry, num_cf, num_tf, num_ff)
+			entry_cf_ff = self.obj_anti_temporal_transformer(entry, num_cf, num_tf, num_ff)
 			entry_cf_ff = self.generate_future_ff_rels_for_context(entry, entry_cf_ff, num_cf, num_tf, num_ff)
 			result[count] = entry_cf_ff
 			count += 1
 			num_cf += 1
-		
 		entry["output"] = result
 		return entry
 	

@@ -3,8 +3,10 @@ from lib.supervised.biased.sga.obj.obj_base_transformer import ObjBaseTransforme
 """
 1. ObjectClassifierTransformer
 2. Enabled Tracking for past sequences
-3. Uses spatial transformer for generating embeddings
+3. Uses spatial temporal transformer for generating embeddings
 4. Uses temporal transformer for anticipation
+5. Also use generation transformer for classification of current inputs
+6. Uses object anticipation decoder for generating future embeddings
 """
 
 

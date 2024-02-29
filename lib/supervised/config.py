@@ -1,5 +1,7 @@
 from argparse import ArgumentParser
 
+import torch
+
 BATCHNORM_MOMENTUM = 0.01
 
 
@@ -24,6 +26,8 @@ class Config(object):
         self.nepoch = 10
         self.results_path = None
         self.method_name = None
+
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
         self.max_window = 5
         self.brownian_size = 1
@@ -68,6 +72,7 @@ class Config(object):
         parser.add_argument('-baseline_future', default=3, type=int)
         parser.add_argument('-use_raw_data', action='store_true')
         parser.add_argument('-data_path', default='/data/rohith/ag', type=str)
+        parser.add_argument('-device', default='cuda', type=str)
         parser.add_argument('-datasize', dest='datasize', help='mini dataset or whole', default='large', type=str)
         parser.add_argument('-ckpt', dest='ckpt', help='checkpoint', default=None, type=str)
         parser.add_argument('-optimizer', help='adamw/adam/sgd', default='adamw', type=str)

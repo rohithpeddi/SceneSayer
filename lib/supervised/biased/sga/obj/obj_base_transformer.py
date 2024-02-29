@@ -41,12 +41,14 @@ class ObjBaseTransformer(nn.Module):
 		:return:
 		"""
 		# Visual Part
-		subj_rep = entry['features'][entry['pair_idx'][:, 0]]
-		subj_rep = self.subj_fc(subj_rep)
-		obj_rep = entry['features'][entry['pair_idx'][:, 1]]
-		obj_rep = self.obj_fc(obj_rep)
-		vr = self.union_func1(entry['union_feat']) + self.conv(entry['spatial_masks'])
-		vr = self.vr_fc(vr.view(-1, 256 * 7 * 7))
+		subj_feats = entry['features'][entry['pair_idx'][:, 0]]
+		subj_rep = self.subj_fc(subj_feats)
+		obj_feats = entry['features'][entry['pair_idx'][:, 1]]
+		obj_rep = self.obj_fc(obj_feats)
+
+		# TODO: Think of a way to include union and intersection features
+		sub_obj_feats = torch.cat((subj_rep, obj_rep), dim=1)
+		vr = self.vr_fc(sub_obj_feats)
 		x_visual = torch.cat((subj_rep, obj_rep, vr), 1)
 		
 		# semantic part

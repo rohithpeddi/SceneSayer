@@ -865,7 +865,7 @@ class ObjectAnt(nn.Module):
 		
 		self.d_model = 1936
 		
-		# MLP decoders for object classification, bounding box prediction, and object representation reconstruction losses.
+		# MLP decoders for object classification, and object representation reconstruction losses.
 	
 	# Define heads for object prediction, bounding box prediction
 	

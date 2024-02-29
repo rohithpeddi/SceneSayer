@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
@@ -134,4 +135,136 @@ class ObjBaseTransformer(nn.Module):
 		return padding_mask, causal_mask
 	
 	def generate_future_ff_obj_for_context(self, entry, num_cf, num_tf, num_ff):
-		pass
+		"""
+		1. Fetch object representation from the object classifier.
+		2. Use object decoder to fetch representations for future frames in an auto-regressive manner.
+		3. Construct entry for the future frames that include
+			a. im_idx
+			b. pair_idx
+			c. pred_labels
+			d. boxes
+			e. scores
+			f. union_feat
+			g. spatial_masks
+		4. Construct masks for object level losses
+			a. Bounding box regression loss
+			b. Object classification loss
+		:param entry:
+		:param num_cf:
+		:param num_tf:
+		:param num_ff:
+		:return:
+		"""
+		entry_cf_ff = {}
+		entry = self.object_classifier(entry)
+		while num_cf + 1 <= num_tf:
+			num_ff = min(num_ff, num_tf - num_cf)
+			
+			# ------------------- Fetch future object representations from object decoder -------------------
+			
+			# ------------------- Construct entry for the future frames -------------------
+			
+			# ------------------- Construct masks for object level losses  -------------------
+			
+			num_cf += 1
+		
+		return entry_cf_ff
+	
+	def generate_future_ff_rels_for_context(self, entry, entry_cf_ff, num_cf, num_tf, num_ff):
+		entry_cf_ff, spa_so_rels_feats_cf_ff, obj_seqs_cf_ff = self.generate_spatial_predicate_embeddings(entry_cf_ff)
+		entry_cf_ff, spa_so_rels_feats_cf_ff, obj_seqs_cf_ff, spa_temp_rels_feats_cf_ff = self.generate_spatio_temporal_predicate_embeddings(
+			entry_cf_ff, spa_so_rels_feats_cf_ff, obj_seqs_cf_ff, self.anti_temporal_transformer)
+		
+		# 1. Truncate spa_so_rels_feats_cf_ff and obj_seqs_cf_ff for the future frames
+		# ------------------- From dictionary corresponding to the anticipated future frames -------------------
+		num_ff = min(num_ff, num_tf - num_cf)
+		ant_ff_start_id = entry_cf_ff["im_idx"].unique()[num_cf]
+		ant_obj_ff_start_id = int(torch.where(entry_cf_ff["im_idx"] == ant_ff_start_id)[0][0])
+		ant_spa_temp_rels_feats_ff = spa_temp_rels_feats_cf_ff[ant_obj_ff_start_id:]
+		ant_obj_cf = entry_cf_ff["im_idx"][:ant_obj_ff_start_id]
+		
+		ant_num_obj_cf = ant_obj_cf.shape[0]
+		ant_num_obj_cf_ff = entry_cf_ff["im_idx"].shape[0]
+		ant_num_obj_ff = ant_num_obj_cf_ff - ant_num_obj_cf
+		
+		# ------------------- From dictionary corresponding to the ground truth frames -------------------
+		
+		gt_ff_start_id = entry["im_idx"].unique()[num_cf]
+		gt_ff_end_id = entry["im_idx"].unique()[num_cf + num_ff - 1]
+		
+		gt_obj_ff_start_id = int(torch.where(entry["im_idx"] == gt_ff_start_id)[0][0])
+		gt_obj_ff_end_id = int(torch.where(entry["im_idx"] == gt_ff_end_id)[0][-1]) + 1
+		
+		# 2. Truncate pair_idx, im_dx, pred_labels, boxes, and scores for the future frames
+		ant_im_idx_ff = entry_cf_ff["im_idx"][ant_obj_ff_start_id:]
+		ant_pair_idx_ff = entry_cf_ff["pair_idx"][ant_obj_ff_start_id:]
+		ant_obj_labels_ff_start_id = ant_pair_idx_ff.min()
+		
+		ant_pred_labels_ff = entry_cf_ff["pred_labels"][ant_obj_labels_ff_start_id:]
+		ant_boxes_ff = entry_cf_ff["boxes"][ant_obj_labels_ff_start_id:]
+		ant_scores_ff = entry_cf_ff["scores"][ant_obj_labels_ff_start_id:]
+		
+		assert ant_num_obj_ff == ant_im_idx_ff.shape[0]
+		assert ant_num_obj_ff + num_ff == ant_pred_labels_ff.shape[0]
+		assert ant_num_obj_ff + num_ff == ant_boxes_ff.shape[0]
+		assert ant_num_obj_ff + num_ff == ant_scores_ff.shape[0]
+		
+		# ------------------- Construct mask_ant and mask_gt -------------------
+		# 3. Construct mask_ant and mask_gt for the future frames
+		# mask_ant: indices in only anticipated frames
+		# mask_gt: indices in all frames
+		# ----------------------------------------------------------------------
+		if self.training:
+			"""
+			Fetch all labels of the predicted objects in the future frames.
+			Fetch all the labels of the ground truth objects in the future frames.
+			
+			Look at the intersection of the object labels in the predicted future frames and the ground truth future frames.
+			
+			Maintain the indices of the intersection in the predicted future frames and the ground truth future frames.
+			This can be used for application of loss function, where the loss is calculated only for the intersection.
+			"""
+			obj_idx_ff = entry_cf_ff["pair_idx"][ant_obj_ff_start_id:][:, 1]
+			pred_obj_labels_ff = entry_cf_ff["pred_labels"][ant_obj_labels_ff_start_id:][obj_idx_ff]
+			
+			gt_obj_labels_ff = entry["pred_labels"][entry["pair_idx"][gt_obj_ff_start_id:gt_obj_ff_end_id][:, 1]]
+			
+			np_pred_obj_labels_ff = pred_obj_labels_ff.cpu().numpy()
+			np_gt_obj_labels_ff = gt_obj_labels_ff.cpu().numpy()
+			
+			int_obj_labels, gt_ff_obj_labels_in_pred_ff, pred_ff_obj_labels_in_gt_ff = (
+				np.intersect1d(np_pred_obj_labels_ff, np_gt_obj_labels_ff, return_indices=True))
+			
+			gt_ff_start_id = entry["im_idx"].unique()[num_cf]
+			gt_ff_end_id = entry["im_idx"].unique()[num_cf + num_ff - 1]
+			gt_ff_obj_idx = (entry["im_idx"] >= gt_ff_start_id) & (entry["im_idx"] <= gt_ff_end_id)
+			gt_ff_obj_idx = gt_ff_obj_idx.nonzero(as_tuple=False).squeeze()
+			
+			assert gt_ff_obj_idx.shape[0] >= pred_ff_obj_labels_in_gt_ff.shape[0]
+			
+			mask_ant = torch.tensor(gt_ff_obj_labels_in_pred_ff).cuda()
+			mask_gt = torch.tensor(gt_ff_obj_idx[pred_ff_obj_labels_in_gt_ff]).cuda()
+			
+			assert mask_ant.shape[0] == mask_gt.shape[0]
+			assert mask_ant.shape[0] <= ant_spa_temp_rels_feats_ff.shape[0]
+		
+		# 4. Construct attention_distribution, spatial_distribution, and contacting_distribution for the future frames
+		temp = {
+			"attention_distribution": self.a_rel_compress(ant_spa_temp_rels_feats_ff),
+			"spatial_distribution": torch.sigmoid(self.s_rel_compress(ant_spa_temp_rels_feats_ff)),
+			"contacting_distribution": torch.sigmoid(self.c_rel_compress(ant_spa_temp_rels_feats_ff)),
+			"global_output": ant_spa_temp_rels_feats_ff,
+			"pair_idx": ant_pair_idx_ff,
+			"im_idx": ant_im_idx_ff,
+			"labels": ant_pred_labels_ff,
+			"pred_labels": ant_pred_labels_ff,
+			"scores": ant_scores_ff,
+			"pred_scores": ant_scores_ff,
+			"boxes": ant_boxes_ff
+		}
+		
+		if self.training:
+			temp["mask_ant"] = mask_ant
+			temp["mask_gt"] = mask_gt
+		
+		return temp

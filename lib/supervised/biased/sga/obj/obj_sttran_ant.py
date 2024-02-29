@@ -35,6 +35,7 @@ class ObjSTTranAnt(ObjBaseTransformer):
 		self.num_features = 1936
 		
 		self.object_classifier = ObjectClassifierMLP(mode=self.mode, obj_classes=self.obj_classes)
+		
 		self.obj_anti_positional_encoder = PositionalEncoding(2376, 0.1, 600 if mode == "sgdet" else 400)
 		self.obj_anti_temporal_transformer = ObjectAnt(mode=self.mode, obj_classes=self.obj_classes)
 		
@@ -97,30 +98,18 @@ class ObjSTTranAnt(ObjBaseTransformer):
 		# Generate representations for objects in the future frames
 		
 		count = 0
-		entry_cf_ff = {}
-		num_tf = len(entry["im_idx"].unique())
-		num_cf = min(num_cf, num_tf - 1)
-		while num_cf + 1 <= num_tf:
-			num_ff = min(num_ff, num_tf - num_cf)
-			entry_cf_ff[count] = self.generate_future_ff_obj_for_context(entry, num_cf, num_tf, num_ff)
-			count += 1
-			num_cf += 1
-		
-		entry, spa_so_rels_feats_tf, obj_seqs_tf = self.generate_spatial_predicate_embeddings(entry)
-		
-		count = 0
 		result = {}
 		num_tf = len(entry["im_idx"].unique())
 		num_cf = min(num_cf, num_tf - 1)
 		while num_cf + 1 <= num_tf:
 			num_ff = min(num_ff, num_tf - num_cf)
-			result[count] = self.generate_future_ff_rels_for_context(entry, spa_so_rels_feats_tf, obj_seqs_tf,
-			                                                         num_cf, num_tf, num_ff)
+			entry_cf_ff = self.generate_future_ff_obj_for_context(entry, num_cf, num_tf, num_ff)
+			entry_cf_ff = self.generate_future_ff_rels_for_context(entry, entry_cf_ff, num_cf, num_tf, num_ff)
+			result[count] = entry_cf_ff
 			count += 1
 			num_cf += 1
 		
-		entry["output"] = entry_cf_ff
-		entry["global_output"] = spa_so_rels_feats_tf
+		entry["output"] = result
 		return entry
 	
 	def forward_single_entry(self, context_fraction, entry):

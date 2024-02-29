@@ -82,6 +82,8 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
 	num_tf = len(entry["im_idx"].unique())
 	loss_count = 0
 	while num_cf + 1 <= num_tf:
+		# TODO: Include object decoder losses here for a. object classification, b. object reconstruction
+		
 		ant_spatial_distribution = ant_output[count]["spatial_distribution"]
 		ant_contact_distribution = ant_output[count]["contacting_distribution"]
 		ant_attention_distribution = ant_output[count]["attention_distribution"]

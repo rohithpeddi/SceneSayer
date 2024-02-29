@@ -865,6 +865,7 @@ class ObjectAnticipation(nn.Module):
 		
 		self.d_model = 1936
 		
+		self.presence_threshold = 0.5
 		self.obj_anti_positional_encoder = PositionalEncoding(2376, 0.1, 600 if mode == "sgdet" else 400)
 		
 		# Learnable queries for object anticipation decoder
@@ -872,14 +873,16 @@ class ObjectAnticipation(nn.Module):
 		
 		# Decoder Layers for the transformer
 		decoder_layer = TransformerDecoderLayer(d_model=self.d_model, dim_feedforward=1024, nhead=8)
-		self.decoder = TransformerDecoder(decoder_layer, num_layers=self.decoder_layer_num)
+		self.ff_feats_decoder = TransformerDecoder(decoder_layer, num_layers=self.decoder_layer_num)
 		
 		# MLP decoders for object classification, and object representation reconstruction losses.
 		self.presence_prediction = nn.Sequential(
 			nn.Linear(self.d_model, 1024),
 			nn.BatchNorm1d(1024),
 			nn.ReLU(),
-			nn.Linear(1024, len(self.classes)))
+			nn.Linear(1024, len(self.classes)),
+			nn.Sigmoid()
+		)
 	
 	def forward(self, entry, num_cf, num_tf, num_ff):
 		"""
@@ -894,23 +897,30 @@ class ObjectAnticipation(nn.Module):
 				f. union_feat
 				g. spatial_masks
 			4. Construct masks for object level losses
-				a. Bounding box regression loss
-				b. Object classification loss
+				a. Object classification loss
 			:param num_tf:
 			:param entry:
 			:param num_cf:
 			:param num_ff:
 			:return:
 		"""
+		# ----------------- Fetch object representation from the object decoder for future frames -----------------
+		cf_end_id = entry["im_idx"].unique()[num_cf - 1]
+		obj_cf_end_id = int(torch.where(entry["im_idx"] == cf_end_id)[0][-1]) + 1
+		
+		obj_label_idx_tf = entry["pair_idx"][:, 1]
+		obj_label_idx_cf = entry["pair_idx"][:, 1][:obj_cf_end_id]
+		pred_label_cf_end_id = obj_label_idx_cf.max().item()
+		
+		# These can be considered as output of encoder features that decoder attends to
+		feats_cf = entry["features"][:pred_label_cf_end_id]
+		
+		# ------ Use object decoder to fetch representations for future frames in an auto-regressive manner -------
 		entry_cf_ff = {}
-		while num_cf + 1 <= num_tf:
-			num_ff = min(num_ff, num_tf - num_cf)
+		for ff_id in range(num_ff):
+			feats_ff = self.ff_feats_decoder(tgt=self.obj_class_queries, memory=feats_cf)
+			presence_output = self.presence_prediction(feats_ff)
+			presence_mask_ff = presence_output > self.presence_threshold
 			
-			# ------------------- Fetch future object representations from object decoder -------------------
+			# Construct items for the entry of future frames
 			
-			# ------------------- Construct entry for the future frames -------------------
-			
-			# ------------------- Construct masks for object level losses  -------------------
-			
-			num_cf += 1
-		pass

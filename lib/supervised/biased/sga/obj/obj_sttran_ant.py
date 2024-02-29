@@ -1,6 +1,9 @@
+import math
+
 from torch import nn
 
-from lib.supervised.biased.sga.blocks import ObjectClassifierMLP, EncoderLayer, Encoder, PositionalEncoding, ObjectAnticipation
+from lib.supervised.biased.sga.blocks import ObjectClassifierMLP, EncoderLayer, Encoder, PositionalEncoding, \
+	ObjectAnticipation
 from lib.supervised.biased.sga.obj.obj_base_transformer import ObjBaseTransformer
 from lib.word_vectors import obj_edge_vectors
 
@@ -92,4 +95,14 @@ class ObjSTTranAnt(ObjBaseTransformer):
 		return entry
 	
 	def forward_single_entry(self, context_fraction, entry):
-		pass
+		entry = self.object_classifier(entry)
+		result = {}
+		count = 0
+		num_tf = len(entry["im_idx"].unique())
+		num_cf = min(int(math.ceil(context_fraction * num_tf)), num_tf - 1)
+		num_ff = num_tf - num_cf
+		entry_cf_ff = self.obj_anti_temporal_transformer(entry, num_cf, num_tf, num_ff)
+		entry_cf_ff = self.generate_future_ff_rels_for_context(entry, entry_cf_ff, num_cf, num_tf, num_ff)
+		result[count] = entry_cf_ff
+		entry["output"] = result
+		return entry

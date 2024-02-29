@@ -908,11 +908,11 @@ class ObjectAnticipation(nn.Module):
         obj_cf_end_id = int(torch.where(entry["im_idx"] == cf_end_id)[0][-1]) + 1
 
         obj_label_idx_cf = entry["pair_idx"][:, 1][:obj_cf_end_id]
-        pred_label_cf_end_id = obj_label_idx_cf.max().item()
+        pred_label_cf_end_id = obj_label_idx_cf.max().item() + 1
 
         # ------ Use object decoder to fetch representations for future frames in an auto-regressive manner -------
         entry_cf_ff = {}
-        im_idx_cf = entry["im_idx"][:cf_end_id]
+        im_idx_cf = entry["im_idx"][:obj_cf_end_id]
         pair_idx_cf = entry["pair_idx"][:obj_cf_end_id]
         pred_labels_cf = entry["pred_labels"][:pred_label_cf_end_id]
         boxes_cf = entry["boxes"][:pred_label_cf_end_id]
@@ -938,33 +938,40 @@ class ObjectAnticipation(nn.Module):
 
             sub_label_ff_id = torch.tensor([1]).cuda()
             obj_labels_ff_id = (torch.nonzero(presence_mask_ff) + 1).squeeze()
-            pred_labels_ff_id = torch.cat(sub_label_ff_id, obj_labels_ff_id)
+            pred_labels_ff_id = torch.cat((sub_label_ff_id, obj_labels_ff_id))
 
             num_obj_ff_id = obj_labels_ff_id.shape[0]
 
             # Construct items for the entry of future frames
             im_idx_ff_id = entry["im_idx"].unique()[num_cf + c_ff_id].repeat(num_obj_ff_id)
 
-            pred_label_cf_end_id += pred_labels_ff.shape[0]
-            sub_id_in_pair_idx_ff = torch.tensor(pred_label_cf_end_id).repeat(num_obj_ff_id).cuda()
-            obj_id_in_pair_idx_ff = torch.arange(1, num_obj_ff_id + 1).cuda() + pred_label_cf_end_id
+            sub_id_in_pair_idx_ff = torch.tensor([pred_label_cf_end_id], device=entry["device"]).repeat(num_obj_ff_id)
+            obj_id_in_pair_idx_ff = torch.arange(start=1, end=num_obj_ff_id + 1,
+                                                 device=entry["device"]) + pred_label_cf_end_id
+
+            sub_id_in_pair_idx_ff = sub_id_in_pair_idx_ff.unsqueeze(1)  # Make it (num_obj_ff_id, 1)
+            obj_id_in_pair_idx_ff = obj_id_in_pair_idx_ff.unsqueeze(1)  # Make it (num_obj_ff_id, 1)
+
+            # Concatenate along dimension 1 to make pairs [(sub_id, obj_id), ...]
             pair_idx_ff_id = torch.cat((sub_id_in_pair_idx_ff, obj_id_in_pair_idx_ff), dim=1)
 
             boxes_ff_id = torch.tensor([[0.5] * 5 for _ in range(len(pred_labels_ff_id))]).cuda()
             scores_ff_id = torch.tensor([1] * len(pred_labels_ff_id)).cuda()
+            features_ff_id = torch.cat((sub_feats_ff_id.unsqueeze(0), obj_feats_ff_id[torch.nonzero(presence_mask_ff)].squeeze()), dim=0)
 
             pred_labels_ff = torch.cat((pred_labels_ff, pred_labels_ff_id))
-            im_idx_ff = torch.cat(im_idx_ff, im_idx_ff_id)
+            im_idx_ff = torch.cat((im_idx_ff, im_idx_ff_id))
             pair_idx_ff = torch.cat((pair_idx_ff, pair_idx_ff_id))
-            boxes_ff = torch.cat(boxes_ff, boxes_ff_id)
-            scores_ff = torch.cat(scores_ff, scores_ff_id)
-            features_ff = torch.cat((features_ff, sub_feats_ff_id, obj_feats_ff_id[torch.nonzero(presence_mask_ff)]))
+            boxes_ff = torch.cat((boxes_ff, boxes_ff_id))
+            scores_ff = torch.cat((scores_ff, scores_ff_id))
+
+            features_ff = torch.cat((features_ff, features_ff_id.unsqueeze(1)))
 
         entry_cf_ff["im_idx"] = torch.cat((im_idx_cf, im_idx_ff))
         entry_cf_ff["pair_idx"] = torch.cat((pair_idx_cf, pair_idx_ff))
         entry_cf_ff["pred_labels"] = torch.cat((pred_labels_cf, pred_labels_ff))
         entry_cf_ff["boxes"] = torch.cat((boxes_cf, boxes_ff))
         entry_cf_ff["scores"] = torch.cat((scores_cf, scores_ff))
-        entry_cf_ff["features"] = torch.cat((features_cf, features_ff))
+        entry_cf_ff["features"] = torch.cat((features_cf.squeeze(), features_ff.squeeze()), dim=0)
 
         return entry_cf_ff

@@ -303,13 +303,15 @@ def process_train_video_obj_cold(conf, entry, optimizer, model, epoch, num_video
     return num_video
 
 
-def fetch_train_type(category):
+def fetch_train_type(category, model):
     if category == "obj_hot":
-        return process_train_video_obj_hot
+        model.init_warm_start()
+        return process_train_video_obj_hot, model
     elif category == "obj_cold":
-        return process_train_video_obj_cold
+        model.init_cold_start()
+        return process_train_video_obj_cold, model
     elif category == "rel_hot":
-        return process_train_video_rel_hot
+        return process_train_video_rel_hot, model
 
 
 def fetch_category(conf, epoch):
@@ -366,7 +368,7 @@ def train_model():
                 entry["device"] = conf.device
             
             category = fetch_category(conf, epoch)
-            process_train_video = fetch_train_type(category)
+            process_train_video, model = fetch_train_type(category, model)
             num = process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_device, dataloader_train,
                                       gt_annotation, matcher, frame_size, start_time)
         print(f"Finished training an epoch {epoch}")

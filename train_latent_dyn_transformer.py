@@ -38,49 +38,50 @@ def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
 
     hp_recon_loss = conf.hp_recon_loss
 
-    # Initialize accumulators
     cum_obj_pred_loss = 0
-    cum_sub_feat_recon_loss = 0
-    cum_obj_feat_recon_loss = 0
+    cum_feat_recon_loss = 0
 
-    obj_feat_loss_count = 0
     pred_loss_count = num_tf - num_cf
+
+    gt_num_obj_ff = 0
+    pred_num_obj_ff = 0
     for count in range(pred_loss_count):
         obj_ant_output_ff = pred["output_ff"][count]
         obj_ant_output = pred["output"][count]
+        gt_num_obj_ff += obj_ant_output_ff["num_obj_ff"]
 
-        # Object prediction loss
-        presence_prediction_loss = bce_loss(obj_ant_output_ff["pred_presence"], obj_ant_output_ff["gt_presence"]).mean()
+        # Object presence prediction loss
+        obj_presence_pred_loss = bce_loss(obj_ant_output_ff["pred_obj_presence"],
+                                          obj_ant_output_ff["gt_obj_presence"]).mean()
 
-        # Feature reconstruction loss
-        sub_recon_loss = hp_recon_loss * abs_loss(obj_ant_output_ff["pred_sub_feats"],
-                                                  obj_ant_output_ff["gt_sub_feats"]).mean()
+        pred_feats_mask = obj_ant_output_ff["feat_mask_ant"]
+        gt_feats_mask = obj_ant_output_ff["feat_mask_gt"]
 
-        pred_obj_feats_mask = obj_ant_output_ff["obj_mask_ant"]
-        gt_obj_feats_mask = obj_ant_output_ff["obj_mask_gt"]
+        assert pred_feats_mask.shape[0] == gt_feats_mask.shape[0]
 
-        if pred_obj_feats_mask:
-            pred_obj_feats_ff = obj_ant_output_ff["features"]
-            gt_obj_feats_ff = obj_ant_output["features"]
-            obj_recon_loss = hp_recon_loss * abs_loss(pred_obj_feats_ff[pred_obj_feats_mask],
-                                                      gt_obj_feats_ff[gt_obj_feats_mask]).mean()
-            cum_obj_feat_recon_loss += obj_recon_loss
-            obj_feat_loss_count += 1
-        else:
-            assert not gt_obj_feats_mask
+        pred_feats_ff = obj_ant_output_ff["features"]
+        gt_feats_ff = obj_ant_output["features"]
 
-        cum_obj_pred_loss += presence_prediction_loss
-        cum_sub_feat_recon_loss += sub_recon_loss
+        pred_common_feats_ff = pred_feats_ff[pred_feats_mask]
+        gt_common_feats_ff = gt_feats_ff[gt_feats_mask]
+
+        feat_recon_loss = hp_recon_loss * abs_loss(pred_common_feats_ff, gt_common_feats_ff).mean()
+        cum_feat_recon_loss += feat_recon_loss
+        cum_obj_pred_loss += obj_presence_pred_loss
+        pred_num_obj_ff += pred_feats_mask.shape[0]
 
     cum_obj_pred_loss /= max(pred_loss_count, 1)
-    cum_sub_feat_recon_loss /= max(pred_loss_count, 1)
-    cum_obj_feat_recon_loss /= max(obj_feat_loss_count, 1)
+    cum_feat_recon_loss /= max(pred_loss_count, 1)
+
+    print(f"--------------------------------------------------------------------")
+    print(
+        f"GT Num Obj FF: {gt_num_obj_ff}, Pred Num Obj FF: {pred_num_obj_ff}, Percentage: {pred_num_obj_ff / gt_num_obj_ff}")
 
     # Update losses
     losses.update({
         "object_prediction_loss": cum_obj_pred_loss,
-        "subject_feature_recon_loss": cum_sub_feat_recon_loss,
-        "object_feature_recon_loss": cum_obj_feat_recon_loss
+        # "subject_feature_recon_loss": cum_sub_feat_recon_loss,
+        "object_feature_recon_loss": cum_feat_recon_loss
     })
 
     return losses

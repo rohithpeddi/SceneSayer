@@ -80,8 +80,7 @@ def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
     # Update losses
     losses.update({
         "object_prediction_loss": cum_obj_pred_loss,
-        # "subject_feature_recon_loss": cum_sub_feat_recon_loss,
-        "object_feature_recon_loss": cum_feat_recon_loss
+        "feature_recon_loss": cum_feat_recon_loss
     })
 
     return losses

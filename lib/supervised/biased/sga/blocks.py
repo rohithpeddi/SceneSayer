@@ -867,7 +867,7 @@ class ObjectAnticipation(nn.Module):
 
         self.d_model = 2048
 
-        self.presence_threshold = 0.5
+        self.presence_threshold = 0.35
         self.obj_anti_positional_encoder = PositionalEncoding(self.d_model, 0.1, 600 if mode == "sgdet" else 400)
 
         # Learnable queries for object anticipation decoder
@@ -938,13 +938,16 @@ class ObjectAnticipation(nn.Module):
         # Object Prediction Tensor, Latent Mask Tensor
         pred_presence_ff = []
         gt_presence_ff = []
-        mask_ant = []
-        mask_gt = []
+        obj_mask_ant = []
+        obj_mask_gt = []
+        pred_sub_feats_ff = torch.tensor([]).to(device=entry["device"])
+        gt_sub_feats_ff = torch.tensor([]).to(device=entry["device"])
         for current_ff_id_in_num_ff in range(num_ff):
             gt_ff_id = entry["im_idx"].unique()[num_cf + current_ff_id_in_num_ff]
             gt_obj_ff_start_id = int(torch.where(entry["im_idx"] == gt_ff_id)[0][0])
             gt_obj_ff_end_id = int(torch.where(entry["im_idx"] == gt_ff_id)[0][-1]) + 1
             gt_obj_label_idx_ff_id = entry["pair_idx"][:, 1][gt_obj_ff_start_id:gt_obj_ff_end_id]
+            gt_sub_label_idx_ff_id = entry["pair_idx"][:, 0][gt_obj_ff_start_id:gt_obj_ff_end_id].unique()[0]
 
             features_ff_id = self.ff_feats_decoder(tgt=self.obj_class_queries, memory=features_cf).squeeze()
 
@@ -954,7 +957,7 @@ class ObjectAnticipation(nn.Module):
             pred_presence_output = self.presence_prediction(obj_feats_ff_id).squeeze()
             pred_presence_ff_id = pred_presence_output > self.presence_threshold
 
-            sub_label_ff_id = torch.tensor([1]).cuda()
+            sub_label_ff_id = torch.tensor([1]).to(device=entry["device"])
             obj_labels_ff_id = (torch.nonzero(pred_presence_ff_id) + 1).squeeze()
             pred_labels_ff_id = torch.cat((sub_label_ff_id, obj_labels_ff_id))
 
@@ -980,21 +983,24 @@ class ObjectAnticipation(nn.Module):
                 dim=0)
 
             gt_labels_ff_id = entry["pred_labels"][gt_obj_label_idx_ff_id]
-            np_gt_labels_ff_id = entry["pred_labels"][gt_obj_label_idx_ff_id].cpu().numpy()
+            np_gt_labels_ff_id = gt_labels_ff_id.cpu().numpy()
             np_pred_labels_ff_id = pred_labels_ff_id.cpu().numpy()
 
             # Use these masks for application of latent reconstruction loss
             (int_pred_gt_obj_labels,
-             gt_obj_labels_idx_in_pred, pred_obj_labels_idx_in_gt) = np.intersect1d(np_gt_labels_ff_id,
-                                                                                    np_pred_labels_ff_id,
+             gt_obj_labels_idx_in_pred, pred_obj_labels_idx_in_gt) = np.intersect1d(np_pred_labels_ff_id,
+                                                                                    np_gt_labels_ff_id,
                                                                                     return_indices=True)
 
-            mask_ant.append(num_objects_cf + im_idx_ff.shape[0] + gt_obj_labels_idx_in_pred)
-            mask_gt.append(gt_obj_label_idx_ff_id[pred_obj_labels_idx_in_gt])
+            obj_mask_ant.append(num_objects_cf + im_idx_ff.shape[0] + gt_obj_labels_idx_in_pred)
+            obj_mask_gt.append(gt_obj_label_idx_ff_id[pred_obj_labels_idx_in_gt])
 
             gt_presence_ff_id = torch.zeros_like(pred_presence_ff_id).to(device=entry["device"])
             for obj_idx in gt_labels_ff_id:
                 gt_presence_ff_id[obj_idx] = 1
+
+            pred_sub_feats_ff = torch.cat((pred_sub_feats_ff, sub_feats_ff_id))
+            gt_sub_feats_ff = torch.cat((gt_sub_feats_ff, entry["features"][gt_sub_label_idx_ff_id]))
 
             pred_presence_ff.append(pred_presence_ff_id)
             gt_presence_ff.append(gt_presence_ff_id)
@@ -1006,7 +1012,6 @@ class ObjectAnticipation(nn.Module):
             scores_ff = torch.cat((scores_ff, scores_ff_id))
 
             features_ff = torch.cat((features_ff, features_ff_id.unsqueeze(1)))
-
         entry_cf_ff["im_idx"] = torch.cat((im_idx_cf, im_idx_ff))
         entry_cf_ff["pair_idx"] = torch.cat((pair_idx_cf, pair_idx_ff))
         entry_cf_ff["pred_labels"] = torch.cat((pred_labels_cf, pred_labels_ff))
@@ -1014,8 +1019,8 @@ class ObjectAnticipation(nn.Module):
         entry_cf_ff["scores"] = torch.cat((scores_cf, scores_ff))
         entry_cf_ff["features"] = torch.cat((features_cf.squeeze(), features_ff.squeeze()), dim=0)
 
-        entry_ff["im_idx"] = im_idx_ff - im_idx_ff.min()
-        entry_ff["pair_idx"] = pair_idx_ff - pair_idx_ff.min()
+        entry_ff["im_idx"] = im_idx_ff - im_idx_ff.min() if im_idx_ff.shape[0] > 0 else im_idx_ff
+        entry_ff["pair_idx"] = pair_idx_ff - pair_idx_ff.min() if pair_idx_ff.shape[0] > 0 else pair_idx_ff
         entry_ff["pred_labels"] = pred_labels_ff
         entry_ff["boxes"] = boxes_ff
         entry_ff["scores"] = scores_ff
@@ -1023,7 +1028,10 @@ class ObjectAnticipation(nn.Module):
 
         entry_ff["pred_presence"] = pred_presence_ff
         entry_ff["gt_presence"] = gt_presence_ff
-        entry_ff["mask_ant"] = mask_ant
-        entry_ff["mask_gt"] = mask_gt
+        entry_ff["obj_mask_ant"] = obj_mask_ant
+        entry_ff["obj_mask_gt"] = obj_mask_gt
+
+        entry_ff["pred_sub_feats"] = pred_sub_feats_ff
+        entry_ff["gt_sub_feats"] = gt_sub_feats_ff
 
         return entry_cf_ff

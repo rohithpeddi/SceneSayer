@@ -28,6 +28,7 @@ class Config(object):
         self.method_name = None
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.hot_epoch = 2
         
         self.max_window = 5
         self.brownian_size = 1
@@ -67,6 +68,7 @@ class Config(object):
         parser.add_argument('-sde_ratio', default=1.0, type=float)
         parser.add_argument('-bbox_ratio', default=0.1, type=float)
         parser.add_argument('-features_path', default=None, type=str)
+        parser.add_argument('-hot_epoch', default=2, type=float)
         parser.add_argument('-additional_data_path', default=None, type=str)
         parser.add_argument('-baseline_context', default=3, type=int)
         parser.add_argument('-baseline_future', default=3, type=int)

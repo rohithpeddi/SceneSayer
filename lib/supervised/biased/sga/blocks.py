@@ -954,8 +954,8 @@ class ObjectAnticipation(nn.Module):
             sub_feats_ff_id = features_ff_id[0]
             obj_feats_ff_id = features_ff_id[1:]
 
-            pred_presence_output = self.presence_prediction(obj_feats_ff_id).squeeze()
-            pred_presence_ff_id = pred_presence_output > self.presence_threshold
+            pred_presence_ff_id_distribution = self.presence_prediction(obj_feats_ff_id).squeeze()
+            pred_presence_ff_id = pred_presence_ff_id_distribution > self.presence_threshold
 
             sub_label_ff_id = torch.tensor([1]).to(device=entry["device"])
             obj_labels_ff_id = (torch.nonzero(pred_presence_ff_id) + 1).squeeze()
@@ -984,6 +984,7 @@ class ObjectAnticipation(nn.Module):
 
             gt_labels_ff_id = entry["pred_labels"][gt_obj_label_idx_ff_id]
             np_gt_labels_ff_id = gt_labels_ff_id.cpu().numpy()
+            # Has both subject and object labels
             np_pred_labels_ff_id = pred_labels_ff_id.cpu().numpy()
 
             # Use these masks for application of latent reconstruction loss
@@ -992,17 +993,16 @@ class ObjectAnticipation(nn.Module):
                                                                                     np_gt_labels_ff_id,
                                                                                     return_indices=True)
 
-            obj_mask_ant.append(num_objects_cf + im_idx_ff.shape[0] + gt_obj_labels_idx_in_pred)
+            obj_mask_ant.append(pred_labels_ff.shape[0] + gt_obj_labels_idx_in_pred)
             obj_mask_gt.append(gt_obj_label_idx_ff_id[pred_obj_labels_idx_in_gt])
 
-            gt_presence_ff_id = torch.zeros_like(pred_presence_ff_id).to(device=entry["device"])
-            for obj_idx in gt_labels_ff_id:
-                gt_presence_ff_id[obj_idx] = 1
+            gt_presence_ff_id = torch.zeros_like(pred_presence_ff_id_distribution).to(device=entry["device"])
+            gt_presence_ff_id[gt_labels_ff_id] = 1
 
             pred_sub_feats_ff = torch.cat((pred_sub_feats_ff, sub_feats_ff_id))
             gt_sub_feats_ff = torch.cat((gt_sub_feats_ff, entry["features"][gt_sub_label_idx_ff_id]))
 
-            pred_presence_ff.append(pred_presence_ff_id)
+            pred_presence_ff.append(pred_presence_ff_id_distribution)
             gt_presence_ff.append(gt_presence_ff_id)
 
             pred_labels_ff = torch.cat((pred_labels_ff, pred_labels_ff_id))

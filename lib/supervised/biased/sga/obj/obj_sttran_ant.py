@@ -75,7 +75,7 @@ class ObjSTTranAnt(ObjBaseTransformer):
         self.s_rel_compress = nn.Linear(d_model, self.spatial_class_num)
         self.c_rel_compress = nn.Linear(d_model, self.contact_class_num)
 
-    def forward(self, entry, num_cf, num_ff):
+    def forward(self, entry, num_cf, num_ff, is_cold=False):
         entry = self.object_classifier(entry)
         count = 0
         result_ff = {}
@@ -85,12 +85,13 @@ class ObjSTTranAnt(ObjBaseTransformer):
         while num_cf + 1 <= num_tf:
             num_ff = min(num_ff, num_tf - num_cf)
             entry_cf_ff, entry_ff = self.obj_anti_temporal_transformer(entry, num_cf, num_tf, num_ff)
-            entry_cf_ff = self.generate_future_ff_rels_for_context(entry, entry_cf_ff, num_cf, num_tf, num_ff)
+            if not is_cold:
+                entry_cf_ff = self.generate_future_ff_rels_for_context(entry, entry_cf_ff, num_cf, num_tf, num_ff)
             result_cf_ff[count] = entry_cf_ff
             result_ff[count] = entry_ff
             count += 1
             num_cf += 1
-        entry["output_cf_ff"] = result_cf_ff
+        entry["output"] = result_cf_ff
         entry["output_ff"] = result_ff
         return entry
 

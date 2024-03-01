@@ -32,15 +32,132 @@ def calculate_gen_losses(conf, pred, losses, ce_loss, mlm_loss, bce_loss, attent
     return losses
 
 
-def calculate_object_decoder_losses(entry, count, conf, losses, bce_loss, abs_loss):
-    # 1. Object classification loss
-    # 2. Object reconstruction loss
+def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
+    num_tf = len(pred["im_idx"].unique())
+    num_cf = conf.baseline_context
 
+    hp_recon_loss = conf.hp_recon_loss
+
+    # Initialize accumulators
+    cum_obj_pred_loss = 0
+    cum_sub_feat_recon_loss = 0
+    cum_obj_feat_recon_loss = 0
+
+    obj_feat_loss_count = 0
+    pred_loss_count = num_tf - num_cf  # If every step in the loop is guaranteed, pre-calculate this
+
+    # Batch processing outside the loop if possible
+    # If individual processing is necessary, consider optimizations within this structure
+    for count in range(pred_loss_count):
+        obj_ant_output_ff = pred["output_ff"][count]
+        obj_ant_output = pred["output"][count]
+
+        # Object prediction loss
+        presence_prediction_loss = bce_loss(obj_ant_output_ff["pred_presence"], obj_ant_output_ff["gt_presence"]).mean()
+
+        # Feature reconstruction loss
+        sub_recon_loss = hp_recon_loss * abs_loss(obj_ant_output_ff["pred_sub_feats"],
+                                                  obj_ant_output_ff["gt_sub_feats"]).mean()
+
+        pred_obj_feats_mask = obj_ant_output_ff["obj_mask_ant"]
+        gt_obj_feats_mask = obj_ant_output_ff["obj_mask_gt"]
+
+        if pred_obj_feats_mask:
+            pred_obj_feats_ff = obj_ant_output_ff["features"]
+            gt_obj_feats_ff = obj_ant_output["features"]
+            obj_recon_loss = hp_recon_loss * abs_loss(pred_obj_feats_ff[pred_obj_feats_mask],
+                                                      gt_obj_feats_ff[gt_obj_feats_mask]).mean()
+            cum_obj_feat_recon_loss += obj_recon_loss
+            obj_feat_loss_count += 1
+        else:
+            assert not gt_obj_feats_mask
+
+        cum_obj_pred_loss += presence_prediction_loss
+        cum_sub_feat_recon_loss += sub_recon_loss
+
+    # Avoid division by zero
+    cum_obj_pred_loss /= max(pred_loss_count, 1)
+    cum_sub_feat_recon_loss /= max(pred_loss_count, 1)
+    cum_obj_feat_recon_loss /= max(obj_feat_loss_count, 1)
+
+    # Update losses
+    losses.update({
+        "object_prediction_loss": cum_obj_pred_loss,
+        "subject_feature_recon_loss": cum_sub_feat_recon_loss,
+        "object_feature_recon_loss": cum_obj_feat_recon_loss
+    })
+
+    return losses
+
+
+def process_test_video(conf, entry, model, gt_annotation, evaluator, matcher, frame_size):
+    # ----------------- Make predictions -----------------
+    fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size)
+    num_ff = conf.baseline_future
+    num_cf = conf.baseline_context
+    pred = model(entry, num_cf, num_ff)
+
+    # ----------------- Evaluate the anticipated scene graphs -----------------
+    count = 0
+    num_ff = conf.baseline_future
+    num_cf = conf.baseline_context
+    num_tf = len(entry["im_idx"].unique())
+    num_cf = min(num_cf, num_tf - 1)
+    while num_cf + 1 <= num_tf:
+        num_ff = min(num_ff, num_tf - num_cf)
+        gt_future = gt_annotation[num_cf: num_cf + num_ff]
+        pred_dict = pred["output"][count]
+        evaluator.evaluate_scene_graph(gt_future, pred_dict)
+        count += 1
+        num_cf += 1
+
+
+def process_train_video_obj_hot(conf, entry, optimizer, model, epoch, num, tr, gpu_device, dataloader_train,
+                                gt_annotation, matcher, frame_size, start_time):
     pass
 
 
-def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu_device, dataloader_train,
-                        gt_annotation, matcher, frame_size, start_time):
+def process_train_video_obj_cold(conf, entry, optimizer, model, epoch, num_video, tr, gpu_device, dataloader_train,
+                                 gt_annotation, matcher, frame_size, start_time):
+    bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_transformer_loss_functions()
+
+    num_cf = conf.baseline_context
+    num_ff = conf.baseline_future
+    fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size)
+    pred = model(entry, num_cf, num_ff, is_cold=True)
+
+    losses = {}
+    if conf.mode == 'sgcls' or conf.mode == 'sgdet':
+        losses['object_loss'] = ce_loss(pred['distribution'], pred['labels']).mean()
+
+    # ----------------- Loss calculation for anticipated objects -----------------
+    losses = calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss)
+
+    optimizer.zero_grad()
+    loss = sum(losses.values())
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
+    optimizer.step()
+    print("Cold Start Object Loss: epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(
+        epoch, num_video,
+        len(dataloader_train),
+        loss.item()))
+
+    num_video += 1
+
+    tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
+    if num_video % 1000 == 0 and num_video >= 1000:
+        time_per_batch = (time.time() - start_time) / 1000
+        print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, num_video, len(dataloader_train),
+                                                                            time_per_batch,
+                                                                            len(dataloader_train) * time_per_batch / 60))
+        mn = pd.concat(tr[-1000:], axis=1).mean(1)
+        print(mn)
+    return num_video
+
+
+def process_train_video_rel_hot(conf, entry, optimizer, model, epoch, num_video, tr, gpu_device, dataloader_train,
+                                gt_annotation, matcher, frame_size, start_time):
     bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_transformer_loss_functions()
 
     count = 0
@@ -89,9 +206,6 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
     num_tf = len(entry["im_idx"].unique())
     loss_count = 0
     while num_cf + 1 <= num_tf:
-        if conf.method_name in ["obj_sttran_ant", "obj_dsgdetr_ant", "obj_sttran_gen_ant", "obj_dsgdetr_gen_ant"]:
-            calculate_object_decoder_losses(conf, losses, bce_loss, abs_loss)
-
         ant_spatial_distribution = ant_output[count]["spatial_distribution"]
         ant_contact_distribution = ant_output[count]["contacting_distribution"]
         ant_attention_distribution = ant_output[count]["attention_distribution"]
@@ -160,43 +274,6 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
     return num_video
 
 
-def process_test_video(conf, entry, model, gt_annotation, evaluator, matcher, frame_size):
-    # ----------------- Make predictions -----------------
-    fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size)
-    num_ff = conf.baseline_future
-    num_cf = conf.baseline_context
-    pred = model(entry, num_cf, num_ff)
-
-    # ----------------- Evaluate the anticipated scene graphs -----------------
-    count = 0
-    num_ff = conf.baseline_future
-    num_cf = conf.baseline_context
-    num_tf = len(entry["im_idx"].unique())
-    num_cf = min(num_cf, num_tf - 1)
-    while num_cf + 1 <= num_tf:
-        num_ff = min(num_ff, num_tf - num_cf)
-        gt_future = gt_annotation[num_cf: num_cf + num_ff]
-        pred_dict = pred["output"][count]
-        evaluator.evaluate_scene_graph(gt_future, pred_dict)
-        count += 1
-        num_cf += 1
-
-
-def process_train_video_obj_hot(conf, entry, optimizer, model, epoch, num, tr, gpu_device, dataloader_train,
-                                gt_annotation, matcher, frame_size, start_time):
-    pass
-
-
-def process_train_video_obj_cold(conf, entry, optimizer, model, epoch, num, tr, gpu_device, dataloader_train,
-                                 gt_annotation, matcher, frame_size, start_time):
-    pass
-
-
-def process_train_video_rel_hot(conf, entry, optimizer, model, epoch, num, tr, gpu_device, dataloader_train,
-                                gt_annotation, matcher, frame_size, start_time):
-    pass
-
-
 def fetch_train_type(category):
     if category == "obj_hot":
         return process_train_video_obj_hot
@@ -215,7 +292,6 @@ def fetch_category(conf, epoch):
             category_name = "obj_cold"
         else:
             category_name = "obj_hot"
-
     return category_name
 
 

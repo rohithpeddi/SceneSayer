@@ -3,6 +3,7 @@ import math
 from itertools import combinations
 from typing import Optional
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -905,12 +906,19 @@ class ObjectAnticipation(nn.Module):
         """
         # ----------------- Fetch object representation from the object decoder for future frames -----------------
         cf_end_id = entry["im_idx"].unique()[num_cf - 1]
+        ff_start_id = entry["im_idx"].unique()[num_cf]
+
+        objects_ff_start_id = int(torch.where(entry["im_idx"] == ff_start_id)[0][0])
         obj_cf_end_id = int(torch.where(entry["im_idx"] == cf_end_id)[0][-1]) + 1
+
+        objects_cf = entry["im_idx"][:objects_ff_start_id]
+        num_objects_cf = objects_cf.shape[0]
 
         obj_label_idx_cf = entry["pair_idx"][:, 1][:obj_cf_end_id]
         pred_label_cf_end_id = obj_label_idx_cf.max().item() + 1
 
         # ------ Use object decoder to fetch representations for future frames in an auto-regressive manner -------
+        entry_ff = {}
         entry_cf_ff = {}
         im_idx_cf = entry["im_idx"][:obj_cf_end_id]
         pair_idx_cf = entry["pair_idx"][:obj_cf_end_id]
@@ -920,30 +928,40 @@ class ObjectAnticipation(nn.Module):
         # These can be considered as output of encoder features that decoder attends to
         features_cf = entry["features"][:pred_label_cf_end_id].unsqueeze(1)
 
-        # TODO: Define Masks for object predictions
         im_idx_ff = torch.tensor([]).to(device=entry["device"])
         pair_idx_ff = torch.tensor([]).to(device=entry["device"])
         pred_labels_ff = torch.tensor([]).to(device=entry["device"])
         boxes_ff = torch.tensor([]).to(device=entry["device"])
         scores_ff = torch.tensor([]).to(device=entry["device"])
         features_ff = torch.tensor([]).to(device=entry["device"])
-        for c_ff_id in range(num_ff):
+
+        # Object Prediction Tensor, Latent Mask Tensor
+        pred_presence_ff = []
+        gt_presence_ff = []
+        mask_ant = []
+        mask_gt = []
+        for current_ff_id_in_num_ff in range(num_ff):
+            gt_ff_id = entry["im_idx"].unique()[num_cf + current_ff_id_in_num_ff]
+            gt_obj_ff_start_id = int(torch.where(entry["im_idx"] == gt_ff_id)[0][0])
+            gt_obj_ff_end_id = int(torch.where(entry["im_idx"] == gt_ff_id)[0][-1]) + 1
+            gt_obj_label_idx_ff_id = entry["pair_idx"][:, 1][gt_obj_ff_start_id:gt_obj_ff_end_id]
+
             features_ff_id = self.ff_feats_decoder(tgt=self.obj_class_queries, memory=features_cf).squeeze()
 
             sub_feats_ff_id = features_ff_id[0]
             obj_feats_ff_id = features_ff_id[1:]
 
-            presence_output = self.presence_prediction(obj_feats_ff_id).squeeze()
-            presence_mask_ff = presence_output > self.presence_threshold
+            pred_presence_output = self.presence_prediction(obj_feats_ff_id).squeeze()
+            pred_presence_ff_id = pred_presence_output > self.presence_threshold
 
             sub_label_ff_id = torch.tensor([1]).cuda()
-            obj_labels_ff_id = (torch.nonzero(presence_mask_ff) + 1).squeeze()
+            obj_labels_ff_id = (torch.nonzero(pred_presence_ff_id) + 1).squeeze()
             pred_labels_ff_id = torch.cat((sub_label_ff_id, obj_labels_ff_id))
 
             num_obj_ff_id = obj_labels_ff_id.shape[0]
 
             # Construct items for the entry of future frames
-            im_idx_ff_id = entry["im_idx"].unique()[num_cf + c_ff_id].repeat(num_obj_ff_id)
+            im_idx_ff_id = gt_ff_id.repeat(num_obj_ff_id)
 
             sub_id_in_pair_idx_ff = torch.tensor([pred_label_cf_end_id], device=entry["device"]).repeat(num_obj_ff_id)
             obj_id_in_pair_idx_ff = torch.arange(start=1, end=num_obj_ff_id + 1,
@@ -957,7 +975,29 @@ class ObjectAnticipation(nn.Module):
 
             boxes_ff_id = torch.tensor([[0.5] * 5 for _ in range(len(pred_labels_ff_id))]).cuda()
             scores_ff_id = torch.tensor([1] * len(pred_labels_ff_id)).cuda()
-            features_ff_id = torch.cat((sub_feats_ff_id.unsqueeze(0), obj_feats_ff_id[torch.nonzero(presence_mask_ff)].squeeze()), dim=0)
+            features_ff_id = torch.cat(
+                (sub_feats_ff_id.unsqueeze(0), obj_feats_ff_id[torch.nonzero(pred_presence_ff_id)].squeeze()),
+                dim=0)
+
+            gt_labels_ff_id = entry["pred_labels"][gt_obj_label_idx_ff_id]
+            np_gt_labels_ff_id = entry["pred_labels"][gt_obj_label_idx_ff_id].cpu().numpy()
+            np_pred_labels_ff_id = pred_labels_ff_id.cpu().numpy()
+
+            # Use these masks for application of latent reconstruction loss
+            (int_pred_gt_obj_labels,
+             gt_obj_labels_idx_in_pred, pred_obj_labels_idx_in_gt) = np.intersect1d(np_gt_labels_ff_id,
+                                                                                    np_pred_labels_ff_id,
+                                                                                    return_indices=True)
+
+            mask_ant.append(num_objects_cf + im_idx_ff.shape[0] + gt_obj_labels_idx_in_pred)
+            mask_gt.append(gt_obj_label_idx_ff_id[pred_obj_labels_idx_in_gt])
+
+            gt_presence_ff_id = torch.zeros_like(pred_presence_ff_id).to(device=entry["device"])
+            for obj_idx in gt_labels_ff_id:
+                gt_presence_ff_id[obj_idx] = 1
+
+            pred_presence_ff.append(pred_presence_ff_id)
+            gt_presence_ff.append(gt_presence_ff_id)
 
             pred_labels_ff = torch.cat((pred_labels_ff, pred_labels_ff_id))
             im_idx_ff = torch.cat((im_idx_ff, im_idx_ff_id))
@@ -973,5 +1013,17 @@ class ObjectAnticipation(nn.Module):
         entry_cf_ff["boxes"] = torch.cat((boxes_cf, boxes_ff))
         entry_cf_ff["scores"] = torch.cat((scores_cf, scores_ff))
         entry_cf_ff["features"] = torch.cat((features_cf.squeeze(), features_ff.squeeze()), dim=0)
+
+        entry_ff["im_idx"] = im_idx_ff - im_idx_ff.min()
+        entry_ff["pair_idx"] = pair_idx_ff - pair_idx_ff.min()
+        entry_ff["pred_labels"] = pred_labels_ff
+        entry_ff["boxes"] = boxes_ff
+        entry_ff["scores"] = scores_ff
+        entry_ff["features"] = features_ff
+
+        entry_ff["pred_presence"] = pred_presence_ff
+        entry_ff["gt_presence"] = gt_presence_ff
+        entry_ff["mask_ant"] = mask_ant
+        entry_ff["mask_gt"] = mask_gt
 
         return entry_cf_ff

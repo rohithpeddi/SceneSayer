@@ -44,10 +44,7 @@ def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
     cum_obj_feat_recon_loss = 0
 
     obj_feat_loss_count = 0
-    pred_loss_count = num_tf - num_cf  # If every step in the loop is guaranteed, pre-calculate this
-
-    # Batch processing outside the loop if possible
-    # If individual processing is necessary, consider optimizations within this structure
+    pred_loss_count = num_tf - num_cf
     for count in range(pred_loss_count):
         obj_ant_output_ff = pred["output_ff"][count]
         obj_ant_output = pred["output"][count]
@@ -75,7 +72,6 @@ def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
         cum_obj_pred_loss += presence_prediction_loss
         cum_sub_feat_recon_loss += sub_recon_loss
 
-    # Avoid division by zero
     cum_obj_pred_loss /= max(pred_loss_count, 1)
     cum_sub_feat_recon_loss /= max(pred_loss_count, 1)
     cum_obj_feat_recon_loss /= max(obj_feat_loss_count, 1)
@@ -112,60 +108,7 @@ def process_test_video(conf, entry, model, gt_annotation, evaluator, matcher, fr
         num_cf += 1
 
 
-def process_train_video_obj_hot(conf, entry, optimizer, model, epoch, num, tr, gpu_device, dataloader_train,
-                                gt_annotation, matcher, frame_size, start_time):
-    pass
-
-
-def process_train_video_obj_cold(conf, entry, optimizer, model, epoch, num_video, tr, gpu_device, dataloader_train,
-                                 gt_annotation, matcher, frame_size, start_time):
-    bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_transformer_loss_functions()
-
-    num_cf = conf.baseline_context
-    num_ff = conf.baseline_future
-    fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size)
-    pred = model(entry, num_cf, num_ff, is_cold=True)
-
-    losses = {}
-    if conf.mode == 'sgcls' or conf.mode == 'sgdet':
-        losses['object_loss'] = ce_loss(pred['distribution'], pred['labels']).mean()
-
-    # ----------------- Loss calculation for anticipated objects -----------------
-    losses = calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss)
-
-    optimizer.zero_grad()
-    loss = sum(losses.values())
-    loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
-    optimizer.step()
-    print("Cold Start Object Loss: epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(
-        epoch, num_video,
-        len(dataloader_train),
-        loss.item()))
-
-    num_video += 1
-
-    tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
-    if num_video % 1000 == 0 and num_video >= 1000:
-        time_per_batch = (time.time() - start_time) / 1000
-        print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, num_video, len(dataloader_train),
-                                                                            time_per_batch,
-                                                                            len(dataloader_train) * time_per_batch / 60))
-        mn = pd.concat(tr[-1000:], axis=1).mean(1)
-        print(mn)
-    return num_video
-
-
-def process_train_video_rel_hot(conf, entry, optimizer, model, epoch, num_video, tr, gpu_device, dataloader_train,
-                                gt_annotation, matcher, frame_size, start_time):
-    bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_transformer_loss_functions()
-
-    count = 0
-    num_cf = conf.baseline_context
-    num_ff = conf.baseline_future
-    fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size)
-    pred = model(entry, num_cf, num_ff)
-
+def fetch_updated_labels(pred, gpu_device, conf):
     attention_label = torch.tensor(pred["attention_gt"], dtype=torch.long).to(device=gpu_device).squeeze()
     if not conf.bce_loss:
         spatial_label = -torch.ones([len(pred["spatial_gt"]), 6], dtype=torch.long).to(device=gpu_device)
@@ -180,20 +123,11 @@ def process_train_video_rel_hot(conf, entry, optimizer, model, epoch, num_video,
             spatial_label[i, pred["spatial_gt"][i]] = 1
             contact_label[i, pred["contacting_gt"][i]] = 1
 
-    losses = {}
-    has_object_loss = False
-    if conf.mode == 'sgcls' or conf.mode == 'sgdet':
-        has_object_loss = True
-        losses['object_loss'] = ce_loss(pred['distribution'], pred['labels']).mean()
+    return attention_label, spatial_label, contact_label
 
-    has_gen_loss = False
-    # ----------------- Loss calculation for generation outputs -----------------
-    if conf.method_name in ["rel_sttran_gen_ant", "rel_dsgdetr_gen_ant", "obj_sttran_gen_ant", "obj_dsgdetr_gen_ant"]:
-        has_gen_loss = True
-        losses = calculate_gen_losses(conf, pred, losses, ce_loss, mlm_loss, bce_loss,
-                                      attention_label, spatial_label, contact_label)
 
-    # ----------------- Loss calculation for anticipated outputs -----------------
+def calculate_anticipated_relation_losses(conf, pred, losses, ce_loss, mlm_loss, bce_loss, abs_loss, attention_label,
+                                          spatial_label, contact_label):
     global_output = pred["global_output"]
     ant_output = pred["output"]
 
@@ -202,8 +136,9 @@ def process_train_video_rel_hot(conf, entry, optimizer, model, epoch, num_video,
     cum_ant_contact_relation_loss = 0
     cum_ant_latent_loss = 0
 
+    count = 0
     num_cf = conf.baseline_context
-    num_tf = len(entry["im_idx"].unique())
+    num_tf = len(pred["im_idx"].unique())
     loss_count = 0
     while num_cf + 1 <= num_tf:
         ant_spatial_distribution = ant_output[count]["spatial_distribution"]
@@ -246,12 +181,50 @@ def process_train_video_rel_hot(conf, entry, optimizer, model, epoch, num_video,
         losses["anticipated_contact_relation_loss"] = cum_ant_contact_relation_loss / loss_count
         losses["anticipated_latent_loss"] = cum_ant_latent_loss / loss_count
 
+    return losses, loss_count
+
+
+def backpropagate_loss(losses, optimizer, model):
+    optimizer.zero_grad()
+    loss = sum(losses.values())
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
+    optimizer.step()
+    return loss
+
+
+def process_train_video_rel_hot(conf, entry, optimizer, model, epoch, num_video, tr, gpu_device, dataloader_train,
+                                gt_annotation, matcher, frame_size, start_time):
+    bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_transformer_loss_functions()
+
+    num_cf = conf.baseline_context
+    num_ff = conf.baseline_future
+    fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size)
+    pred = model(entry, num_cf, num_ff)
+
+    losses = {}
+    # ----------------- Loss calculation for object outputs -----------------
+    has_object_loss = False
+    if conf.mode == 'sgcls' or conf.mode == 'sgdet':
+        has_object_loss = True
+        losses['object_loss'] = ce_loss(pred['distribution'], pred['labels']).mean()
+
+    attention_label, spatial_label, contact_label = fetch_updated_labels(pred, gpu_device, conf)
+
+    has_gen_loss = False
+    # ----------------- Loss calculation for generation outputs -----------------
+    if conf.method_name in ["rel_sttran_gen_ant", "rel_dsgdetr_gen_ant", "obj_sttran_gen_ant", "obj_dsgdetr_gen_ant"]:
+        has_gen_loss = True
+        losses = calculate_gen_losses(conf, pred, losses, ce_loss, mlm_loss, bce_loss,
+                                      attention_label, spatial_label, contact_label)
+
+    # ----------------- Loss calculation for anticipated outputs -----------------
+    losses, loss_count = calculate_anticipated_relation_losses(conf, pred, losses, ce_loss, mlm_loss, bce_loss,
+                                                               abs_loss,
+                                                               attention_label, spatial_label, contact_label)
+
     if loss_count > 0 or has_gen_loss or has_object_loss:
-        optimizer.zero_grad()
-        loss = sum(losses.values())
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
-        optimizer.step()
+        loss = backpropagate_loss(losses, optimizer, model)
         print(
             "Gen Loss: {}, Ant Loss: {}, Object Loss:{}, epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(
                 has_gen_loss,
@@ -261,6 +234,104 @@ def process_train_video_rel_hot(conf, entry, optimizer, model, epoch, num_video,
                 loss.item()))
     else:
         print(f"No loss to back-propagate for video: {num_video}")
+
+    num_video += 1
+
+    tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
+    if num_video % 1000 == 0 and num_video >= 1000:
+        time_per_batch = (time.time() - start_time) / 1000
+        print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, num_video, len(dataloader_train),
+                                                                            time_per_batch,
+                                                                            len(dataloader_train) * time_per_batch / 60))
+        mn = pd.concat(tr[-1000:], axis=1).mean(1)
+        print(mn)
+    return num_video
+
+
+def process_train_video_obj_hot(conf, entry, optimizer, model, epoch, num_video, tr, gpu_device, dataloader_train,
+                                gt_annotation, matcher, frame_size, start_time):
+    bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_transformer_loss_functions()
+
+    num_cf = conf.baseline_context
+    num_ff = conf.baseline_future
+    fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size)
+    pred = model(entry, num_cf, num_ff)
+
+    losses = {}
+    # ----------------- Loss calculation for object outputs -----------------
+    has_object_loss = False
+    if conf.mode == 'sgcls' or conf.mode == 'sgdet':
+        has_object_loss = True
+        losses['object_loss'] = ce_loss(pred['distribution'], pred['labels']).mean()
+
+    # ----------------- Loss calculation for anticipated objects -----------------
+    losses = calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss)
+
+    attention_label, spatial_label, contact_label = fetch_updated_labels(pred, gpu_device, conf)
+
+    has_gen_loss = False
+    # ----------------- Loss calculation for generation outputs -----------------
+    if conf.method_name in ["obj_sttran_gen_ant", "obj_dsgdetr_gen_ant"]:
+        has_gen_loss = True
+        losses = calculate_gen_losses(conf, pred, losses, ce_loss, mlm_loss, bce_loss,
+                                      attention_label, spatial_label, contact_label)
+
+    # ----------------- Loss calculation for anticipated outputs -----------------
+    losses, loss_count = calculate_anticipated_relation_losses(conf, pred, losses, ce_loss, mlm_loss, bce_loss,
+                                                               abs_loss,
+                                                               attention_label, spatial_label, contact_label)
+
+    if loss_count > 0 or has_gen_loss or has_object_loss:
+        loss = backpropagate_loss(losses, optimizer, model)
+        print(
+            "Gen Loss: {}, Ant Loss: {}, Object Loss:{}, epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(
+                has_gen_loss,
+                loss_count, has_object_loss,
+                epoch, num_video,
+                len(dataloader_train),
+                loss.item()))
+    else:
+        print(f"No loss to back-propagate for video: {num_video}")
+
+    num_video += 1
+
+    tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
+    if num_video % 1000 == 0 and num_video >= 1000:
+        time_per_batch = (time.time() - start_time) / 1000
+        print("\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, num_video, len(dataloader_train),
+                                                                            time_per_batch,
+                                                                            len(dataloader_train) * time_per_batch / 60))
+        mn = pd.concat(tr[-1000:], axis=1).mean(1)
+        print(mn)
+    return num_video
+
+
+def process_train_video_obj_cold(conf, entry, optimizer, model, epoch, num_video, tr, gpu_device, dataloader_train,
+                                 gt_annotation, matcher, frame_size, start_time):
+    bce_loss, ce_loss, mlm_loss, bbox_loss, abs_loss, mse_loss = fetch_transformer_loss_functions()
+
+    num_cf = conf.baseline_context
+    num_ff = conf.baseline_future
+    fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size)
+    pred = model(entry, num_cf, num_ff, is_cold=True)
+
+    losses = {}
+    if conf.mode == 'sgcls' or conf.mode == 'sgdet':
+        losses['object_loss'] = ce_loss(pred['distribution'], pred['labels']).mean()
+
+    # ----------------- Loss calculation for anticipated objects -----------------
+    losses = calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss)
+
+    optimizer.zero_grad()
+    loss = sum(losses.values())
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
+    optimizer.step()
+    print("Cold Start Object Loss: epoch {:2d}  batch {:5d}/{:5d}  loss {:.4f}".format(
+        epoch, num_video,
+        len(dataloader_train),
+        loss.item()))
+
     num_video += 1
 
     tr.append(pd.Series({x: y.item() for x, y in losses.items()}))

@@ -78,28 +78,34 @@ class ObjSTTranAnt(ObjBaseTransformer):
     def forward(self, entry, num_cf, num_ff):
         entry = self.object_classifier(entry)
         count = 0
-        result = {}
+        result_ff = {}
+        result_cf_ff = {}
         num_tf = len(entry["im_idx"].unique())
         num_cf = min(num_cf, num_tf - 1)
         while num_cf + 1 <= num_tf:
             num_ff = min(num_ff, num_tf - num_cf)
-            entry_cf_ff = self.obj_anti_temporal_transformer(entry, num_cf, num_tf, num_ff)
+            entry_cf_ff, entry_ff = self.obj_anti_temporal_transformer(entry, num_cf, num_tf, num_ff)
             entry_cf_ff = self.generate_future_ff_rels_for_context(entry, entry_cf_ff, num_cf, num_tf, num_ff)
-            result[count] = entry_cf_ff
+            result_cf_ff[count] = entry_cf_ff
+            result_ff[count] = entry_ff
             count += 1
             num_cf += 1
-        entry["output"] = result
+        entry["output_cf_ff"] = result_cf_ff
+        entry["output_ff"] = result_ff
         return entry
 
     def forward_single_entry(self, context_fraction, entry):
         entry = self.object_classifier(entry)
-        result = {}
+        result_cf_ff = {}
+        result_ff = {}
         count = 0
         num_tf = len(entry["im_idx"].unique())
         num_cf = min(int(math.ceil(context_fraction * num_tf)), num_tf - 1)
         num_ff = num_tf - num_cf
-        entry_cf_ff = self.obj_anti_temporal_transformer(entry, num_cf, num_tf, num_ff)
+        entry_cf_ff, entry_ff = self.obj_anti_temporal_transformer(entry, num_cf, num_tf, num_ff)
         entry_cf_ff = self.generate_future_ff_rels_for_context(entry, entry_cf_ff, num_cf, num_tf, num_ff)
-        result[count] = entry_cf_ff
-        entry["output"] = result
+        result_cf_ff[count] = entry_cf_ff
+        result_ff[count] = entry_ff
+        entry["output_cf_ff"] = result_cf_ff
+        entry["output_ff"] = result_ff
         return entry

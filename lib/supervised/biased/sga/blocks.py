@@ -1034,4 +1034,4 @@ class ObjectAnticipation(nn.Module):
         entry_ff["pred_sub_feats"] = pred_sub_feats_ff
         entry_ff["gt_sub_feats"] = gt_sub_feats_ff
 
-        return entry_cf_ff
+        return entry_cf_ff, entry_ff

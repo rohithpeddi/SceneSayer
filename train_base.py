@@ -135,7 +135,6 @@ def fetch_train_basic_config():
         )
 
     gpu_device = torch.device("cuda:0")
-
     evaluator = BasicSceneGraphEvaluator(
         mode=conf.mode,
         AG_object_classes=ag_train_data.object_classes,

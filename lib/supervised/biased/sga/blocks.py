@@ -919,21 +919,21 @@ class ObjectAnticipation(nn.Module):
         objects_cf = entry["im_idx"][:obj_ff_start_id]
         objects_ff = entry["im_idx"][obj_ff_start_id:obj_ff_end_id]
         num_objects_cf = objects_cf.shape[0]
-        num_objects_ff = objects_ff.shape[0]
+        gt_num_objects_ff = objects_ff.shape[0]
 
         obj_label_idx_cf = entry["pair_idx"][:, 1][:obj_cf_end_id]
-        pred_label_cf_end_id = obj_label_idx_cf.max().item() + 1
+        pred_label_idx_cf_end_id = obj_label_idx_cf.max().item() + 1
 
         # ------ Use object decoder to fetch representations for future frames in an auto-regressive manner -------
         entry_ff = {}
         entry_cf_ff = {}
         im_idx_cf = entry["im_idx"][:obj_cf_end_id]
         pair_idx_cf = entry["pair_idx"][:obj_cf_end_id]
-        pred_labels_cf = entry["pred_labels"][:pred_label_cf_end_id]
-        boxes_cf = entry["boxes"][:pred_label_cf_end_id]
-        scores_cf = entry["scores"][:pred_label_cf_end_id]
+        pred_labels_cf = entry["pred_labels"][:pred_label_idx_cf_end_id]
+        boxes_cf = entry["boxes"][:pred_label_idx_cf_end_id]
+        scores_cf = entry["scores"][:pred_label_idx_cf_end_id]
         # These can be considered as output of encoder features that decoder attends to
-        features_cf = entry["features"][:pred_label_cf_end_id].unsqueeze(1)
+        features_cf = entry["features"][:pred_label_idx_cf_end_id].unsqueeze(1)
 
         im_idx_ff = torch.tensor([]).to(device=entry["device"])
         pair_idx_ff = torch.tensor([]).to(device=entry["device"])
@@ -949,31 +949,36 @@ class ObjectAnticipation(nn.Module):
         feat_mask_gt = torch.tensor([]).to(device=entry["device"])
         for current_ff_id_in_num_ff in range(num_ff):
             gt_ff_id = gt_idx_ff[current_ff_id_in_num_ff]
-            gt_obj_ff_start_id = int(torch.where(entry["im_idx"] == gt_ff_id)[0][0])
-            gt_obj_ff_end_id = int(torch.where(entry["im_idx"] == gt_ff_id)[0][-1]) + 1
-            gt_obj_label_idx_ff_id = entry["pair_idx"][:, 1][gt_obj_ff_start_id:gt_obj_ff_end_id]
-            gt_sub_label_idx_ff_id = entry["pair_idx"][:, 0][gt_obj_ff_start_id:gt_obj_ff_end_id].unique()[0]
+
+            # ----------------- Fetch object representation from the object decoder for future frames -----------------
 
             decoder_feats_ff_id = self.ff_feats_decoder(tgt=self.obj_class_queries, memory=features_cf).squeeze()
 
             sub_feats_ff_id = decoder_feats_ff_id[0]
             obj_feats_ff_id = decoder_feats_ff_id[1:]
 
-            pred_obj_presence_ff_id_distribution = self.obj_presence_prediction(obj_feats_ff_id).squeeze()
-            pred_obj_presence_ff_id = pred_obj_presence_ff_id_distribution > self.obj_presence_threshold
+            ant_obj_presence_ff_id_distribution = self.obj_presence_prediction(obj_feats_ff_id).squeeze()
+            ant_obj_presence_ff_id = ant_obj_presence_ff_id_distribution > self.obj_presence_threshold
 
+            # ----------------- Construct entry for the future frames that include -----------------
+
+            # Add subject label to the predicted labels, add object labels to the predicted labels
+            # Here object labels are indexed from 0 to 35 formed by excluding the background label and subject labels in ground truth
+            # Hence, for actual labels we add +2 to the predicted labels
             sub_label_ff_id = torch.tensor([1]).to(device=entry["device"])
-            obj_labels_ff_id = (torch.nonzero(pred_obj_presence_ff_id) + 2).squeeze()
-            pred_labels_ff_id = torch.cat((sub_label_ff_id, obj_labels_ff_id))
+            obj_labels_ff_id = (torch.nonzero(ant_obj_presence_ff_id) + 2).squeeze()
+            ant_labels_ff_id = torch.cat((sub_label_ff_id, obj_labels_ff_id))
 
             num_obj_ff_id = obj_labels_ff_id.shape[0]
 
-            # Construct items for the future frames entry dictionary
+            # Construct im_idx : Repeat the current future frame index for the number of objects in the future frame
             im_idx_ff_id = gt_ff_id.repeat(num_obj_ff_id)
 
-            sub_id_in_pair_idx_ff = torch.tensor([pred_label_cf_end_id], device=entry["device"]).repeat(num_obj_ff_id)
+            # Construct pair_idx: Using the last predicted label index from the previous future frame
+            sub_id_in_pair_idx_ff = torch.tensor([pred_label_idx_cf_end_id], device=entry["device"]).repeat(
+                num_obj_ff_id)
             obj_id_in_pair_idx_ff = torch.arange(start=1, end=num_obj_ff_id + 1,
-                                                 device=entry["device"]) + pred_label_cf_end_id
+                                                 device=entry["device"]) + pred_label_idx_cf_end_id
 
             sub_id_in_pair_idx_ff = sub_id_in_pair_idx_ff.unsqueeze(1)  # Make it (num_obj_ff_id, 1)
             obj_id_in_pair_idx_ff = obj_id_in_pair_idx_ff.unsqueeze(1)  # Make it (num_obj_ff_id, 1)
@@ -981,43 +986,67 @@ class ObjectAnticipation(nn.Module):
             # Concatenate along dimension 1 to make pairs [(sub_id, obj_id), ...]
             pair_idx_ff_id = torch.cat((sub_id_in_pair_idx_ff, obj_id_in_pair_idx_ff), dim=1)
 
-            boxes_ff_id = torch.tensor([[0.5] * 5 for _ in range(len(pred_labels_ff_id))]).cuda()
-            scores_ff_id = torch.tensor([1] * len(pred_labels_ff_id)).cuda()
+            # Construct Boxes, Scores: Repeat standard boxes and scores for the number of labels in the future frame (subject + object)
+            boxes_ff_id = torch.tensor([[0.5] * 5 for _ in range(len(ant_labels_ff_id))]).cuda()
+            scores_ff_id = torch.tensor([1] * len(ant_labels_ff_id)).cuda()
+
+            # Construct Features: Concatenate, subject features and anticipated object features in the future frame
             features_ff_id = torch.cat(
-                (sub_feats_ff_id.unsqueeze(0), obj_feats_ff_id[torch.nonzero(pred_obj_presence_ff_id)].squeeze()),
+                (sub_feats_ff_id.unsqueeze(0), obj_feats_ff_id[torch.nonzero(ant_obj_presence_ff_id)].squeeze()),
                 dim=0)
 
-            gt_label_idx_ff_id = torch.cat((gt_sub_label_idx_ff_id.unsqueeze(0), gt_obj_label_idx_ff_id))
-            gt_labels_ff_id = entry["pred_labels"][gt_label_idx_ff_id]
-            gt_obj_labels_ff_id = entry["pred_labels"][gt_obj_label_idx_ff_id]
-            np_gt_labels_ff_id = gt_labels_ff_id.cpu().numpy()
-            # Has both subject and object labels
-            np_pred_labels_ff_id = pred_labels_ff_id.cpu().numpy()
+            if self.training:
+                gt_obj_ff_start_id = int(torch.where(entry["im_idx"] == gt_ff_id)[0][0])
+                gt_obj_ff_end_id = int(torch.where(entry["im_idx"] == gt_ff_id)[0][-1]) + 1
 
-            # Use these masks for application of latent reconstruction loss
-            (int_pred_gt_obj_labels,
-             gt_labels_idx_in_pred, pred_labels_idx_in_gt) = np.intersect1d(np_pred_labels_ff_id,
-                                                                                    np_gt_labels_ff_id,
-                                                                                    return_indices=True)
+                gt_obj_label_idx_ff_id = entry["pair_idx"][:, 1][gt_obj_ff_start_id:gt_obj_ff_end_id]
+                gt_sub_label_idx_ff_id = entry["pair_idx"][:, 0][gt_obj_ff_start_id:gt_obj_ff_end_id].unique()[0]
+                gt_label_idx_ff_id = torch.cat((gt_sub_label_idx_ff_id.unsqueeze(0), gt_obj_label_idx_ff_id))
 
-            feat_mask_ant_ff_id = pred_labels_ff.shape[0] + torch.tensor(gt_labels_idx_in_pred).to(device=entry["device"])
-            feat_mask_gt_ff_id = gt_label_idx_ff_id[pred_labels_idx_in_gt]
-            feat_mask_ant = torch.cat((feat_mask_ant, feat_mask_ant_ff_id))
-            feat_mask_gt = torch.cat((feat_mask_gt, feat_mask_gt_ff_id))
+                gt_obj_labels_ff_id = entry["pred_labels"][gt_obj_label_idx_ff_id]
+                gt_labels_ff_id = entry["pred_labels"][gt_label_idx_ff_id]
 
-            gt_obj_presence_ff_id = torch.zeros_like(pred_obj_presence_ff_id_distribution).to(device=entry["device"])
-            gt_obj_presence_ff_id[gt_obj_labels_ff_id] = 1
+                # ------------------------- Construct masks for reconstruction losses -----------------------
+                # Has both subject and object labels
+                np_gt_labels_ff_id = gt_labels_ff_id.cpu().numpy()
+                np_pred_labels_ff_id = ant_labels_ff_id.cpu().numpy()
 
-            pred_obj_presence_ff.append(pred_obj_presence_ff_id_distribution)
-            gt_obj_presence_ff.append(gt_obj_presence_ff_id)
+                # Use these masks for application of latent reconstruction loss
+                (int_pred_gt_obj_labels,
+                 gt_labels_idx_in_pred, pred_labels_idx_in_gt) = np.intersect1d(np_pred_labels_ff_id,
+                                                                                np_gt_labels_ff_id,
+                                                                                return_indices=True)
 
-            pred_labels_ff = torch.cat((pred_labels_ff, pred_labels_ff_id))
+                # Feature mask on anticipated features: Size of pred_labels for past frames + Ground truth labels in past frames
+                feat_mask_ant_ff_id = pred_labels_ff.shape[0] + torch.tensor(gt_labels_idx_in_pred).to(
+                    device=entry["device"])
+
+                # Feature mask on ground truth features: Size of ground truth labels in past frames
+                feat_mask_gt_ff_id = gt_label_idx_ff_id[pred_labels_idx_in_gt]
+                feat_mask_ant = torch.cat((feat_mask_ant, feat_mask_ant_ff_id))
+                feat_mask_gt = torch.cat((feat_mask_gt, feat_mask_gt_ff_id))
+
+                # ------------------------- Construct anticipation object distribution loss -----------------------
+                gt_obj_presence_ff_id = torch.zeros_like(ant_obj_presence_ff_id_distribution).to(device=entry["device"])
+                # Subtract 2 from the ground truth object labels as we ignore background and subject labels
+                truncated_gt_obj_labels_ff_id = gt_obj_labels_ff_id.view(-1) - 2
+                assert truncated_gt_obj_labels_ff_id.max() < 35
+                gt_obj_presence_ff_id[truncated_gt_obj_labels_ff_id] = 1
+
+                pred_obj_presence_ff.append(ant_obj_presence_ff_id_distribution)
+                gt_obj_presence_ff.append(gt_obj_presence_ff_id)
+
+            # Update the box index for subject in the next future frame
+            pred_label_idx_cf_end_id += num_obj_ff_id + 1
+
+            pred_labels_ff = torch.cat((pred_labels_ff, ant_labels_ff_id))
             im_idx_ff = torch.cat((im_idx_ff, im_idx_ff_id))
             pair_idx_ff = torch.cat((pair_idx_ff, pair_idx_ff_id))
             boxes_ff = torch.cat((boxes_ff, boxes_ff_id))
             scores_ff = torch.cat((scores_ff, scores_ff_id))
 
             features_ff = torch.cat((features_ff, features_ff_id.unsqueeze(1)))
+
         entry_cf_ff["im_idx"] = torch.cat((im_idx_cf, im_idx_ff))
         entry_cf_ff["pair_idx"] = torch.cat((pair_idx_cf, pair_idx_ff))
         entry_cf_ff["pred_labels"] = torch.cat((pred_labels_cf, pred_labels_ff))
@@ -1032,10 +1061,11 @@ class ObjectAnticipation(nn.Module):
         entry_ff["scores"] = scores_ff
         entry_ff["features"] = features_ff.squeeze()
 
-        entry_ff["pred_obj_presence"] = torch.stack(pred_obj_presence_ff, dim=0).to(device=entry["device"])
-        entry_ff["gt_obj_presence"] = torch.stack(gt_obj_presence_ff, dim=0).to(device=entry["device"])
-        entry_ff["feat_mask_ant"] = feat_mask_ant.long()
-        entry_ff["feat_mask_gt"] = feat_mask_gt.long()
-        entry_ff["num_obj_ff"] = num_objects_ff
+        if self.training:
+            entry_ff["pred_obj_presence"] = torch.stack(pred_obj_presence_ff, dim=0).to(device=entry["device"])
+            entry_ff["gt_obj_presence"] = torch.stack(gt_obj_presence_ff, dim=0).to(device=entry["device"])
+            entry_ff["feat_mask_ant"] = feat_mask_ant.long()
+            entry_ff["feat_mask_gt"] = feat_mask_gt.long()
+            entry_ff["gt_num_obj_ff"] = gt_num_objects_ff
 
         return entry_cf_ff, entry_ff

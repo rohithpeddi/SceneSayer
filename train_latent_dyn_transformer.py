@@ -45,9 +45,9 @@ def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
 
     gt_num_obj_ff = 0
     pred_num_obj_ff = 0
+    obj_ant_output = pred
     for count in range(pred_loss_count):
         obj_ant_output_ff = pred["output_ff"][count]
-        obj_ant_output = pred["output"][count]
         gt_num_obj_ff += obj_ant_output_ff["num_obj_ff"]
 
         # Object presence prediction loss
@@ -62,8 +62,8 @@ def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
         pred_feats_ff = obj_ant_output_ff["features"]
         gt_feats_ff = obj_ant_output["features"]
 
-        pred_common_feats_ff = pred_feats_ff[pred_feats_mask]
-        gt_common_feats_ff = gt_feats_ff[gt_feats_mask]
+        pred_common_feats_ff = pred_feats_ff[pred_feats_mask.view(-1)]
+        gt_common_feats_ff = gt_feats_ff[gt_feats_mask.view(-1)]
 
         feat_recon_loss = hp_recon_loss * abs_loss(pred_common_feats_ff, gt_common_feats_ff).mean()
         cum_feat_recon_loss += feat_recon_loss
@@ -75,7 +75,7 @@ def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
 
     print(f"--------------------------------------------------------------------")
     print(
-        f"GT Num Obj FF: {gt_num_obj_ff}, Pred Num Obj FF: {pred_num_obj_ff}, Percentage: {pred_num_obj_ff / gt_num_obj_ff}")
+        f"GT Num Obj FF: {gt_num_obj_ff}, Pred Num Obj FF: {pred_num_obj_ff}")
 
     # Update losses
     losses.update({
@@ -345,13 +345,17 @@ def process_train_video_obj_cold(conf, entry, optimizer, model, epoch, num_video
     return num_video
 
 
-def fetch_train_type(category):
+def fetch_train_type(category, model, epoch, conf):
     if category == "obj_hot":
-        return process_train_video_obj_hot
+        if epoch == conf.hot_epoch - 1:
+            model.init_warm_start()
+        return process_train_video_obj_hot, model
     elif category == "obj_cold":
-        return process_train_video_obj_cold
+        if epoch == 0:
+            model.init_cold_start()
+        return process_train_video_obj_cold, model
     elif category == "rel_hot":
-        return process_train_video_rel_hot
+        return process_train_video_rel_hot, model
 
 
 def fetch_category(conf, epoch):
@@ -381,7 +385,6 @@ def train_model():
 
     (model, object_detector, future_frame_loss_num,
      mode, method_name, matcher) = load_common_config(conf, ag_test_data, gpu_device)
-    optimizer, scheduler = prepare_optimizer(conf, model)
 
     tr = []
     for epoch in range(int(conf.nepoch)):
@@ -390,6 +393,10 @@ def train_model():
         print('Training using raw data', flush=True)
         train_iter = iter(dataloader_train)
         object_detector.is_train = True
+        category = fetch_category(conf, epoch)
+        process_train_video, model = fetch_train_type(category, model, epoch, conf)
+        optimizer, scheduler = prepare_optimizer(conf, model)
+        model.to(device=gpu_device)
         model.train()
         object_detector.train_x = True
         num = 0
@@ -406,9 +413,6 @@ def train_model():
             with torch.no_grad():
                 entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
                 entry["device"] = conf.device
-
-            category = fetch_category(conf, epoch)
-            process_train_video = fetch_train_type(category)
             num = process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_device, dataloader_train,
                                       gt_annotation, matcher, frame_size, start_time)
         print(f"Finished training an epoch {epoch}")
@@ -428,7 +432,7 @@ def train_model():
                 frame_size = (im_info[0][:2] / im_info[0, 2]).cpu().data
 
                 entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-                entry["device"] = conf.device
+                entry["device"] = gpu_device
                 process_test_video(conf, entry, model, gt_annotation, evaluator, matcher, frame_size)
                 if b % 50 == 0:
                     print(f"Finished processing {b} of {len(dataloader_test)} batches")

@@ -27,7 +27,7 @@ class Config(object):
         self.results_path = None
         self.method_name = None
 
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         self.hot_epoch = 2
         
         self.max_window = 5
@@ -74,7 +74,7 @@ class Config(object):
         parser.add_argument('-baseline_future', default=3, type=int)
         parser.add_argument('-use_raw_data', action='store_true')
         parser.add_argument('-data_path', default='/data/rohith/ag', type=str)
-        parser.add_argument('-device', default='cuda', type=str)
+        parser.add_argument('-device', default='cuda:0', type=str)
         parser.add_argument('-datasize', dest='datasize', help='mini dataset or whole', default='large', type=str)
         parser.add_argument('-ckpt', dest='ckpt', help='checkpoint', default=None, type=str)
         parser.add_argument('-optimizer', help='adamw/adam/sgd', default='adamw', type=str)

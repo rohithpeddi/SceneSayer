@@ -966,12 +966,13 @@ class ObjectAnticipation(nn.Module):
             # Here object labels are indexed from 0 to 35 formed by excluding the background label and subject labels in ground truth
             # Hence, for actual labels we add +2 to the predicted labels
             sub_label_ff_id = torch.tensor([1]).to(device=entry["device"])
+            sub_label_ff_id = sub_label_ff_id.unsqueeze(0)
             decoder_non_zero_obj_indices = torch.nonzero(ant_obj_presence_ff_id)
             if decoder_non_zero_obj_indices.numel() == 0:
                 ant_labels_ff_id = sub_label_ff_id
             else:
                 obj_labels_ff_id = (decoder_non_zero_obj_indices + 2).squeeze()
-                ant_labels_ff_id = torch.cat((sub_label_ff_id, obj_labels_ff_id))
+                ant_labels_ff_id = torch.cat((sub_label_ff_id, obj_labels_ff_id), dim=0)
 
             num_obj_ff_id = decoder_non_zero_obj_indices.numel()
 

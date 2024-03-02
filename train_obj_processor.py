@@ -10,6 +10,40 @@ from train_base import fetch_train_basic_config, prepare_optimizer, save_model, 
 from transformer_base_scripts import load_common_config, fetch_sequences_after_tracking
 
 
+def fetch_obj_presence_loss(obj_ant_output_ff, bce_loss, is_reweighting=False):
+    logit_outputs = obj_ant_output_ff["pred_obj_presence"]
+    targets = obj_ant_output_ff["gt_obj_presence"]
+    uw_obj_presence_pred_loss = bce_loss(logit_outputs, targets)
+    if is_reweighting:
+        # Object presence prediction loss re-weighted by mis-classification weights
+        # weight of alpha for incorrect positive predictions and a weight of beta for incorrect negative predictions,
+        # where alpha > beta.
+
+        target_positive_samples = torch.where(targets == 1)[0].numel()
+        target_negative_samples = torch.where(targets == 0)[0].numel()
+        total_samples = target_positive_samples + target_negative_samples
+
+        positive_sample_weight = 0.5 * total_samples / target_positive_samples
+        negative_sample_weight = 0.5 * total_samples / target_negative_samples
+
+        mis_classification_weights = torch.where(targets == 1, positive_sample_weight * (logit_outputs < 0.5).float(),
+                                                 negative_sample_weight * (logit_outputs >= 0.5).float())
+        w_obj_presence_pred_loss = uw_obj_presence_pred_loss * mis_classification_weights
+        return w_obj_presence_pred_loss
+    else:
+        gamma = 0.1
+        alpha = 10
+
+        p_t = logit_outputs * targets + (1 - logit_outputs) * (1 - targets)
+
+        # Apply the focal loss modulation
+        focal_modulation = (1 - p_t) ** gamma
+
+        # Compute the final focal loss
+        focal_loss = alpha * focal_modulation * uw_obj_presence_pred_loss
+        return focal_loss.mean()
+
+
 def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
     num_tf = len(pred["im_idx"].unique())
     num_cf = conf.baseline_context
@@ -26,27 +60,7 @@ def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
         obj_ant_output_ff = pred["output_ff"][count]
         gt_num_obj_ff += obj_ant_output_ff["gt_num_obj_ff"]
 
-        # Object presence prediction loss re-weighted by mis-classification weights
-        # weight of alpha for incorrect positive predictions and a weight of beta for incorrect negative predictions,
-        # where alpha > beta.
-        logit_outputs = obj_ant_output_ff["pred_obj_presence"]
-        targets = obj_ant_output_ff["gt_obj_presence"]
-
-        target_positive_samples = torch.where(targets == 1)[0].numel()
-        target_negative_samples = torch.where(targets == 0)[0].numel()
-        total_samples = target_positive_samples + target_negative_samples
-
-        # if target_positive_samples + target_negative_samples != 35: print(f"Target positive samples: {
-        # target_positive_samples}, Target negative samples: {target_negative_samples}") assert
-        # target_positive_samples + target_negative_samples == 35
-
-        positive_sample_weight = 0.5 * total_samples / target_positive_samples
-        negative_sample_weight = 0.5 * total_samples / target_negative_samples
-        uw_obj_presence_pred_loss = bce_loss(logit_outputs, targets)
-        mis_classification_weights = torch.where(targets == 1, positive_sample_weight * (logit_outputs < 0.5).float(),
-                                                 negative_sample_weight * (logit_outputs >= 0.5).float())
-        w_obj_presence_pred_loss = uw_obj_presence_pred_loss * mis_classification_weights
-        obj_presence_pred_loss = w_obj_presence_pred_loss.mean()
+        obj_presence_pred_loss = fetch_obj_presence_loss(obj_ant_output_ff, bce_loss, is_reweighting=True)
 
         pred_feats_mask = obj_ant_output_ff["feat_mask_ant"]
         gt_feats_mask = obj_ant_output_ff["feat_mask_gt"]

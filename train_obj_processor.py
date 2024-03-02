@@ -23,13 +23,13 @@ def fetch_obj_presence_loss(obj_ant_output_ff, bce_loss, is_reweighting=False):
         target_negative_samples = torch.where(targets == 0)[0].numel()
         total_samples = target_positive_samples + target_negative_samples
 
-        positive_sample_weight = 0.5 * total_samples / target_positive_samples
-        negative_sample_weight = 0.5 * total_samples / target_negative_samples
+        positive_sample_weight = 0.3 * total_samples / target_positive_samples
+        negative_sample_weight = 0.7 * total_samples / target_negative_samples
 
         mis_classification_weights = torch.where(targets == 1, positive_sample_weight * (logit_outputs < 0.5).float(),
                                                  negative_sample_weight * (logit_outputs >= 0.5).float())
         w_obj_presence_pred_loss = uw_obj_presence_pred_loss * mis_classification_weights
-        return w_obj_presence_pred_loss
+        return w_obj_presence_pred_loss.mean()
     else:
         gamma = 0.1
         alpha = 10

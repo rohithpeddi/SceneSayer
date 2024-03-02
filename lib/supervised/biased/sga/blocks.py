@@ -966,12 +966,11 @@ class ObjectAnticipation(nn.Module):
             # Here object labels are indexed from 0 to 35 formed by excluding the background label and subject labels in ground truth
             # Hence, for actual labels we add +2 to the predicted labels
             sub_label_ff_id = torch.tensor([1]).to(device=entry["device"])
-            sub_label_ff_id = sub_label_ff_id.unsqueeze(0)
             decoder_non_zero_obj_indices = torch.nonzero(ant_obj_presence_ff_id)
             if decoder_non_zero_obj_indices.numel() == 0:
                 ant_labels_ff_id = sub_label_ff_id
             else:
-                obj_labels_ff_id = (decoder_non_zero_obj_indices + 2).squeeze()
+                obj_labels_ff_id = (decoder_non_zero_obj_indices + 2).reshape(-1)
                 ant_labels_ff_id = torch.cat((sub_label_ff_id, obj_labels_ff_id), dim=0)
 
             num_obj_ff_id = decoder_non_zero_obj_indices.numel()
@@ -995,10 +994,19 @@ class ObjectAnticipation(nn.Module):
             boxes_ff_id = torch.tensor([[0.5] * 5 for _ in range(len(ant_labels_ff_id))]).cuda()
             scores_ff_id = torch.tensor([1] * len(ant_labels_ff_id)).cuda()
 
-            # Construct Features: Concatenate, subject features and anticipated object features in the future frame
-            features_ff_id = torch.cat(
-                (sub_feats_ff_id.unsqueeze(0), obj_feats_ff_id[torch.nonzero(ant_obj_presence_ff_id)].squeeze()),
-                dim=0)
+            if sub_feats_ff_id.dim() == 1:
+                sub_feats_ff_id = sub_feats_ff_id.unsqueeze(0)
+            elif sub_feats_ff_id.dim() > 2:
+                raise ValueError("sub_feats_ff_id has more than 2 dimensions")
+
+            filtered_obj_feats = obj_feats_ff_id[torch.nonzero(ant_obj_presence_ff_id, as_tuple=True)]
+            if filtered_obj_feats.dim() == 1:
+                filtered_obj_feats = filtered_obj_feats.unsqueeze(0)
+
+            if filtered_obj_feats.size(0) > 0:
+                features_ff_id = torch.cat((sub_feats_ff_id, filtered_obj_feats), dim=0)
+            else:
+                features_ff_id = sub_feats_ff_id
 
             if self.training:
                 gt_obj_ff_start_id = int(torch.where(entry["im_idx"] == gt_ff_id)[0][0])
@@ -1057,7 +1065,11 @@ class ObjectAnticipation(nn.Module):
         entry_cf_ff["pred_labels"] = torch.cat((pred_labels_cf, pred_labels_ff))
         entry_cf_ff["boxes"] = torch.cat((boxes_cf, boxes_ff))
         entry_cf_ff["scores"] = torch.cat((scores_cf, scores_ff))
-        entry_cf_ff["features"] = torch.cat((features_cf.squeeze(), features_ff.squeeze()), dim=0)
+        if features_cf.dim() == 3:
+            features_cf = features_cf.squeeze()
+        if features_ff.dim() == 3:
+            features_ff = features_ff.squeeze()
+        entry_cf_ff["features"] = torch.cat((features_cf, features_ff), dim=0)
 
         entry_ff["im_idx"] = im_idx_ff - im_idx_ff.min() if im_idx_ff.shape[0] > 0 else im_idx_ff
         entry_ff["pair_idx"] = pair_idx_ff - pair_idx_ff.min() if pair_idx_ff.shape[0] > 0 else pair_idx_ff

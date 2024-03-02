@@ -14,8 +14,8 @@ def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
     num_tf = len(pred["im_idx"].unique())
     num_cf = conf.baseline_context
 
-    cum_obj_pred_loss = 0
-    cum_feat_recon_loss = 0
+    cum_obj_pred_loss = torch.tensor(0.0, device=pred["device"])
+    cum_feat_recon_loss = torch.tensor(0.0, device=pred["device"])
 
     pred_loss_count = num_tf - num_cf
 
@@ -48,6 +48,11 @@ def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
 
     cum_obj_pred_loss /= max(pred_loss_count, 1)
     cum_feat_recon_loss /= max(pred_loss_count, 1)
+
+    if torch.isnan(cum_obj_pred_loss):
+        print("Object presence prediction loss is NaN")
+    if torch.isnan(cum_feat_recon_loss):
+        print("Feature reconstruction loss is NaN")
 
     print(f"--------------------------------------------------------------------")
     print(

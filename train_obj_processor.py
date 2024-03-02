@@ -32,9 +32,19 @@ def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
         logit_outputs = obj_ant_output_ff["pred_obj_presence"]
         targets = obj_ant_output_ff["gt_obj_presence"]
 
+        target_positive_samples = torch.where(targets == 1)[0].numel()
+        target_negative_samples = torch.where(targets == 0)[0].numel()
+        total_samples = target_positive_samples + target_negative_samples
+
+        # if target_positive_samples + target_negative_samples != 35: print(f"Target positive samples: {
+        # target_positive_samples}, Target negative samples: {target_negative_samples}") assert
+        # target_positive_samples + target_negative_samples == 35
+
+        positive_sample_weight = 0.5 * total_samples / target_positive_samples
+        negative_sample_weight = 0.5 * total_samples / target_negative_samples
         uw_obj_presence_pred_loss = bce_loss(logit_outputs, targets)
-        mis_classification_weights = torch.where(targets == 1, 0.8 * (logit_outputs < 0.5).float(),
-                                                 0.2 * (logit_outputs >= 0.5).float())
+        mis_classification_weights = torch.where(targets == 1, positive_sample_weight * (logit_outputs < 0.5).float(),
+                                                 negative_sample_weight * (logit_outputs >= 0.5).float())
         w_obj_presence_pred_loss = uw_obj_presence_pred_loss * mis_classification_weights
         obj_presence_pred_loss = w_obj_presence_pred_loss.mean()
 

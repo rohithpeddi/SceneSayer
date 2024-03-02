@@ -26,9 +26,17 @@ def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
         obj_ant_output_ff = pred["output_ff"][count]
         gt_num_obj_ff += obj_ant_output_ff["gt_num_obj_ff"]
 
-        # Object presence prediction loss
-        obj_presence_pred_loss = bce_loss(obj_ant_output_ff["pred_obj_presence"],
-                                          obj_ant_output_ff["gt_obj_presence"]).mean()
+        # Object presence prediction loss re-weighted by mis-classification weights
+        # weight of alpha for incorrect positive predictions and a weight of beta for incorrect negative predictions,
+        # where alpha > beta.
+        logit_outputs = obj_ant_output_ff["pred_obj_presence"]
+        targets = obj_ant_output_ff["gt_obj_presence"]
+
+        uw_obj_presence_pred_loss = bce_loss(logit_outputs, targets)
+        mis_classification_weights = torch.where(targets == 1, 0.8 * (logit_outputs < 0.5).float(),
+                                                 0.2 * (logit_outputs >= 0.5).float())
+        w_obj_presence_pred_loss = uw_obj_presence_pred_loss * mis_classification_weights
+        obj_presence_pred_loss = w_obj_presence_pred_loss.mean()
 
         pred_feats_mask = obj_ant_output_ff["feat_mask_ant"]
         gt_feats_mask = obj_ant_output_ff["feat_mask_gt"]

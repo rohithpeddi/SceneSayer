@@ -33,16 +33,20 @@ def calculate_object_decoder_losses(conf, pred, losses, abs_loss, bce_loss):
         pred_feats_mask = obj_ant_output_ff["feat_mask_ant"]
         gt_feats_mask = obj_ant_output_ff["feat_mask_gt"]
 
-        assert pred_feats_mask.shape[0] == gt_feats_mask.shape[0]
+        if pred_feats_mask.numel() == 0 or gt_feats_mask.numel() == 0:
+            print("Empty feature mask")
+        else:
+            assert pred_feats_mask.shape[0] == gt_feats_mask.shape[0]
 
-        pred_feats_ff = obj_ant_output_ff["features"]
-        gt_feats_ff = obj_ant_output["features"]
+            pred_feats_ff = obj_ant_output_ff["features"]
+            gt_feats_ff = obj_ant_output["features"]
 
-        pred_common_feats_ff = pred_feats_ff[pred_feats_mask.view(-1)]
-        gt_common_feats_ff = gt_feats_ff[gt_feats_mask.view(-1)]
+            pred_common_feats_ff = pred_feats_ff[pred_feats_mask.view(-1)]
+            gt_common_feats_ff = gt_feats_ff[gt_feats_mask.view(-1)]
 
-        feat_recon_loss = conf.hp_recon_loss * abs_loss(pred_common_feats_ff, gt_common_feats_ff).mean()
-        cum_feat_recon_loss += feat_recon_loss
+            feat_recon_loss = conf.hp_recon_loss * abs_loss(pred_common_feats_ff, gt_common_feats_ff).mean()
+            cum_feat_recon_loss += feat_recon_loss
+
         cum_obj_pred_loss += obj_presence_pred_loss
         pred_num_obj_ff += obj_ant_output_ff["im_idx"].shape[0]
 

@@ -886,6 +886,24 @@ class ObjectAnticipation(nn.Module):
             nn.Sigmoid()
         )
 
+    @staticmethod
+    def adapt_dimensions(original_tensor, num_dimensions):
+        if original_tensor.numel() == 0:
+            return None
+
+        if original_tensor.dim() == 0:
+            if original_tensor.numel() > 0:
+                return original_tensor.unsqueeze(0)
+            else:
+                return None
+        else:
+            if original_tensor.dim() == num_dimensions:
+                return original_tensor
+            elif original_tensor.dim() == num_dimensions + 1:
+                return original_tensor.squeeze()
+            elif original_tensor.dim() == num_dimensions - 1:
+                return original_tensor.unsqueeze(0)
+
     def forward(self, entry, num_cf, num_tf, num_ff):
         """
             1. Fetch object representation from the object classifier.
@@ -962,8 +980,8 @@ class ObjectAnticipation(nn.Module):
 
             # ----------------- Construct entry for the future frames that include -----------------
 
-            # Add subject label to the predicted labels, add object labels to the predicted labels
-            # Here object labels are indexed from 0 to 35 formed by excluding the background label and subject labels in ground truth
+            # Add subject label to the predicted labels, add object labels to the predicted labels Here object labels
+            # are indexed from 0 to 35 formed by excluding the background label and subject labels in ground truth
             # Hence, for actual labels we add +2 to the predicted labels
             sub_label_ff_id = torch.tensor([1]).to(device=entry["device"])
             decoder_non_zero_obj_indices = torch.nonzero(ant_obj_presence_ff_id)
@@ -990,20 +1008,16 @@ class ObjectAnticipation(nn.Module):
             # Concatenate along dimension 1 to make pairs [(sub_id, obj_id), ...]
             pair_idx_ff_id = torch.cat((sub_id_in_pair_idx_ff, obj_id_in_pair_idx_ff), dim=1)
 
-            # Construct Boxes, Scores: Repeat standard boxes and scores for the number of labels in the future frame (subject + object)
+            # Construct Boxes, Scores: Repeat standard boxes and scores for the number of labels in the future frame
+            # (subject + object)
             boxes_ff_id = torch.tensor([[0.5] * 5 for _ in range(len(ant_labels_ff_id))]).cuda()
             scores_ff_id = torch.tensor([1] * len(ant_labels_ff_id)).cuda()
 
-            if sub_feats_ff_id.dim() == 1:
-                sub_feats_ff_id = sub_feats_ff_id.unsqueeze(0)
-            elif sub_feats_ff_id.dim() > 2:
-                raise ValueError("sub_feats_ff_id has more than 2 dimensions")
-
+            sub_feats_ff_id = self.adapt_dimensions(sub_feats_ff_id, 2)
             filtered_obj_feats = obj_feats_ff_id[torch.nonzero(ant_obj_presence_ff_id, as_tuple=True)]
-            if filtered_obj_feats.dim() == 1:
-                filtered_obj_feats = filtered_obj_feats.unsqueeze(0)
+            filtered_obj_feats = self.adapt_dimensions(filtered_obj_feats, 2)
 
-            if filtered_obj_feats.size(0) > 0:
+            if filtered_obj_feats is not None:
                 features_ff_id = torch.cat((sub_feats_ff_id, filtered_obj_feats), dim=0)
             else:
                 features_ff_id = sub_feats_ff_id
@@ -1030,7 +1044,8 @@ class ObjectAnticipation(nn.Module):
                                                                                 np_gt_labels_ff_id,
                                                                                 return_indices=True)
 
-                # Feature mask on anticipated features: Size of pred_labels for past frames + Ground truth labels in past frames
+                # Feature mask on anticipated features: Size of pred_labels for past frames + Ground truth labels in
+                # past frames
                 feat_mask_ant_ff_id = pred_labels_ff.shape[0] + torch.tensor(gt_labels_idx_in_pred).to(
                     device=entry["device"])
 
@@ -1065,14 +1080,20 @@ class ObjectAnticipation(nn.Module):
         entry_cf_ff["pred_labels"] = torch.cat((pred_labels_cf, pred_labels_ff))
         entry_cf_ff["boxes"] = torch.cat((boxes_cf, boxes_ff))
         entry_cf_ff["scores"] = torch.cat((scores_cf, scores_ff))
-        if features_cf.dim() == 3:
-            features_cf = features_cf.squeeze()
-        if features_ff.dim() == 3:
-            features_ff = features_ff.squeeze()
-        entry_cf_ff["features"] = torch.cat((features_cf, features_ff), dim=0)
 
-        entry_ff["im_idx"] = im_idx_ff - im_idx_ff.min() if im_idx_ff.shape[0] > 0 else im_idx_ff
-        entry_ff["pair_idx"] = pair_idx_ff - pair_idx_ff.min() if pair_idx_ff.shape[0] > 0 else pair_idx_ff
+        features_cf = self.adapt_dimensions(features_cf, 2)
+        features_ff = self.adapt_dimensions(features_ff, 2)
+
+        if features_ff is not None:
+            features_cf_ff = torch.cat((features_cf.reshape(-1, self.d_model),
+                                        features_ff.reshape(-1, self.d_model)), dim=0)
+        else:
+            features_cf_ff = features_cf
+
+        entry_cf_ff["features"] = features_cf_ff
+
+        entry_ff["im_idx"] = im_idx_ff - im_idx_ff.min() if im_idx_ff.numel() > 0 else im_idx_ff
+        entry_ff["pair_idx"] = pair_idx_ff - pair_idx_ff.min() if pair_idx_ff.numel() > 0 else pair_idx_ff
         entry_ff["pred_labels"] = pred_labels_ff
         entry_ff["boxes"] = boxes_ff
         entry_ff["scores"] = scores_ff

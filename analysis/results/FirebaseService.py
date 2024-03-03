@@ -32,6 +32,9 @@ class FirebaseService:
 	def fetch_results(self):
 		return self.db.child(const.RESULTS).get().val()
 	
+	def fetch_results_from_db(self, database_name):
+		return self.db.child(database_name).get().val()
+	
 	# ---------------------- END RESULTS ----------------------
 	
 	# ---------------------- BEGIN RESULT ----------------------
@@ -44,6 +47,10 @@ class FirebaseService:
 	
 	def update_result(self, result_id: str, result: dict):
 		self.db.child(const.RESULTS).child(result_id).set(result)
+		logger.info(f"Updated result in the firebase - {result.__str__()}")
+		
+	def update_result_to_db(self, database_name, result_id: str, result: dict):
+		self.db.child(database_name).child(result_id).set(result)
 		logger.info(f"Updated result in the firebase - {result.__str__()}")
 	
 	def remove_result(self, result_id: str):

@@ -95,11 +95,21 @@ def fetch_completed_metrics_json(
 	return metrics_json
 
 
-def fetch_method_name(method_name):
+def fetch_setting_name(mode):
+	if mode == "sgdet":
+		setting_name = "\\textbf{SGA of AGS}"
+	elif mode == "sgcls":
+		setting_name = "\\textbf{SGA of PGAGS}"
+	elif mode == "predcls":
+		setting_name = "\\textbf{SGA of GAGS}"
+	return setting_name
+
+
+def fetch_method_name_latex(method_name):
 	if method_name == "NeuralODE" or method_name == "ode":
-		method_name = "\\textbf{SgatODE (Ours)}"
+		method_name = "\\textbf{SceneSayerODE (Ours)}"
 	elif method_name == "NeuralSDE" or method_name == "sde":
-		method_name = "\\textbf{SgatSDE (Ours)}"
+		method_name = "\\textbf{SceneSayerSDE (Ours)}"
 	elif method_name == "sttran_ant":
 		method_name = "STTran+ \cite{cong_et_al_sttran_2021}"
 	elif method_name == "sttran_gen_ant":
@@ -108,6 +118,38 @@ def fetch_method_name(method_name):
 		method_name = "DSGDetr+ \cite{Feng_2021}"
 	elif method_name == "dsgdetr_gen_ant":
 		method_name = "DSGDetr++ \cite{Feng_2021}"
+	return method_name
+
+
+def fetch_method_name_csv(method_name):
+	if method_name == "NeuralODE" or method_name == "ode":
+		method_name = "SceneSayerODE"
+	elif method_name == "NeuralSDE" or method_name == "sde":
+		method_name = "SceneSayerSDE"
+	elif method_name == "sttran_ant":
+		method_name = "STTran+"
+	elif method_name == "sttran_gen_ant":
+		method_name = "STTran++"
+	elif method_name == "dsgdetr_ant":
+		method_name = "DSGDetr+"
+	elif method_name == "dsgdetr_gen_ant":
+		method_name = "DSGDetr++"
+	return method_name
+
+
+def fetch_method_name_json(method_name):
+	if method_name == "NeuralODE" or method_name == "ode":
+		method_name = "SceneSayerODE"
+	elif method_name == "NeuralSDE" or method_name == "sde":
+		method_name = "SceneSayerSDE"
+	elif method_name == "sttran_ant":
+		method_name = "STTran+"
+	elif method_name == "sttran_gen_ant":
+		method_name = "STTran++"
+	elif method_name == "dsgdetr_ant":
+		method_name = "DSGDetr+"
+	elif method_name == "dsgdetr_gen_ant":
+		method_name = "DSGDetr++"
 	return method_name
 
 
@@ -120,10 +162,10 @@ def compile_context_results():
 			context_results_json[context_fraction][mode] = {}
 			for train_future_frame in train_future_frame_loss_list:
 				context_results_json[context_fraction][mode][train_future_frame] = {}
-				for model_name in methods:
-					model_name = fetch_method_name(model_name)
+				for method_name in methods:
+					method_name = fetch_method_name_json(method_name)
 					context_results_json[context_fraction][mode][train_future_frame][
-						model_name] = fetch_empty_metrics_json()
+						method_name] = fetch_empty_metrics_json()
 	
 	for context_fraction in context_fraction_list:
 		context_sga_list = []
@@ -133,8 +175,8 @@ def compile_context_results():
 		
 		for result in context_sga_list:
 			mode = result.mode
-			model_name = result.method_name
-			model_name = fetch_method_name(model_name)
+			method_name = result.method_name
+			method_name = fetch_method_name_json(method_name)
 			
 			train_future_frame = str(result.train_num_future_frames)
 			
@@ -148,7 +190,7 @@ def compile_context_results():
 				semi_constraint_metrics
 			)
 			
-			context_results_json[context_fraction][mode][train_future_frame][model_name] = completed_metrics_json
+			context_results_json[context_fraction][mode][train_future_frame][method_name] = completed_metrics_json
 	return context_results_json
 
 
@@ -168,48 +210,40 @@ def generate_context_results_csvs(context_results_json):
 					"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50"
 				])
 				for train_future_frame in train_future_frame_loss_list:
-					for model_name in methods:
-						model_name = fetch_method_name(model_name)
+					for method_name in methods:
+						method_name = fetch_method_name_json(method_name)
+						method_name_csv = fetch_method_name_csv(method_name)
 						writer.writerow([
 							train_future_frame,
-							model_name,
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["R@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["R@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["R@50"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["mR@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["mR@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["mR@50"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["hR@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["hR@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["hR@50"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["R@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["R@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["R@50"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["mR@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["mR@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["mR@50"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["hR@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["hR@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["hR@50"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["R@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["R@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["R@50"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["mR@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["mR@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["mR@50"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["hR@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["hR@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["hR@50"]
+							method_name_csv,
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["R@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["R@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["R@50"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["mR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["mR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["mR@50"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["hR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["hR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["hR@50"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["R@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["R@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["R@50"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["mR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["mR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["mR@50"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["hR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["hR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["hR@50"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["R@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["R@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["R@50"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["mR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["mR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["mR@50"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["hR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["hR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["hR@50"]
 						])
-
-
-def prepare_context_results():
-	context_results_json = compile_context_results()
-	# Generate Context Results CSVs
-	generate_context_results_csvs(context_results_json)
-	# Generate Context Results Latex Tables
-	
-	return
 
 
 def compile_complete_future_frame_results():
@@ -221,10 +255,10 @@ def compile_complete_future_frame_results():
 			context_results_json[test_num_future_frames][mode] = {}
 			for train_future_frame in train_future_frame_loss_list:
 				context_results_json[test_num_future_frames][mode][train_future_frame] = {}
-				for model_name in methods:
-					model_name = fetch_method_name(model_name)
+				for method_name in methods:
+					method_name = fetch_method_name_json(method_name)
 					context_results_json[test_num_future_frames][mode][train_future_frame][
-						model_name] = fetch_empty_metrics_json()
+						method_name] = fetch_empty_metrics_json()
 	
 	for test_num_future_frames in test_future_frame_list:
 		test_future_num_sga_list = []
@@ -235,8 +269,8 @@ def compile_complete_future_frame_results():
 		
 		for result in test_future_num_sga_list:
 			mode = result.mode
-			model_name = result.method_name
-			model_name = fetch_method_name(model_name)
+			method_name = result.method_name
+			method_name = fetch_method_name_json(method_name)
 			
 			train_future_frame = str(result.train_num_future_frames)
 			
@@ -250,7 +284,7 @@ def compile_complete_future_frame_results():
 				semi_constraint_metrics
 			)
 			
-			context_results_json[test_num_future_frames][mode][train_future_frame][model_name] = completed_metrics_json
+			context_results_json[test_num_future_frames][mode][train_future_frame][method_name] = completed_metrics_json
 	
 	return context_results_json
 
@@ -272,64 +306,65 @@ def generate_complete_future_frame_results_csvs(future_frame_results_json):
 					"R@10", "R@20", "R@50", "mR@10", "mR@20", "mR@50", "hR@10", "hR@20", "hR@50"
 				])
 				for train_future_frame in train_future_frame_loss_list:
-					for model_name in methods:
-						model_name = fetch_method_name(model_name)
+					for method_name in methods:
+						method_name = fetch_method_name_json(method_name)
+						method_name_csv = fetch_method_name_csv(method_name)
 						writer.writerow([
 							train_future_frame,
-							model_name,
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							method_name_csv,
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"R@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"R@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"R@50"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"mR@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"mR@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"mR@50"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"hR@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"hR@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"hR@50"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"R@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"R@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"R@50"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"mR@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"mR@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"mR@50"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"hR@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"hR@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"hR@50"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"R@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"R@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"R@50"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"mR@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"mR@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"mR@50"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"hR@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"hR@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"hR@50"]
 						])
 
@@ -339,7 +374,14 @@ def prepare_complete_future_frame_results():
 	# Generate Context Results CSVs
 	generate_complete_future_frame_results_csvs(complete_future_frame_json)
 	# Generate Context Results Latex Tables
-	
+	return
+
+
+def prepare_context_results():
+	context_results_json = compile_context_results()
+	# Generate Context Results CSVs
+	generate_context_results_csvs(context_results_json)
+	# Generate Context Results Latex Tables
 	return
 
 
@@ -382,21 +424,21 @@ def generate_paper_combined_context_recall_results_csvs(context_results_json):
 			])
 			for train_future_frame in train_future_frame_loss_list:
 				for context_fraction in context_fraction_list:
-					for model_name in methods:
-						model_name = fetch_method_name(model_name)
+					for method_name in methods:
+						method_name = fetch_method_name_json(method_name)
 						writer.writerow([
 							train_future_frame,
 							context_fraction,
-							model_name,
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["R@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["R@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["R@50"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["R@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["R@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["R@50"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["R@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["R@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["R@50"]
+							method_name,
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["R@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["R@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["R@50"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["R@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["R@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["R@50"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["R@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["R@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["R@50"]
 						])
 
 
@@ -416,21 +458,21 @@ def generate_paper_combined_context_mean_recall_results_csvs(context_results_jso
 			])
 			for train_future_frame in train_future_frame_loss_list:
 				for context_fraction in context_fraction_list:
-					for model_name in methods:
-						model_name = fetch_method_name(model_name)
+					for method_name in methods:
+						method_name = fetch_method_name_json(method_name)
 						writer.writerow([
 							train_future_frame,
 							context_fraction,
-							model_name,
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["mR@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["mR@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][0]["mR@50"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["mR@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["mR@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][1]["mR@50"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["mR@10"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["mR@20"],
-							context_results_json[context_fraction][mode][train_future_frame][model_name][2]["mR@50"]
+							method_name,
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["mR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["mR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][0]["mR@50"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["mR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["mR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][1]["mR@50"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["mR@10"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["mR@20"],
+							context_results_json[context_fraction][mode][train_future_frame][method_name][2]["mR@50"]
 						])
 
 
@@ -450,29 +492,29 @@ def generate_paper_combined_future_frame_recall_results_csvs(future_frame_result
 			])
 			for train_future_frame in train_future_frame_loss_list:
 				for test_num_future_frames in test_future_frame_list:
-					for model_name in methods:
-						model_name = fetch_method_name(model_name)
+					for method_name in methods:
+						method_name = fetch_method_name_json(method_name)
 						writer.writerow([
 							train_future_frame,
 							test_num_future_frames,
-							model_name,
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							method_name,
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"R@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"R@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"R@50"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"R@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"R@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"R@50"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"R@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"R@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"R@50"]
 						])
 
@@ -493,49 +535,39 @@ def generate_paper_combined_future_frame_mean_recall_results_csvs(future_frame_r
 			])
 			for train_future_frame in train_future_frame_loss_list:
 				for test_num_future_frames in test_future_frame_list:
-					for model_name in methods:
-						model_name = fetch_method_name(model_name)
+					for method_name in methods:
+						method_name = fetch_method_name_json(method_name)
 						writer.writerow([
 							train_future_frame,
 							test_num_future_frames,
-							model_name,
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							method_name,
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"mR@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"mR@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][0][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][0][
 								"mR@50"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"mR@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"mR@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][1][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][1][
 								"mR@50"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"mR@10"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"mR@20"],
-							future_frame_results_json[test_num_future_frames][mode][train_future_frame][model_name][2][
+							future_frame_results_json[test_num_future_frames][mode][train_future_frame][method_name][2][
 								"mR@50"]
 						])
 
 
-def fetch_setting_name(mode):
-	if mode == "sgdet":
-		setting_name = "\\textbf{SGA of AGS}"
-	elif mode == "sgcls":
-		setting_name = "\\textbf{SGA of PGAGS}"
-	elif mode == "predcls":
-		setting_name = "\\textbf{SGA of GAGS}"
-	return setting_name
-
-
 def generate_latex_header(setting_name, metric, train_horizon):
-	latex_header = "\\begin{table}[!ht]\n"
+	latex_header = "\\begin{table}[!h]\n"
 	latex_header += "    \\centering\n"
 	latex_header += "    \\captionsetup{font=small}\n"
-	latex_header += "    \\caption{Results for " + setting_name + ", when trained using anticipatory horizon of " + train_horizon + " future annotated frames.}\n"
-	latex_header += "    \\label{tab:anticipation_results_" + metric + "}\n"
+	latex_header += "    \\caption{Results for " + setting_name + ", when trained using anticipatory horizon of " + train_horizon + " future frames.}\n"
+	latex_header += "    \\label{tab:anticipation_results_" + metric + "_" + setting_name +"}\n"
 	latex_header += "    \\renewcommand{\\arraystretch}{1.2} \n"
 	latex_header += "    \\resizebox{\\textwidth}{!}{\n"
 	latex_header += "    \\begin{tabular}{llcccccc}\n"
@@ -554,11 +586,11 @@ def generate_latex_header(setting_name, metric, train_horizon):
 
 
 def generate_combined_recalls_latex_header(setting_name, metric, train_horizon):
-	latex_header = "\\begin{table}[!ht]\n"
+	latex_header = "\\begin{table}[!h]\n"
 	latex_header += "    \\centering\n"
 	latex_header += "    \\captionsetup{font=small}\n"
-	latex_header += "    \\caption{Results for " + setting_name + ", when trained using anticipatory horizon of " + train_horizon + " future annotated frames.}\n"
-	latex_header += "    \\label{tab:anticipation_results_" + metric + "}\n"
+	latex_header += "    \\caption{Results for " + setting_name + ", when trained using anticipatory horizon of " + train_horizon + " future frames.}\n"
+	latex_header += "    \\label{tab:anticipation_results_" + metric + "_" + setting_name + "}\n"
 	latex_header += "    \\renewcommand{\\arraystretch}{1.2} \n"
 	latex_header += "    \\resizebox{\\textwidth}{!}{\n"
 	latex_header += "    \\begin{tabular}{ll|cccccc|cccccc}\n"
@@ -574,24 +606,24 @@ def generate_combined_recalls_latex_header(setting_name, metric, train_horizon):
 
 
 def generate_combined_wn_recalls_latex_header(setting_name, metric, train_horizon):
-	latex_header = "\\begin{table}[!ht]\n"
+	latex_header = "\\begin{table}[!h]\n"
 	latex_header += "    \\centering\n"
 	latex_header += "    \\captionsetup{font=small}\n"
-	latex_header += "    \\caption{Results for " + setting_name + ", when trained using anticipatory horizon of " + train_horizon + " future annotated frames.}\n"
-	latex_header += "    \\label{tab:anticipation_results_" + metric + "}\n"
-	latex_header += "    \\setlength{\\tabcolsep}{5pt}"
+	latex_header += "    \\caption{Results for " + setting_name + ", when trained using anticipatory horizon of " + train_horizon + " future frames.}\n"
+	latex_header += "    \\label{tab:anticipation_results_" + metric + "_" + setting_name + "}\n"
+	latex_header += "    \\setlength{\\tabcolsep}{5pt} \n"
 	latex_header += "    \\renewcommand{\\arraystretch}{1.2} \n"
 	latex_header += "    \\resizebox{\\textwidth}{!}{\n"
 	latex_header += "    \\begin{tabular}{ll|cccccc|cccccc}\n"
 	latex_header += "    \\hline\n"
-	latex_header += "        \\multicolumn{2}{c}{\\textbf{" + setting_name + "}} & \\multicolumn{3}{c}{\\textbf{With Constraint}} & \\multicolumn{3}{c}{\\textbf{No Constraint}} & \\multicolumn{3}{c}{\\textbf{With Constraint}} & \\multicolumn{3}{c}{\\textbf{No Constraint}}\\\\ \n"
-	latex_header += "    & & \\multicolumn{3}{c}{Recall} & \\multicolumn{3}{c}{Mean Recall} & \\multicolumn{3}{c}{Recall} & \\multicolumn{3}{c}{Mean Recall} \\ \n"
+	latex_header += "         & & \\multicolumn{6}{c|}{\\textbf{Recall (R)}} & \\multicolumn{6}{c}{\\textbf{Mean Recall (mR)}} \\\\ \n"
+	latex_header += "        \\cmidrule(lr){3-8} \\cmidrule(lr){9-14} \n "
+	latex_header += "        \\multicolumn{2}{c|}{\\textbf{" + setting_name + "}} & \\multicolumn{3}{c}{\\textbf{With Constraint}} & \\multicolumn{3}{c|}{\\textbf{No Constraint}} & \\multicolumn{3}{c}{\\textbf{With Constraint}} & \\multicolumn{3}{c}{\\textbf{No Constraint}}\\\\ \n"
 	latex_header += "        \\cmidrule(lr){1-2}\\cmidrule(lr){3-5} \\cmidrule(lr){6-8}\\cmidrule(lr){9-11} \\cmidrule(lr){12-14} \n "
-	
-	latex_header += ("        $\\mathcal{F}$ & \\textbf{Method} & \\textbf{R@10} & \\textbf{R@20} & \\textbf{R@50} & "
-	                 "\\textbf{R@10} & \\textbf{R@20} & \\textbf{R@50} & "
-	                 "\\textbf{mR@10} & \\textbf{mR@20} & \\textbf{mR@50}  & "
-	                 "\\textbf{mR@10} & \\textbf{mR@20} & \\textbf{mR@50}   \\\\ \\hline\n")
+	latex_header += ("        $\\mathcal{F}$ & \\textbf{Method} & \\textbf{10} & \\textbf{20} & \\textbf{50} & "
+	                 "\\textbf{10} & \\textbf{20} & \\textbf{50} & "
+	                 "\\textbf{10} & \\textbf{20} & \\textbf{50}  & "
+	                 "\\textbf{10} & \\textbf{20} & \\textbf{50}   \\\\ \\hline\n")
 	return latex_header
 
 
@@ -613,65 +645,127 @@ def fetch_rounded_value(value):
 	return round(float(value), 1)
 
 
-def generate_paper_combined_context_recall_vertical_latex_tables(context_results_json):
-	for mode in modes:
-		for train_num_future_frame in train_future_frame_loss_list:
-			latex_file_name = f"recall_{mode}_{train_num_future_frame}.txt"
-			latex_file_path = os.path.join(os.path.dirname(__file__), "results_docs",
-			                               "paper_combined_context_vertical_latex_tables", latex_file_name)
-			os.makedirs(os.path.dirname(latex_file_path), exist_ok=True)
-			
-			setting_name = fetch_setting_name(mode)
-			
-			latex_table = generate_latex_header(setting_name, "recall", train_horizon=train_num_future_frame)
-			
-			for context_fraction in context_fraction_list:
-				values_matrix = np.zeros((6, 6), dtype=np.float32)
-				
-				for idx, model_name in enumerate(methods):
-					model_name = fetch_method_name(model_name)
-					values_matrix[idx, 0] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]["R@10"])
-					values_matrix[idx, 1] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]["R@20"])
-					values_matrix[idx, 2] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]["R@50"])
-					values_matrix[idx, 3] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]["R@10"])
-					values_matrix[idx, 4] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]["R@20"])
-					values_matrix[idx, 5] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]["R@50"])
-				
-				max_boolean_matrix = values_matrix == np.max(values_matrix, axis=0)
-				
-				for idx, model_name in enumerate(methods):
-					model_name = fetch_method_name(model_name)
-					
-					initial_string = ""
-					if idx == 0:
-						initial_string = f"        \\multirow{{4}}{{*}}{{{context_fraction}}} & {model_name}"
-					elif idx in [1, 2, 3, 4, 5]:
-						initial_string = f"        & {model_name}"
-					
-					latex_row = initial_string
-					for col_idx in range(6):
-						if max_boolean_matrix[idx, col_idx]:
-							latex_row += f" & \\textbf{{{fetch_rounded_value(values_matrix[idx, col_idx])}}}"
-						else:
-							latex_row += f" & {fetch_rounded_value(values_matrix[idx, col_idx])}"
-					
-					if idx == 5:
-						latex_row += "  \\\\ \\hline\n"
-					else:
-						latex_row += "  \\\\ \n"
-					
-					latex_table += latex_row
-			latex_footer = generate_latex_footer()
-			latex_table += latex_footer
-			
-			with open(latex_file_path, "a", newline='') as latex_file:
-				latex_file.write(latex_table)
+def fill_combined_context_fraction_values_matrix(values_matrix, idx, method_name, context_results_json,
+                                                 context_fraction, mode,
+                                                 train_num_future_frame):
+	method_name = fetch_method_name_json(method_name)
+	values_matrix[idx, 0] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["R@10"])
+	values_matrix[idx, 1] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["R@20"])
+	values_matrix[idx, 2] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["R@50"])
+	values_matrix[idx, 3] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["mR@10"])
+	values_matrix[idx, 4] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["mR@20"])
+	values_matrix[idx, 5] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["mR@50"])
+	values_matrix[idx, 6] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["R@10"])
+	values_matrix[idx, 7] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["R@20"])
+	values_matrix[idx, 8] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["R@50"])
+	values_matrix[idx, 9] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["mR@10"])
+	values_matrix[idx, 10] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["mR@20"])
+	values_matrix[idx, 11] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["mR@50"])
+	return values_matrix
+
+
+def fill_combined_wn_context_fraction_values_matrix(values_matrix, idx, method_name, context_results_json,
+                                                    context_fraction, mode,
+                                                    train_num_future_frame):
+	method_name = fetch_method_name_json(method_name)
+	values_matrix[idx, 0] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["R@10"])
+	values_matrix[idx, 1] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["R@20"])
+	values_matrix[idx, 2] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["R@50"])
+	values_matrix[idx, 3] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["R@10"])
+	values_matrix[idx, 4] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["R@20"])
+	values_matrix[idx, 5] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["R@50"])
+	values_matrix[idx, 6] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["mR@10"])
+	values_matrix[idx, 7] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["mR@20"])
+	values_matrix[idx, 8] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["mR@50"])
+	values_matrix[idx, 9] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["mR@10"])
+	values_matrix[idx, 10] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["mR@20"])
+	values_matrix[idx, 11] = fetch_value(
+		context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["mR@50"])
+	return values_matrix
+
+
+def fill_combined_future_frame_values_matrix(values_matrix, idx, method_name, context_results_json, test_future_frame,
+                                             mode, train_num_future_frame):
+	method_name = fetch_method_name_json(method_name)
+	values_matrix[idx, 0] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["R@10"])
+	values_matrix[idx, 1] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["R@20"])
+	values_matrix[idx, 2] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["R@50"])
+	values_matrix[idx, 3] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["mR@10"])
+	values_matrix[idx, 4] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["mR@20"])
+	values_matrix[idx, 5] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["mR@50"])
+	values_matrix[idx, 6] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["R@10"])
+	values_matrix[idx, 7] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["R@20"])
+	values_matrix[idx, 8] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["R@50"])
+	values_matrix[idx, 9] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["mR@10"])
+	values_matrix[idx, 10] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["mR@20"])
+	values_matrix[idx, 11] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["mR@50"])
+	return values_matrix
+
+
+def fill_combined_wn_future_frame_values_matrix(values_matrix, idx, method_name, context_results_json,
+                                                test_future_frame,
+                                                mode, train_num_future_frame):
+	method_name = fetch_method_name_json(method_name)
+	values_matrix[idx, 0] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["R@10"])
+	values_matrix[idx, 1] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["R@20"])
+	values_matrix[idx, 2] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["R@50"])
+	values_matrix[idx, 3] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["R@10"])
+	values_matrix[idx, 4] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["R@20"])
+	values_matrix[idx, 5] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["R@50"])
+	values_matrix[idx, 6] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["mR@10"])
+	values_matrix[idx, 7] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["mR@20"])
+	values_matrix[idx, 8] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["mR@50"])
+	values_matrix[idx, 9] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["mR@10"])
+	values_matrix[idx, 10] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["mR@20"])
+	values_matrix[idx, 11] = fetch_value(
+		context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["mR@50"])
+	return values_matrix
 
 
 def generate_paper_combined_context_recalls_latex_tables(context_results_json):
@@ -691,36 +785,15 @@ def generate_paper_combined_context_recalls_latex_tables(context_results_json):
 				values_matrix = np.zeros((6, 12), dtype=np.float32)
 				
 				for idx, method_name in enumerate(methods):
-					method_name = fetch_method_name(method_name)
-					values_matrix[idx, 0] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["R@10"])
-					values_matrix[idx, 1] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["R@20"])
-					values_matrix[idx, 2] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["R@50"])
-					values_matrix[idx, 3] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["mR@10"])
-					values_matrix[idx, 4] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["mR@20"])
-					values_matrix[idx, 5] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["mR@50"])
-					values_matrix[idx, 6] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["R@10"])
-					values_matrix[idx, 7] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["R@20"])
-					values_matrix[idx, 8] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["R@50"])
-					values_matrix[idx, 9] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["mR@10"])
-					values_matrix[idx, 10] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["mR@20"])
-					values_matrix[idx, 11] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["mR@50"])
+					values_matrix = fill_combined_context_fraction_values_matrix(values_matrix, idx, method_name,
+					                                                             context_results_json,
+					                                                             context_fraction, mode,
+					                                                             train_num_future_frame)
 				
 				max_boolean_matrix = values_matrix == np.max(values_matrix, axis=0)
 				
 				for idx, method_name in enumerate(methods):
-					method_name = fetch_method_name(method_name)
+					method_name = fetch_method_name_latex(method_name)
 					
 					initial_string = ""
 					if idx == 0:
@@ -765,36 +838,15 @@ def generate_paper_combined_wn_context_recalls_latex_tables(context_results_json
 				values_matrix = np.zeros((6, 12), dtype=np.float32)
 				
 				for idx, method_name in enumerate(methods):
-					method_name = fetch_method_name(method_name)
-					values_matrix[idx, 0] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["R@10"])
-					values_matrix[idx, 1] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["R@20"])
-					values_matrix[idx, 2] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["R@50"])
-					values_matrix[idx, 3] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["R@10"])
-					values_matrix[idx, 4] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["R@20"])
-					values_matrix[idx, 5] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["R@50"])
-					values_matrix[idx, 6] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["mR@10"])
-					values_matrix[idx, 7] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["mR@20"])
-					values_matrix[idx, 8] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][0]["mR@50"])
-					values_matrix[idx, 9] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["mR@10"])
-					values_matrix[idx, 10] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["mR@20"])
-					values_matrix[idx, 11] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][method_name][1]["mR@50"])
+					values_matrix = fill_combined_wn_context_fraction_values_matrix(values_matrix, idx, method_name,
+					                                                                context_results_json,
+					                                                                context_fraction, mode,
+					                                                                train_num_future_frame)
 				
 				max_boolean_matrix = values_matrix == np.max(values_matrix, axis=0)
 				
 				for idx, method_name in enumerate(methods):
-					method_name = fetch_method_name(method_name)
+					method_name = fetch_method_name_latex(method_name)
 					
 					initial_string = ""
 					if idx == 0:
@@ -839,36 +891,15 @@ def generate_paper_combined_future_frame_recalls_latex_tables(context_results_js
 				values_matrix = np.zeros((6, 12), dtype=np.float32)
 				
 				for idx, method_name in enumerate(methods):
-					method_name = fetch_method_name(method_name)
-					values_matrix[idx, 0] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["R@10"])
-					values_matrix[idx, 1] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["R@20"])
-					values_matrix[idx, 2] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["R@50"])
-					values_matrix[idx, 3] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["mR@10"])
-					values_matrix[idx, 4] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["mR@20"])
-					values_matrix[idx, 5] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["mR@50"])
-					values_matrix[idx, 6] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["R@10"])
-					values_matrix[idx, 7] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["R@20"])
-					values_matrix[idx, 8] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["R@50"])
-					values_matrix[idx, 9] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["mR@10"])
-					values_matrix[idx, 10] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["mR@20"])
-					values_matrix[idx, 11] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["mR@50"])
+					values_matrix = fill_combined_future_frame_values_matrix(values_matrix, idx, method_name,
+					                                                         context_results_json,
+					                                                         test_future_frame, mode,
+					                                                         train_num_future_frame)
 				
 				max_boolean_matrix = values_matrix == np.max(values_matrix, axis=0)
 				
 				for idx, method_name in enumerate(methods):
-					method_name = fetch_method_name(method_name)
+					method_name = fetch_method_name_latex(method_name)
 					
 					initial_string = ""
 					if idx == 0:
@@ -913,36 +944,15 @@ def generate_paper_combined_wn_future_frame_recalls_latex_tables(context_results
 				values_matrix = np.zeros((6, 12), dtype=np.float32)
 				
 				for idx, method_name in enumerate(methods):
-					method_name = fetch_method_name(method_name)
-					values_matrix[idx, 0] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["R@10"])
-					values_matrix[idx, 1] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["R@20"])
-					values_matrix[idx, 2] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["R@50"])
-					values_matrix[idx, 3] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["mR@10"])
-					values_matrix[idx, 4] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["mR@20"])
-					values_matrix[idx, 5] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][0]["mR@50"])
-					values_matrix[idx, 6] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["R@10"])
-					values_matrix[idx, 7] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["R@20"])
-					values_matrix[idx, 8] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["R@50"])
-					values_matrix[idx, 9] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["mR@10"])
-					values_matrix[idx, 10] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["mR@20"])
-					values_matrix[idx, 11] = fetch_value(
-						context_results_json[test_future_frame][mode][train_num_future_frame][method_name][1]["mR@50"])
+					values_matrix = fill_combined_wn_future_frame_values_matrix(values_matrix, idx, method_name,
+					                                                            context_results_json,
+					                                                            test_future_frame, mode,
+					                                                            train_num_future_frame)
 				
 				max_boolean_matrix = values_matrix == np.max(values_matrix, axis=0)
 				
 				for idx, method_name in enumerate(methods):
-					method_name = fetch_method_name(method_name)
+					method_name = fetch_method_name_latex(method_name)
 					
 					initial_string = ""
 					if idx == 0:
@@ -970,201 +980,6 @@ def generate_paper_combined_wn_future_frame_recalls_latex_tables(context_results
 				latex_file.write(latex_table)
 
 
-def generate_paper_combined_context_mean_recall_vertical_latex_tables(context_results_json):
-	for mode in modes:
-		for train_num_future_frame in train_future_frame_loss_list:
-			latex_file_name = f"mean_recall_{mode}_{train_num_future_frame}.txt"
-			latex_file_path = os.path.join(os.path.dirname(__file__), "results_docs",
-			                               "paper_combined_context_vertical_latex_tables", latex_file_name)
-			os.makedirs(os.path.dirname(latex_file_path), exist_ok=True)
-			
-			setting_name = fetch_setting_name(mode)
-			
-			latex_table = generate_latex_header(setting_name, "mean_recall", train_horizon=train_num_future_frame)
-			
-			for context_fraction in context_fraction_list:
-				values_matrix = np.zeros((6, 6), dtype=np.float32)
-				
-				for idx, model_name in enumerate(methods):
-					model_name = fetch_method_name(model_name)
-					values_matrix[idx, 0] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]["mR@10"])
-					values_matrix[idx, 1] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]["mR@20"])
-					values_matrix[idx, 2] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][model_name][0]["mR@50"])
-					values_matrix[idx, 3] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]["mR@10"])
-					values_matrix[idx, 4] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]["mR@20"])
-					values_matrix[idx, 5] = fetch_value(
-						context_results_json[context_fraction][mode][train_num_future_frame][model_name][1]["mR@50"])
-				
-				max_boolean_matrix = values_matrix == np.max(values_matrix, axis=0)
-				
-				for idx, model_name in enumerate(methods):
-					model_name = fetch_method_name(model_name)
-					
-					initial_string = ""
-					if idx == 0:
-						initial_string = f"        \\multirow{{4}}{{*}}{{{context_fraction}}} & {model_name}"
-					elif idx in [1, 2, 3, 4, 5]:
-						initial_string = f"        & {model_name}"
-					
-					latex_row = initial_string
-					for col_idx in range(6):
-						if max_boolean_matrix[idx, col_idx]:
-							latex_row += f" & \\textbf{{{fetch_rounded_value(values_matrix[idx, col_idx])}}}"
-						else:
-							latex_row += f" & {fetch_rounded_value(values_matrix[idx, col_idx])}"
-					
-					if idx == 5:
-						latex_row += "  \\\\ \\hline\n"
-					else:
-						latex_row += "  \\\\ \n"
-					
-					latex_table += latex_row
-			latex_footer = generate_latex_footer()
-			latex_table += latex_footer
-			
-			with open(latex_file_path, "a", newline='') as latex_file:
-				latex_file.write(latex_table)
-
-
-def generate_paper_combined_future_frame_recall_vertical_latex_tables(future_frame_results_json):
-	for mode in modes:
-		for train_num_future_frame in train_future_frame_loss_list:
-			latex_file_name = f"recall_{mode}_{train_num_future_frame}.txt"
-			latex_file_path = os.path.join(os.path.dirname(__file__), "results_docs",
-			                               "paper_combined_future_frame_vertical_latex_tables", latex_file_name)
-			os.makedirs(os.path.dirname(latex_file_path), exist_ok=True)
-			
-			setting_name = fetch_setting_name(mode)
-			
-			latex_table = generate_latex_header(setting_name, "recall", train_horizon=train_num_future_frame)
-			
-			for test_future_frame in test_future_frame_list:
-				values_matrix = np.zeros((6, 6), dtype=np.float32)
-				
-				for idx, model_name in enumerate(methods):
-					model_name = fetch_method_name(model_name)
-					values_matrix[idx, 0] = fetch_value(
-						future_frame_results_json[test_future_frame][mode][train_num_future_frame][model_name][0][
-							"R@10"])
-					values_matrix[idx, 1] = fetch_value(
-						future_frame_results_json[test_future_frame][mode][train_num_future_frame][model_name][0][
-							"R@20"])
-					values_matrix[idx, 2] = fetch_value(
-						future_frame_results_json[test_future_frame][mode][train_num_future_frame][model_name][0][
-							"R@50"])
-					values_matrix[idx, 3] = fetch_value(
-						future_frame_results_json[test_future_frame][mode][train_num_future_frame][model_name][1][
-							"R@10"])
-					values_matrix[idx, 4] = fetch_value(
-						future_frame_results_json[test_future_frame][mode][train_num_future_frame][model_name][1][
-							"R@20"])
-					values_matrix[idx, 5] = fetch_value(
-						future_frame_results_json[test_future_frame][mode][train_num_future_frame][model_name][1][
-							"R@50"])
-				
-				max_boolean_matrix = values_matrix == np.max(values_matrix, axis=0)
-				
-				for idx, model_name in enumerate(methods):
-					model_name = fetch_method_name(model_name)
-					
-					initial_string = ""
-					if idx == 0:
-						initial_string = f"        \\multirow{{4}}{{*}}{{{test_future_frame}}} & {model_name}"
-					elif idx in [1, 2, 3, 4, 5]:
-						initial_string = f"        & {model_name}"
-					
-					latex_row = initial_string
-					for col_idx in range(6):
-						if max_boolean_matrix[idx, col_idx]:
-							latex_row += f" & \\textbf{{{fetch_rounded_value(values_matrix[idx, col_idx])}}}"
-						else:
-							latex_row += f" & {fetch_rounded_value(values_matrix[idx, col_idx])}"
-					
-					if idx == 5:
-						latex_row += "  \\\\ \\hline\n"
-					else:
-						latex_row += "  \\\\ \n"
-					
-					latex_table += latex_row
-			latex_footer = generate_latex_footer()
-			latex_table += latex_footer
-			
-			with open(latex_file_path, "a", newline='') as latex_file:
-				latex_file.write(latex_table)
-
-
-def generate_paper_combined_future_frame_mean_recall_vertical_latex_tables(future_frame_results_json):
-	for mode in modes:
-		for train_num_future_frame in train_future_frame_loss_list:
-			latex_file_name = f"mean_recall_{mode}_{train_num_future_frame}.txt"
-			latex_file_path = os.path.join(os.path.dirname(__file__), "results_docs",
-			                               "paper_combined_future_frame_vertical_latex_tables", latex_file_name)
-			os.makedirs(os.path.dirname(latex_file_path), exist_ok=True)
-			
-			setting_name = fetch_setting_name(mode)
-			
-			latex_table = generate_latex_header(setting_name, "mean_recall", train_horizon=train_num_future_frame)
-			
-			for test_future_frame in test_future_frame_list:
-				values_matrix = np.zeros((6, 6), dtype=np.float32)
-				
-				for idx, model_name in enumerate(methods):
-					model_name = fetch_method_name(model_name)
-					values_matrix[idx, 0] = fetch_value(
-						future_frame_results_json[test_future_frame][mode][train_num_future_frame][model_name][0][
-							"mR@10"])
-					values_matrix[idx, 1] = fetch_value(
-						future_frame_results_json[test_future_frame][mode][train_num_future_frame][model_name][0][
-							"mR@20"])
-					values_matrix[idx, 2] = fetch_value(
-						future_frame_results_json[test_future_frame][mode][train_num_future_frame][model_name][0][
-							"mR@50"])
-					values_matrix[idx, 3] = fetch_value(
-						future_frame_results_json[test_future_frame][mode][train_num_future_frame][model_name][1][
-							"mR@10"])
-					values_matrix[idx, 4] = fetch_value(
-						future_frame_results_json[test_future_frame][mode][train_num_future_frame][model_name][1][
-							"mR@20"])
-					values_matrix[idx, 5] = fetch_value(
-						future_frame_results_json[test_future_frame][mode][train_num_future_frame][model_name][1][
-							"mR@50"])
-				
-				max_boolean_matrix = values_matrix == np.max(values_matrix, axis=0)
-				
-				for idx, model_name in enumerate(methods):
-					model_name = fetch_method_name(model_name)
-					
-					initial_string = ""
-					if idx == 0:
-						initial_string = f"        \\multirow{{4}}{{*}}{{{test_future_frame}}} & {model_name}"
-					elif idx in [1, 2, 3, 4, 5]:
-						initial_string = f"        & {model_name}"
-					
-					latex_row = initial_string
-					for col_idx in range(6):
-						if max_boolean_matrix[idx, col_idx]:
-							latex_row += f" & \\textbf{{{fetch_rounded_value(values_matrix[idx, col_idx])}}}"
-						else:
-							latex_row += f" & {fetch_rounded_value(values_matrix[idx, col_idx])}"
-					
-					if idx == 5:
-						latex_row += "  \\\\ \\hline\n"
-					else:
-						latex_row += "  \\\\ \n"
-					
-					latex_table += latex_row
-			latex_footer = generate_latex_footer()
-			latex_table += latex_footer
-			
-			with open(latex_file_path, "a", newline='') as latex_file:
-				latex_file.write(latex_table)
-
-
 def prepare_paper_combined_context_results():
 	context_results_json = compile_context_results()
 	# Generate Context Results CSVs
@@ -1172,8 +987,6 @@ def prepare_paper_combined_context_results():
 	generate_paper_combined_context_mean_recall_results_csvs(context_results_json)
 	
 	# Generate Context LateX Tables
-	generate_paper_combined_context_recall_vertical_latex_tables(context_results_json)
-	generate_paper_combined_context_mean_recall_vertical_latex_tables(context_results_json)
 	generate_paper_combined_context_recalls_latex_tables(context_results_json)
 	generate_paper_combined_wn_context_recalls_latex_tables(context_results_json)
 
@@ -1185,8 +998,6 @@ def prepare_paper_combined_future_frame_results():
 	generate_paper_combined_future_frame_mean_recall_results_csvs(future_frame_results_json)
 	
 	# Generate Future Frame Results Latex Tables
-	generate_paper_combined_future_frame_recall_vertical_latex_tables(future_frame_results_json)
-	generate_paper_combined_future_frame_mean_recall_vertical_latex_tables(future_frame_results_json)
 	generate_paper_combined_future_frame_recalls_latex_tables(future_frame_results_json)
 	generate_paper_combined_wn_future_frame_recalls_latex_tables(future_frame_results_json)
 
@@ -1205,14 +1016,14 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 	db_service = FirebaseService()
 	
-	# prepare_context_results()
-	# combine_csv_to_excel(os.path.join(os.path.dirname(__file__), "results_docs", "context_results_csvs"),
-	#                      os.path.join(os.path.dirname(__file__), "results_docs", "combined_context_results.xlsx"))
-	#
-	# prepare_complete_future_frame_results()
-	# combine_csv_to_excel(
-	# 	os.path.join(os.path.dirname(__file__), "results_docs", "complete_test_future_results_csvs"),
-	# 	os.path.join(os.path.dirname(__file__), "results_docs", "complete_test_future_results.xlsx"))
+	prepare_context_results()
+	combine_csv_to_excel(os.path.join(os.path.dirname(__file__), "results_docs", "context_results_csvs"),
+	                     os.path.join(os.path.dirname(__file__), "results_docs", "combined_context_results.xlsx"))
+	
+	prepare_complete_future_frame_results()
+	combine_csv_to_excel(
+		os.path.join(os.path.dirname(__file__), "results_docs", "complete_test_future_results_csvs"),
+		os.path.join(os.path.dirname(__file__), "results_docs", "complete_test_future_results.xlsx"))
 	
 	prepare_paper_combined_context_results()
 	combine_csv_to_excel(

@@ -177,9 +177,10 @@ def main():
     if method_name == "NeuralODE":
         assert train_method == "ode"
         model = load_ode(max_window)
-    elif method_name == "NeuralSDE":
+    elif method_name in ["NeuralSDE", "sde_wo_bb", "sde_wo_recon"]:
         assert train_method == "sde"
         model = load_sde(max_window)
+        print(f"Model loaded: for method: {method_name}")
 
     assert model is not None
     process_data(matcher, model, max_window)
@@ -233,6 +234,6 @@ if __name__ == '__main__':
     train_method = model_name.split('_')[0]
     mode = model_name.split('_')[-5]
     method_name = conf.method_name
-    generate_qualitative_results()
-
+    # generate_qualitative_results()
+    main()
 # python test_latent_diffeq.py -mode sgcls -max_window 5 -method_name NeuralODE -model_path /data/rohith/ag/checkpoints/ode/ode_sgcls_future_3_epoch_9.tar

@@ -41,4 +41,4 @@ def store_filtered_results(version):
 
 if __name__ == '__main__':
 	db_service = FirebaseService()
-	store_versioned_results(2)
+	store_versioned_results(11)

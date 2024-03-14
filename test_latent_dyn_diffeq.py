@@ -198,7 +198,7 @@ def generate_qualitative_results():
     matcher = HungarianMatcher(0.5, 1, 1, 0.5)
     matcher.eval()
 
-    video_id_list = ["0A8CF", "21F9H", "X95D0", "M18XP", "LUQWY", "QE4YE", "ENOLD"]
+    video_id_list = ["X95D0", "LUQWY"]
     context_fraction_list = [0.3, 0.5, 0.7, 0.9]
     with torch.no_grad():
         for context_fraction in context_fraction_list:
@@ -234,6 +234,6 @@ if __name__ == '__main__':
     train_method = model_name.split('_')[0]
     mode = model_name.split('_')[-5]
     method_name = conf.method_name
-    # generate_qualitative_results()
-    main()
+    generate_qualitative_results()
+    # main()
 # python test_latent_diffeq.py -mode sgcls -max_window 5 -method_name NeuralODE -model_path /data/rohith/ag/checkpoints/ode/ode_sgcls_future_3_epoch_9.tar

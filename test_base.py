@@ -67,8 +67,8 @@ def generate_test_dataset_metadata(conf, device):
 		is_compiled_together=False,
 		filter_nonperson_box_frame=True,
 		filter_small_box=False if conf.mode == const.PREDCLS else True,
-		features_path="/data/rohith/ag/features/supervised/test/",
-		additional_data_path="/data/rohith/ag/features/supervised/additional/test/"
+		features_path="/data/rohith/ag/features_mod/supervised/test/",
+		additional_data_path="/data/rohith/ag/features_mod/supervised/additional/test/"
 	)
 	
 	dataloader_test = DataLoader(

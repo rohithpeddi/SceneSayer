@@ -13,8 +13,21 @@
 </div>
 
 
+# TASK PICTURE
 
-# AFTER FEATURE EXTRACTION
+![TaskPicture](https://github.com/rohithpeddi/SceneSayer/assets/23375299/cd5a7092-7b4f-4711-8835-c6a1ff621162)
+
+
+# TECHNICAL APPROACH
+
+![TechnicalApproach](https://github.com/rohithpeddi/SceneSayer/assets/23375299/43bda602-a9ab-4846-9501-51e2ba4474ad)
+
+
+-------
+
+# CODE UNDER PREPARATION
+
+### AFTER FEATURE EXTRACTION
 
 ### Build draw_rectangles modules
 
@@ -58,27 +71,8 @@ pip install -r sga_requirements.txt
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Neuro Symbolic Scene Graph Anticipation
-Neuro Symbolic Video Prediction/ Action Anticipation
+# Scene Sayer
+Scene Sayer
 
 ```
 conda create -n sgg python=3.7 pip
@@ -105,7 +99,7 @@ Dump all frames ```data/ag/frames```
 
 
 Download object_bbox_and_relationship_filtersmall.pkl from [here](https://drive.google.com/file/d/19BkAwjCw5ByyGyZjFo174Oc3Ud56fkaT/view)
-and place in the dataloader folder
+and place it in the data loader folder
 
 # Setup
 
@@ -170,7 +164,7 @@ Change the folder paths in 'fasterRCNN/lib/faster_rcnn.egg.info/SOURCES.txt' to 
 python setup.py build develop
 ```
 
-If any errors check gcc version ```Works for 9.x.x```
+If there are any errors, check gcc version ``` Works for 9.x.x```
 
 Follow [this](https://www.youtube.com/watch?v=aai42Qp6L28) for changing gcc version
 

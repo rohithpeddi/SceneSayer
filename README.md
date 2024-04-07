@@ -25,7 +25,11 @@
 
 -------
 
-# CODE UNDER PREPARATION
+# HOW TO RUN THE CODE
+
+1. To run the baseline transformer-based methods, please follow the instructions on [STTran](https://github.com/yrcong/STTran) and [DSG Detr](https://github.com/Shengyu-Feng/DSG-DETR)
+2. To run SceneSayer models, you need to use remove_object_detector.py code to store features and use them as input to the SDE and ODE models.
+
 
 ### AFTER FEATURE EXTRACTION
 
@@ -66,8 +70,6 @@ pip install torch==1.10.1+cu111 torchvision==0.11.2+cu111 torchaudio==0.10.1 -f 
 ```
 pip install -r sga_requirements.txt
 ```
-
-
 
 
 
@@ -166,7 +168,26 @@ python setup.py build develop
 
 If there are any errors, check gcc version ``` Works for 9.x.x```
 
+
 Follow [this](https://www.youtube.com/watch?v=aai42Qp6L28) for changing gcc version
 
 
 Download pretrained fasterRCNN model [here]() and place in fasterRCNN/models/
+
+
+
+# Citation
+
+```
+@misc{peddi2024scene,
+      title={Towards Scene Graph Anticipation}, 
+      author={Rohith Peddi and Saksham Singh and Saurabh and Parag Singla and Vibhav Gogate},
+      year={2024},
+      eprint={2403.04899},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```
+
+
+

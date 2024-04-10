@@ -24,6 +24,19 @@
 
 
 -------
+### ACKNOWLEDGEMENTS
+
+This code is based on the following awesome repositories. 
+We thank all the authors for releasing their code. 
+
+1. [STTran](https://github.com/yrcong/STTran)
+2. [DSG-DETR](https://github.com/Shengyu-Feng/DSG-DETR)
+3. [Tempura](https://github.com/sayaknag/unbiasedSGG)
+4. [TorchDiffEq](https://github.com/rtqichen/torchdiffeq)
+5. [TorchDyn](https://github.com/DiffEqML/torchdyn)
+
+
+-------
 
 # HOW TO RUN THE CODE
 

@@ -1,4 +1,10 @@
-# UNDER REVIEW
+<h1 align=center>
+  Towards Scene Graph Anticipation
+</h1>
+
+<p align=center>  
+  Rohith Peddi, Saksham Singh, Saurabh, Parag Singla, Vibhav Gogate
+</p>
 
 <div align=center>
   <a src="https://img.shields.io/badge/project-website-green" href="">
@@ -12,13 +18,36 @@
   </a> 
 </div>
 
+<p align="center">
+  (This page is under continuous update)
+</p>
 
-# TASK PICTURE
+----
+
+## UPDATE
+
+**Jun 2024:** Release of pre-trained models and updated code.
+
+**Mar 2024:** Released code for the [paper](https://arxiv.org/pdf/2403.04899v1.pdf) 
+
+
+----
+
+<h3 align=center>
+  TASK PICTURE
+</h3>
+
+
 
 ![TaskPicture](https://github.com/rohithpeddi/SceneSayer/assets/23375299/cd5a7092-7b4f-4711-8835-c6a1ff621162)
 
 
-# TECHNICAL APPROACH
+----
+
+<h3 align=center>
+  TECHNICAL APPROACH
+</h3>
+
 
 ![TechnicalApproach](https://github.com/rohithpeddi/SceneSayer/assets/23375299/43bda602-a9ab-4846-9501-51e2ba4474ad)
 

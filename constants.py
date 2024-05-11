@@ -8,6 +8,7 @@ class Constants:
 	BACKGROUND = "__background__"
 	ANNOTATIONS = "annotations"
 	MINI = "mini"
+	LARGE = "large"
 	METADATA = "metadata"
 	SET = "set"
 	VISIBLE = "visible"

@@ -12,3 +12,6 @@ opencv-python
 pyrebase4
 openpyxl
 networkx
+jupyter
+notebook
+jupyterlab

@@ -37,6 +37,8 @@ class Config(object):
         self.baseline_future = 3
         
         self.hp_recon_loss = 1.0
+
+        self.oracle_disappearance = False
         
         self.use_raw_data = False
         
@@ -64,6 +66,7 @@ class Config(object):
         parser.add_argument('-bbox_ratio', default=0.1, type=float)
         parser.add_argument('-features_path', default=None, type=str)
         parser.add_argument('-additional_data_path', default=None, type=str)
+        parser.add_argument('-oracle_disappearance', action='store_true')
         parser.add_argument('-baseline_context', default=3, type=int)
         parser.add_argument('-baseline_future', default=3, type=int)
         parser.add_argument('-use_raw_data', action='store_true')

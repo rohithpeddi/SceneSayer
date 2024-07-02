@@ -26,7 +26,9 @@
 
 ## UPDATE
 
-**Jun 2024:** Release of pre-trained models and updated code.
+**Aug 2024:** Release of pre-trained models and updated code.
+
+**July 2024:** Towards Scene Graph Anticipation was accepted at ECCV 2024.
 
 **Mar 2024:** Released code for the [paper](https://arxiv.org/pdf/2403.04899v1.pdf) 
 

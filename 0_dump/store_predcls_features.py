@@ -7,8 +7,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from constants import Constants as const
-from dataloader.action_genome import AG, cuda_collate_fn
-from lib.object_detector import Detector
+from dataloader.supervised.generation.action_genome.ag_dataset import AG, cuda_collate_fn
+from lib.object_detector import detector
 from lib.supervised.config import Config
 from logger_config import get_logger, setup_logging
 
@@ -26,7 +26,7 @@ class SupervisedFeatureExtractor:
 		self._initialize_object_detector()
 	
 	def _initialize_object_detector(self):
-		self.predcls_object_detector = Detector(
+		self.predcls_object_detector = detector(
 			train=True,
 			object_classes=self.train_dataset.object_classes,
 			use_SUPPLY=True,

@@ -7,11 +7,11 @@ import pandas as pd
 import torch
 
 from constants import Constants as const
-from lib.object_detector import detector
-from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
-from lib.supervised.biased.dysgg.DyDsgDETR import DyDsgDETR
-from lib.supervised.biased.dysgg.DySTTran import DySTTran
+from lib.object_detector import Detector
+from lib.supervised.dsgdetr.matcher import HungarianMatcher
+from lib.supervised.dsgdetr.track import get_sequence_with_tracking
+from lib.supervised.dysgg import DyDsgDETR
+from lib.supervised.dysgg import DySTTran
 from train_base import fetch_train_basic_config, fetch_loss_functions, save_model, get_sequence_no_tracking, \
 	prepare_optimizer
 
@@ -169,7 +169,7 @@ def test_model(model, object_detector, dataloader_test, ag_test_data, evaluator,
 
 
 def load_object_detector(conf, gpu_device, ag_train_data):
-	object_detector = detector(
+	object_detector = Detector(
 		train=True,
 		object_classes=ag_train_data.object_classes,
 		use_SUPPLY=True,

@@ -4,16 +4,16 @@ import os
 
 import torch
 
-from lib.object_detector import detector
-from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
+from lib.object_detector import Detector
+from lib.supervised.dsgdetr.matcher import HungarianMatcher
 from test_base import (fetch_transformer_test_basic_config, prepare_prediction_graph, get_sequence_no_tracking,
                        send_future_evaluators_stats_to_firebase, write_future_evaluators_stats,
                        write_percentage_evaluators_stats, send_percentage_evaluators_stats_to_firebase)
-from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
-from lib.supervised.biased.sga.sttran_ant import STTranAnt
-from lib.supervised.biased.sga.sttran_gen_ant import STTranGenAnt
-from lib.supervised.biased.sga.dsgdetr_ant import DsgDetrAnt
-from lib.supervised.biased.sga.dsgdetr_gen_ant import DsgDetrGenAnt
+from lib.supervised.dsgdetr.track import get_sequence_with_tracking
+from lib.supervised.sga import STTranAnt
+from lib.supervised.sga import STTranGenAnt
+from lib.supervised.sga import DsgDetrAnt
+from lib.supervised.sga import DsgDetrGenAnt
 
 
 def fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size):
@@ -179,7 +179,7 @@ def load_common_config(conf, ag_test_data, gpu_device):
     matcher = HungarianMatcher(0.5, 1, 1, 0.5)
     matcher.eval()
     
-    object_detector = detector(
+    object_detector = Detector(
         train=False,
         object_classes=ag_test_data.object_classes,
         use_SUPPLY=True,

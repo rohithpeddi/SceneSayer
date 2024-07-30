@@ -284,6 +284,6 @@ class resnet(_fasterRCNN):
 			self.RCNN_base.apply(set_bn_eval)
 			self.RCNN_top.apply(set_bn_eval)
 	
-	def _head_to_tail(self, pool5):
+	def head_to_tail(self, pool5):
 		fc7 = self.RCNN_top(pool5).mean(3).mean(2)
 		return fc7

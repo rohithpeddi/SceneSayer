@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 import torch
 
-from lib.object_detector import Detector
-from lib.supervised.sga import BaselineWithAnticipationGenLoss
+from lib.object_detector import detector
+from lib.supervised.biased.sga.baseline_anticipation_gen_loss import BaselineWithAnticipationGenLoss
 from train_base import fetch_train_basic_config, prepare_optimizer, fetch_transformer_loss_functions, \
 	get_sequence_no_tracking, save_model
 
@@ -330,7 +330,7 @@ def process_test_video(conf, entry, model, gt_annotation, evaluator):
 
 
 def load_object_detector(conf, gpu_device, ag_train_data):
-	object_detector = Detector(
+	object_detector = detector(
 		train=True,
 		object_classes=ag_train_data.object_classes,
 		use_SUPPLY=True,

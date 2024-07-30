@@ -1,18 +1,18 @@
 import numpy as np
 
-from lib.supervised.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.dsgdetr.track import get_sequence_with_tracking
+from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
+from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
 from test_base import fetch_test_basic_config
 
 import copy
 import torch
 from time import time
-from lib.object_detector import Detector
-from lib.supervised.sga import STTran
+from lib.object_detector import detector
+from lib.supervised.biased.sga.forecasting import STTran
 
 
 def test_forecasting():
-	object_detector = Detector(
+	object_detector = detector(
 		train=False,
 		object_classes=ag_features_test.object_classes,
 		use_SUPPLY=True,

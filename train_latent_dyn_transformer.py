@@ -6,13 +6,13 @@ import numpy as np
 import pandas as pd
 import torch
 
-from lib.object_detector import detector
-from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
-from lib.supervised.biased.sga.dsgdetr_ant import DsgDetrAnt
-from lib.supervised.biased.sga.dsgdetr_gen_ant import DsgDetrGenAnt
-from lib.supervised.biased.sga.sttran_ant import STTranAnt
-from lib.supervised.biased.sga.sttran_gen_ant import STTranGenAnt
+from lib.object_detector import Detector
+from lib.supervised.dsgdetr.matcher import HungarianMatcher
+from lib.supervised.dsgdetr.track import get_sequence_with_tracking
+from lib.supervised.sga import DsgDetrAnt
+from lib.supervised.sga import DsgDetrGenAnt
+from lib.supervised.sga import STTranAnt
+from lib.supervised.sga import STTranGenAnt
 from train_base import fetch_train_basic_config, prepare_optimizer, save_model, fetch_transformer_loss_functions, \
     get_sequence_no_tracking, load_model_from_checkpoint
 
@@ -269,7 +269,7 @@ def load_common_config(conf, ag_train_data, gpu_device):
     matcher = HungarianMatcher(0.5, 1, 1, 0.5)
     matcher.eval()
 
-    object_detector = detector(
+    object_detector = Detector(
         train=False,
         object_classes=ag_train_data.object_classes,
         use_SUPPLY=True,
@@ -303,28 +303,28 @@ def train_model():
         print("Begin epoch {:d}".format(epoch))
         assert conf.use_raw_data == True
         print('Training using raw data', flush=True)
-        # train_iter = iter(dataloader_train)
-        # object_detector.is_train = True
-        # model.train()
-        # object_detector.train_x = True
-        # num = 0
-        # start_time = time.time()
-        # for b in range(len(dataloader_train)):
-        #     data = next(train_iter)
-        #     im_data = copy.deepcopy(data[0].cuda(0))
-        #     im_info = copy.deepcopy(data[1].cuda(0))
-        #     gt_boxes = copy.deepcopy(data[2].cuda(0))
-        #     num_boxes = copy.deepcopy(data[3].cuda(0))
-        #     gt_annotation = ag_train_data.gt_annotations[data[4]]
-        #     frame_size = (im_info[0][:2] / im_info[0, 2]).cpu().data
-        #
-        #     with torch.no_grad():
-        #         entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-        #     num = process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_device, dataloader_train,
-        #                               gt_annotation, matcher, frame_size, start_time)
-        # print(f"Finished training an epoch {epoch}")
-        # save_model(model, epoch, checkpoint_save_file_path, checkpoint_name, method_name)
-        # print(f"Saving model after epoch {epoch}")
+        train_iter = iter(dataloader_train)
+        object_detector.is_train = True
+        model.train()
+        object_detector.train_x = True
+        num = 0
+        start_time = time.time()
+        for b in range(len(dataloader_train)):
+            data = next(train_iter)
+            im_data = copy.deepcopy(data[0].cuda(0))
+            im_info = copy.deepcopy(data[1].cuda(0))
+            gt_boxes = copy.deepcopy(data[2].cuda(0))
+            num_boxes = copy.deepcopy(data[3].cuda(0))
+            gt_annotation = ag_train_data.gt_annotations[data[4]]
+            frame_size = (im_info[0][:2] / im_info[0, 2]).cpu().data
+
+            with torch.no_grad():
+                entry = object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+            num = process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_device, dataloader_train,
+                                      gt_annotation, matcher, frame_size, start_time)
+        print(f"Finished training an epoch {epoch}")
+        save_model(model, epoch, checkpoint_save_file_path, checkpoint_name, method_name)
+        print(f"Saving model after epoch {epoch}")
         test_iter = iter(dataloader_test)
         model.eval()
         object_detector.is_train = False

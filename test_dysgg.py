@@ -3,11 +3,11 @@ import os
 
 import torch
 
-from lib.object_detector import detector
-from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
-from lib.supervised.biased.dysgg.DyDsgDETR import DyDsgDETR
-from lib.supervised.biased.dysgg.DySTTran import DySTTran
+from lib.object_detector import Detector
+from lib.supervised.dsgdetr.matcher import HungarianMatcher
+from lib.supervised.dsgdetr.track import get_sequence_with_tracking
+from lib.supervised.dysgg import DyDsgDETR
+from lib.supervised.dysgg import DySTTran
 from test_base import fetch_dysgg_test_basic_config, write_evaluators_stats_dysgg, get_sequence_no_tracking, \
 	send_results_to_firebase
 
@@ -80,7 +80,7 @@ def process_data(model, object_detector, ag_test_data, dataloader_test, gen_eval
 
 
 def load_object_detector(conf, gpu_device, dataset):
-	object_detector = detector(
+	object_detector = Detector(
 		train=True,
 		object_classes=dataset.object_classes,
 		use_SUPPLY=True,

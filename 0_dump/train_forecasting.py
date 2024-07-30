@@ -6,10 +6,11 @@ import time
 import os
 import pandas as pd
 import copy
-from lib.object_detector import Detector
-from lib.supervised.sga import STTran
-from lib.supervised.dsgdetr.track import get_sequence_with_tracking
-from lib.supervised.dsgdetr.matcher import HungarianMatcher
+from lib.object_detector import detector
+from lib.supervised.evaluation_recall import BasicSceneGraphEvaluator
+from lib.supervised.biased.sga.forecasting import STTran
+from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
+from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 from train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions
 
 CONTEXT = 4
@@ -17,8 +18,8 @@ FUTURE = 5
 
 
 def train_forecasting():
-	object_detector = Detector(train=True, object_classes=ag_features_train.object_classes, use_SUPPLY=True,
-                               mode=conf.mode).to(device=gpu_device)
+	object_detector = detector(train=True, object_classes=ag_features_train.object_classes, use_SUPPLY=True,
+	                           mode=conf.mode).to(device=gpu_device)
 	object_detector.eval()
 	
 	model = STTran(mode=conf.mode,

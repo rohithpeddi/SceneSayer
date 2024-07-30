@@ -10,10 +10,10 @@ from torch.utils.data import DataLoader
 
 from analysis.results.FirebaseService import FirebaseService
 from analysis.results.Result import Result, ResultDetails, Metrics
-from dataloader.supervised.generation.action_genome.ag_features import AGFeatures
-from dataloader.supervised.generation.action_genome.ag_features import cuda_collate_fn as ag_features_cuda_collate_fn
-from dataloader.supervised.generation.action_genome.ag_dataset import AG
-from dataloader.supervised.generation.action_genome.ag_dataset import cuda_collate_fn as ag_data_cuda_collate_fn
+from dataloader.action_genome.ag_features import AGFeatures
+from dataloader.action_genome.ag_features import cuda_collate_fn as ag_features_cuda_collate_fn
+from dataloader.action_genome import AG
+from dataloader.action_genome import cuda_collate_fn as ag_data_cuda_collate_fn
 from constants import Constants as const
 from lib.supervised.config import Config
 from lib.supervised.evaluation_recall import BasicSceneGraphEvaluator

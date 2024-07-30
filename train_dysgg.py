@@ -8,8 +8,8 @@ import torch
 
 from constants import Constants as const
 from lib.object_detector import Detector
-from lib.supervised.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.dsgdetr.track import get_sequence_with_tracking
+from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
+from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.dysgg import DyDsgDETR
 from lib.supervised.dysgg import DySTTran
 from train_base import fetch_train_basic_config, fetch_loss_functions, save_model, get_sequence_no_tracking, \

@@ -48,9 +48,9 @@ def prepare_optimizer(model):
 
 
 def train_dsg_detr():
-    from lib.supervised.dsgdetr.dsgdetr import DsgDETR
-    from lib.supervised.dsgdetr.track import get_sequence_with_tracking
-    from lib.supervised.dsgdetr.matcher import HungarianMatcher
+    from lib.supervised.sgg.dsgdetr import DsgDETR
+    from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
+    from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
     from lib.object_detector import Detector
 
     model = DsgDETR(mode=conf.mode,

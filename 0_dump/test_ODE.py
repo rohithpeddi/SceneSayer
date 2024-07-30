@@ -7,8 +7,8 @@ from lib.supervised.sga import ODE as ODE
 
 from constants import Constants as const
 from tqdm import tqdm
-from lib.supervised.dsgdetr.track import get_sequence_with_tracking
-from lib.supervised.dsgdetr.matcher import HungarianMatcher
+from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
+from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
 from test_base import fetch_diffeq_test_basic_config, write_future_evaluators_stats, write_percentage_evaluators_stats, \
 	write_gen_evaluators_stats, evaluate_anticipated_future_frame_scene_graph
 

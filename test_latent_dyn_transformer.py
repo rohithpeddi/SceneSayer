@@ -5,11 +5,11 @@ import os
 import torch
 
 from lib.object_detector import Detector
-from lib.supervised.dsgdetr.matcher import HungarianMatcher
+from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
 from test_base import (fetch_transformer_test_basic_config, prepare_prediction_graph, get_sequence_no_tracking,
                        send_future_evaluators_stats_to_firebase, write_future_evaluators_stats,
                        write_percentage_evaluators_stats, send_percentage_evaluators_stats_to_firebase)
-from lib.supervised.dsgdetr.track import get_sequence_with_tracking
+from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.sga import STTranAnt
 from lib.supervised.sga import STTranGenAnt
 from lib.supervised.sga import DsgDetrAnt

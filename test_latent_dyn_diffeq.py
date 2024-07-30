@@ -5,8 +5,8 @@ from lib.supervised.sga import ODE as ODE
 
 from constants import Constants as const
 from tqdm import tqdm
-from lib.supervised.dsgdetr.track import get_sequence_with_tracking
-from lib.supervised.dsgdetr.matcher import HungarianMatcher
+from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
+from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
 from lib.supervised.sga import SDE
 from test_base import (fetch_diffeq_test_basic_config, write_percentage_evaluators_stats, \
                        prepare_prediction_graph,

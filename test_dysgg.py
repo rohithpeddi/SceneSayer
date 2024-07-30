@@ -4,8 +4,8 @@ import os
 import torch
 
 from lib.object_detector import Detector
-from lib.supervised.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.dsgdetr.track import get_sequence_with_tracking
+from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
+from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.dysgg import DyDsgDETR
 from lib.supervised.dysgg import DySTTran
 from test_base import fetch_dysgg_test_basic_config, write_evaluators_stats_dysgg, get_sequence_no_tracking, \

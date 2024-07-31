@@ -1,6 +1,8 @@
 import copy
 import csv
 import os
+from abc import abstractmethod
+
 import torch
 
 from torch.utils.data import DataLoader
@@ -204,10 +206,11 @@ class TestSGABase(SGABase):
         mode_results_dir = os.path.join(results_dir, self._conf.mode)
         os.makedirs(mode_results_dir, exist_ok=True)
 
+        # TODO: Have train and test future frame windows for the filenames
         # Create the results file
-        """for i, future_frame_window in enumerate(self._future_frame_windows):
+        for i, future_frame_window in enumerate(self._future_frame_windows):
             results_file_path = os.path.join(mode_results_dir,
-                                            f'{self._conf.method_name}_{self._conf.mode}_{self._corruption_name}_{future_frame_window}.csv')
+                                             f'{self._conf.method_name}_{self._conf.mode}_{future_frame_window}.csv')
 
             with open(results_file_path, "a", newline='') as activity_idx_step_idx_annotation_csv_file:
                 writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
@@ -224,11 +227,11 @@ class TestSGABase(SGABase):
                         "hR@100"
                     ])
                     # Write the results row
-                writer.writerow(collated_stats)"""
+                writer.writerow(collated_stats)
 
         for i, context_fraction in enumerate(self._context_fractions):
             results_file_path = os.path.join(mode_results_dir,
-                                             f'{self._conf.method_name}_{self._conf.mode}_{self._corruption_name}_{context_fraction}.csv')
+                                             f'{self._conf.method_name}_{self._conf.mode}_{context_fraction}.csv')
 
             with open(results_file_path, "a", newline='') as activity_idx_step_idx_annotation_csv_file:
                 writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
@@ -266,7 +269,8 @@ class TestSGABase(SGABase):
 
         return metrics
 
-    def _publish_results_to_firebase(self):
+    # TODO: Use this function inside a loop to evaluate all the future frame windows
+    def _publish_results_to_firebase(self, evaluators):
         db_service = FirebaseService()
 
         result = Result(
@@ -276,9 +280,9 @@ class TestSGABase(SGABase):
         )
 
         result_details = ResultDetails()
-        with_constraint_metrics = self._prepare_metrics_from_stats(self._evaluators[0].fetch_stats_json())
-        no_constraint_metrics = self._prepare_metrics_from_stats(self._evaluators[1].fetch_stats_json())
-        semi_constraint_metrics = self._prepare_metrics_from_stats(self._evaluators[2].fetch_stats_json())
+        with_constraint_metrics = self._prepare_metrics_from_stats(evaluators[0].fetch_stats_json())
+        no_constraint_metrics = self._prepare_metrics_from_stats(evaluators[1].fetch_stats_json())
+        semi_constraint_metrics = self._prepare_metrics_from_stats(evaluators[2].fetch_stats_json())
 
         result_details.add_with_constraint_metrics(with_constraint_metrics)
         result_details.add_no_constraint_metrics(no_constraint_metrics)
@@ -297,7 +301,7 @@ class TestSGABase(SGABase):
         self._model.eval()
         self._object_detector.is_train = False
         with torch.no_grad():
-            """for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress",ascii = True):
+            for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress", ascii=True):
                 data = next(test_iter)
                 im_data, im_info, gt_boxes, num_boxes = [copy.deepcopy(d.cuda(0)) for d in data[:4]]
                 gt_annotation = self._test_dataset.gt_annotations[data[4]]
@@ -309,7 +313,7 @@ class TestSGABase(SGABase):
                 for frame_gt_annotation in gt_annotation:
                     frame_id = int(frame_gt_annotation[0][const.FRAME].split('/')[1][:-4])
                     frame_idx_list.append(frame_id)
-                entry[const.FRAME_IDX]= frame_idx_list
+                entry[const.FRAME_IDX] = frame_idx_list
                 # ----------------- Process the video (Method Specific) -----------------
                 pred = self.process_test_video_future_frame(entry, frame_size, gt_annotation)
                 w = self._conf.max_window
@@ -336,10 +340,10 @@ class TestSGABase(SGABase):
                         entry["gt_annotation"][i:],
                         pred_anticipated,
                         future_frame_count=i,
-                        future_evaluators=self._future_frame_evaluators
+                        future_evaluators=self._combined_future_frames_evaluators
                     )
                 # ----------------------------------------------------------------------
-            print('-----------------------------------------------------------------------------------', flush=True)"""
+            print('-----------------------------------------------------------------------------------', flush=True)
             for i, context_fraction in enumerate(self._context_fractions):
                 test_iter = iter(self._dataloader_test)
                 for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress", ascii=True):
@@ -349,7 +353,6 @@ class TestSGABase(SGABase):
                     frame_size = (im_info[0][:2] / im_info[0, 2]).cpu().data
                     entry = self._object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
                     entry["gt_annotation"] = gt_annotation
-                    # To do inside the Dataloader.
                     frame_idx_list = []
                     for frame_gt_annotation in gt_annotation:
                         frame_id = int(frame_gt_annotation[0][const.FRAME].split('/')[1][:-4])
@@ -409,6 +412,18 @@ class TestSGABase(SGABase):
             collate_fn=cuda_collate_fn,
             pin_memory=False
         )
+
+    @abstractmethod
+    def init_model(self):
+        pass
+
+    @abstractmethod
+    def process_test_video_future_frame(self, video_entry, frame_size, gt_annotation):
+        pass
+
+    @abstractmethod
+    def process_test_video_context(self, video_entry, frame_size, gt_annotation, context_fraction):
+        pass
 
     def init_method_evaluation(self):
         diffeq = ["ode", "sde"]

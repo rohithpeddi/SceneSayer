@@ -3,7 +3,7 @@ import os
 import numpy as np
 import torch
 from time import time
-from lib.supervised.sga import SceneSayerODE as ODE
+from lib.supervised.sga import scene_sayer_ode as ODE
 
 from constants import Constants as const
 from tqdm import tqdm

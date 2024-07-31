@@ -126,7 +126,7 @@ class TestODE(TestSgaBase):
         self._matcher = None
 
     def init_model(self):
-        from lib.supervised.sga.SceneSayerODE import SceneSayerODE
+        from lib.supervised.sga.scene_sayer_ode import SceneSayerODE
         from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
 
         self._model = SceneSayerODE(mode=self._conf.mode,
@@ -167,7 +167,7 @@ class TestSDE(TestSgaBase):
         self._matcher = None
 
     def init_model(self):
-        from lib.supervised.sga.SceneSayerSDE import SceneSayerSDE
+        from lib.supervised.sga.scene_sayer_sde import SceneSayerSDE
         from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
 
         self._model = SceneSayerSDE(mode=self._conf.mode,

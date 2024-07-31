@@ -1,13 +1,13 @@
 import os
 
 import torch
-from lib.supervised.sga import SceneSayerODE as ODE
+from lib.supervised.sga import scene_sayer_ode as ODE
 
 from constants import Constants as const
 from tqdm import tqdm
 from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.sga import SceneSayerSDE
+from lib.supervised.sga import scene_sayer_sde
 from test_base import (fetch_diffeq_test_basic_config, write_percentage_evaluators_stats, \
                        prepare_prediction_graph,
                        modify_pred_dict_disappearance_diffeq)

@@ -3,7 +3,7 @@ import torch
 
 from test_base import fetch_diffeq_test_basic_config
 from time import time
-from lib.supervised.sga import SceneSayerSDE as SDE
+from lib.supervised.sga import scene_sayer_sde as SDE
 
 from constants import Constants as const
 from tqdm import tqdm

@@ -126,17 +126,17 @@ class TestODE(TestSgaBase):
         self._matcher = None
 
     def init_model(self):
-        from lib.supervised.sga.ODE import ODE
+        from lib.supervised.sga.SceneSayerODE import SceneSayerODE
         from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
 
-        self._model = ODE(mode=self._conf.mode,
-                          attention_class_num=len(self._test_dataset.attention_relationships),
-                          spatial_class_num=len(self._test_dataset.spatial_relationships),
-                          contact_class_num=len(self._test_dataset.contacting_relationships),
-                          obj_classes=self._test_dataset.object_classes,
-                          enc_layer_num=self._conf.enc_layer,
-                          dec_layer_num=self._conf.dec_layer,
-                          max_window=self._conf.max_window).to(device=self._device)
+        self._model = SceneSayerODE(mode=self._conf.mode,
+                                    attention_class_num=len(self._test_dataset.attention_relationships),
+                                    spatial_class_num=len(self._test_dataset.spatial_relationships),
+                                    contact_class_num=len(self._test_dataset.contacting_relationships),
+                                    obj_classes=self._test_dataset.object_classes,
+                                    enc_layer_num=self._conf.enc_layer,
+                                    dec_layer_num=self._conf.dec_layer,
+                                    max_window=self._conf.max_window).to(device=self._device)
 
         self._matcher = HungarianMatcher(0.5, 1, 1, 0.5)
         self._matcher.eval()
@@ -167,18 +167,18 @@ class TestSDE(TestSgaBase):
         self._matcher = None
 
     def init_model(self):
-        from lib.supervised.sga.SDE import SDE
+        from lib.supervised.sga.SceneSayerSDE import SceneSayerSDE
         from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
 
-        self._model = SDE(mode=self._conf.mode,
-                          attention_class_num=len(self._test_dataset.attention_relationships),
-                          spatial_class_num=len(self._test_dataset.spatial_relationships),
-                          contact_class_num=len(self._test_dataset.contacting_relationships),
-                          obj_classes=self._test_dataset.object_classes,
-                          enc_layer_num=self._conf.enc_layer,
-                          dec_layer_num=self._conf.dec_layer,
-                          max_window=self._conf.max_window,
-                          brownian_size=self._conf.brownian_size).to(device=self._device)
+        self._model = SceneSayerSDE(mode=self._conf.mode,
+                                    attention_class_num=len(self._test_dataset.attention_relationships),
+                                    spatial_class_num=len(self._test_dataset.spatial_relationships),
+                                    contact_class_num=len(self._test_dataset.contacting_relationships),
+                                    obj_classes=self._test_dataset.object_classes,
+                                    enc_layer_num=self._conf.enc_layer,
+                                    dec_layer_num=self._conf.dec_layer,
+                                    max_window=self._conf.max_window,
+                                    brownian_size=self._conf.brownian_size).to(device=self._device)
 
         self._matcher = HungarianMatcher(0.5, 1, 1, 0.5)
         self._matcher.eval()

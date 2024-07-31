@@ -14,7 +14,7 @@ from constants import Constants as const
 
 from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
-from lib.supervised.sga import SDE as SDE
+from lib.supervised.sga import SceneSayerSDE as SDE
 
 from train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions
 

@@ -3,7 +3,7 @@ import os
 import numpy as np
 import torch
 from time import time
-from lib.supervised.sga import ODE as ODE
+from lib.supervised.sga import SceneSayerODE as ODE
 
 from constants import Constants as const
 from tqdm import tqdm
@@ -92,9 +92,9 @@ def test_ode():
 				denominator[mask_gt] += 1 / (times[mask_gt] - times[mask_curr] + 1)
 			global_output_mod = global_output_mod / torch.reshape(denominator, (-1, 1))
 			pred["global_output"] = global_output_mod
-			pred["attention_distribution"] = ode.dsgdetr.a_rel_compress(global_output)
-			pred["spatial_distribution"] = ode.dsgdetr.s_rel_compress(global_output)
-			pred["contacting_distribution"] = ode.dsgdetr.c_rel_compress(global_output)
+			pred["attention_distribution"] = ode.base_ldpu.a_rel_compress(global_output)
+			pred["spatial_distribution"] = ode.base_ldpu.s_rel_compress(global_output)
+			pred["contacting_distribution"] = ode.base_ldpu.c_rel_compress(global_output)
 			pred["spatial_distribution"] = torch.sigmoid(pred["spatial_distribution"])
 			pred["contacting_distribution"] = torch.sigmoid(pred["contacting_distribution"])
 			gen_evaluators[0].evaluate_scene_graph(gt_annotation, pred)

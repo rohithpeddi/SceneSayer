@@ -3,7 +3,7 @@ import torch
 
 from test_base import fetch_diffeq_test_basic_config
 from time import time
-from lib.supervised.sga import SDE as SDE
+from lib.supervised.sga import SceneSayerSDE as SDE
 
 from constants import Constants as const
 from tqdm import tqdm
@@ -198,9 +198,9 @@ def test_sde():
                 denominator[mask_gt] += 1 / (times[mask_gt] - times[mask_curr] + 1)
             global_output_mod = global_output_mod / torch.reshape(denominator, (-1, 1))
             pred["global_output"] = global_output_mod
-            pred["attention_distribution"] = sde.dsgdetr.a_rel_compress(global_output)
-            pred["spatial_distribution"] = sde.dsgdetr.s_rel_compress(global_output)
-            pred["contacting_distribution"] = sde.dsgdetr.c_rel_compress(global_output)
+            pred["attention_distribution"] = sde.base_ldpu.a_rel_compress(global_output)
+            pred["spatial_distribution"] = sde.base_ldpu.s_rel_compress(global_output)
+            pred["contacting_distribution"] = sde.base_ldpu.c_rel_compress(global_output)
             pred["spatial_distribution"] = torch.sigmoid(pred["spatial_distribution"])
             pred["contacting_distribution"] = torch.sigmoid(pred["contacting_distribution"])
             gen_evaluators[0].evaluate_scene_graph(gt_annotation, pred)

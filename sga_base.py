@@ -71,7 +71,7 @@ class SGABase:
         print("*" * 40)
 
     def _init_evaluators(self):
-        # For SGG set iou_threshold=0.5
+        # For VidSGG set iou_threshold=0.5
         # For SGA set iou_threshold=0
         self._evaluator = BasicSceneGraphEvaluator(
             mode=self._conf.mode,

@@ -26,7 +26,7 @@
 
 ## UPDATE
 
-**Aug 2024:** Our submission is accepted as an **Oral Presentation**. 
+**Aug 2024:** Our submission is accepted as an **Oral Presentation** in ECCV. 
 
 **Aug 2024:** Release of pre-trained models and updated code (In progress).
 

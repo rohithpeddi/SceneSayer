@@ -18,8 +18,8 @@ from sga_base import SGABase
 
 class TrainSGABase(SGABase):
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, conf):
+        super().__init__(conf)
         self._model = None
 
         # Load while initializing the object detector
@@ -73,50 +73,17 @@ class TrainSGABase(SGABase):
                 pred = self.process_train_video(entry, frame_size)
                 # ----------------------------------------------------------------------
 
-                attention_distribution = pred[const.ATTENTION_DISTRIBUTION]
-                spatial_distribution = pred[const.SPATIAL_DISTRIBUTION]
-                contact_distribution = pred[const.CONTACTING_DISTRIBUTION]
-
-                attention_label = torch.tensor(pred[const.ATTENTION_GT], dtype=torch.long).to(
-                    device=attention_distribution.device).squeeze()
-                if not self._conf.bce_loss:
-                    # Adjust Labels for MLM Loss
-                    spatial_label = -torch.ones([len(pred[const.SPATIAL_GT]), 6], dtype=torch.long).to(
-                        device=attention_distribution.device)
-                    contact_label = -torch.ones([len(pred[const.CONTACTING_GT]), 17], dtype=torch.long).to(
-                        device=attention_distribution.device)
-                    for i in range(len(pred[const.SPATIAL_GT])):
-                        spatial_label[i, : len(pred[const.SPATIAL_GT][i])] = torch.tensor(pred[const.SPATIAL_GT][i])
-                        contact_label[i, : len(pred[const.CONTACTING_GT][i])] = torch.tensor(
-                            pred[const.CONTACTING_GT][i])
-                else:
-                    # Adjust Labels for BCE Loss
-                    spatial_label = torch.zeros([len(pred[const.SPATIAL_GT]), 6], dtype=torch.float32).to(
-                        device=attention_distribution.device)
-                    contact_label = torch.zeros([len(pred[const.CONTACTING_GT]), 17], dtype=torch.float32).to(
-                        device=attention_distribution.device)
-                    for i in range(len(pred[const.SPATIAL_GT])):
-                        spatial_label[i, pred[const.SPATIAL_GT][i]] = 1
-                        contact_label[i, pred[const.CONTACTING_GT][i]] = 1
-
-                losses = {}
-                if self._conf.mode == const.SGCLS or self._conf.mode == const.SGDET:
-                    losses[const.OBJECT_LOSS] = self._ce_loss(pred[const.DISTRIBUTION], pred[const.LABELS])
-                losses[const.ATTENTION_RELATION_LOSS] = self._ce_loss(attention_distribution, attention_label)
-                if not self._conf.bce_loss:
-                    losses[const.SPATIAL_RELATION_LOSS] = self._mlm_loss(spatial_distribution, spatial_label)
-                    losses[const.CONTACTING_RELATION_LOSS] = self._mlm_loss(contact_distribution, contact_label)
-                else:
-                    losses[const.SPATIAL_RELATION_LOSS] = self._bce_loss(spatial_distribution, spatial_label)
-                    losses[const.CONTACTING_RELATION_LOSS] = self._bce_loss(contact_distribution, contact_label)
+                # ----------------- Compute the loss (Method Specific)-----------------
+                losses = self.compute_loss(pred, gt_annotation)
+                # ----------------------------------------------------------------------
 
                 self._optimizer.zero_grad()
                 loss = sum(losses.values())
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self._model.parameters(), max_norm=5, norm_type=2)
                 self._optimizer.step()
-
                 tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
+                counter += 1
 
                 if counter % 1000 == 0 and counter >= 1000:
                     time_per_batch = (time.time() - start_time) / 1000
@@ -155,7 +122,10 @@ class TrainSGABase(SGABase):
                     pred = self.process_test_video(entry, frame_size)
                     # ----------------------------------------------------------------------
 
-                    self._evaluator.evaluate_scene_graph(gt_annotation, pred)
+                    # ----------------- Process evaluation score (Method Specific)-----------------
+                    self.process_evaluation_score(pred, gt_annotation)
+                    # ----------------------------------------------------------------------
+
                 print('-----------------------------------------------------------------------------------', flush=True)
             score = np.mean(self._evaluator.result_dict[self._conf.mode + "_recall"][20])
             self._evaluator.print_stats()
@@ -200,4 +170,22 @@ class TrainSGABase(SGABase):
 
     @abstractmethod
     def process_test_video(self, video, frame_size) -> dict:
+        pass
+
+    @abstractmethod
+    def compute_loss(self, pred, gt) -> dict:
+        pass
+
+    @abstractmethod
+    def process_evaluation_score(self, pred, gt):
+        pass
+
+    # TODO: Fill the following methods describing various loss functions
+    def compute_scene_sayer_loss(self, pred, gt):
+        pass
+
+    def compute_baseline_ant_loss(self, pred, gt):
+        pass
+
+    def compute_baseline_gen_ant_loss(self, pred, gt):
         pass

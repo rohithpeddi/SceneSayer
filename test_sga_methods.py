@@ -1,40 +1,6 @@
-"""
-1. STTran
-2. DsgDetr
-3. Tempura
-4. Trace
-"""
 import torch
 from lib.supervised.config import Config
 from test_sga_base import TestSGABase
-
-
-def get_sequence_no_tracking(entry, task="sgcls"):
-    if task == "predcls":
-        indices = []
-        for i in entry["labels"].unique():
-            indices.append(torch.where(entry["labels"] == i)[0])
-        entry["indices"] = indices
-        return
-
-    if task == "sgdet" or task == "sgcls":
-        # for sgdet, use the predicted object classes, as a special case of
-        # the proposed method, comment this out for general coase tracking.
-        indices = [[]]
-        # indices[0] store single-element sequence, to save memory
-        pred_labels = torch.argmax(entry["distribution"], 1)
-        for i in pred_labels.unique():
-            index = torch.where(pred_labels == i)[0]
-            if len(index) == 1:
-                indices[0].append(index)
-            else:
-                indices.append(index)
-        if len(indices[0]) > 0:
-            indices[0] = torch.cat(indices[0])
-        else:
-            indices[0] = torch.tensor([])
-        entry["indices"] = indices
-        return
 
 
 class TestODE(TestSGABase):

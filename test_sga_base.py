@@ -368,7 +368,7 @@ class TestSGABase(SGABase):
                 print('-----------------------------------------------------------------------------------', flush=True)
 
     def _test_model_transformer(self):
-        test_iter = iter(self._dataloader_test)
+        iter(self._dataloader_test)
         self._model.eval()
         self._object_detector.is_train = False
         with torch.no_grad():

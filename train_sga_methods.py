@@ -21,7 +21,7 @@ class TrainSttranAnt(TrainSGABase):
         raise NotImplementedError
 
     def compute_loss(self, pred, gt) -> dict:
-        losses = self.compute_baseline_ant_loss(pred, gt)
+        losses = self.compute_baseline_ant_loss(pred)
         return losses
 
     def process_evaluation_score(self, pred, gt):
@@ -42,7 +42,7 @@ class TrainSttranGenAnt(TrainSGABase):
         raise NotImplementedError
 
     def compute_loss(self, pred, gt) -> dict:
-        losses = self.compute_baseline_gen_ant_loss(pred, gt)
+        losses = self.compute_baseline_gen_ant_loss(pred)
         return losses
 
     def process_evaluation_score(self, pred, gt):
@@ -63,7 +63,7 @@ class TrainDsgDetrAnt(TrainSGABase):
         raise NotImplementedError
 
     def compute_loss(self, pred, gt) -> dict:
-        losses = self.compute_baseline_ant_loss(pred, gt)
+        losses = self.compute_baseline_ant_loss(pred)
         return losses
 
     def process_evaluation_score(self, pred, gt):
@@ -84,7 +84,7 @@ class TrainDsgDetrGenAnt(TrainSGABase):
         raise NotImplementedError
 
     def compute_loss(self, pred, gt) -> dict:
-        losses = self.compute_baseline_gen_ant_loss(pred, gt)
+        losses = self.compute_baseline_gen_ant_loss(pred)
         return losses
 
     def process_evaluation_score(self, pred, gt):

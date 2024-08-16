@@ -29,9 +29,24 @@ class SceneSayerSDEDerivatives(nn.Module):
 
 
 class SceneSayerSDE(BaseLDPUDiffEq):
-    def __init__(self, mode, attention_class_num=None, spatial_class_num=None, contact_class_num=None, obj_classes=None,
-                 rel_classes=None, max_window=None, brownian_size=None):
-        super(SceneSayerSDE, self).__init__()
+    def __init__(self,
+                 mode,
+                 attention_class_num=None,
+                 spatial_class_num=None,
+                 contact_class_num=None,
+                 obj_classes=None,
+                 rel_classes=None,
+                 max_window=None,
+                 brownian_size=None):
+        super(SceneSayerSDE, self).__init__(
+            mode,
+            attention_class_num=attention_class_num,
+            spatial_class_num=spatial_class_num,
+            contact_class_num=contact_class_num,
+            obj_classes=obj_classes,
+            rel_classes=rel_classes,
+            max_window=max_window,
+        )
         self.mode = mode
         self.diff_func = SceneSayerSDEDerivatives(brownian_size)
         self.obj_classes = obj_classes

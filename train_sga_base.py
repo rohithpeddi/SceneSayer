@@ -30,9 +30,6 @@ class TrainSGABase(SGABase):
         self._test_dataset = None
         self._object_classes = None
 
-        # Load checkpoint name
-        self._checkpoint_name = None
-
     def _init_diffeq_loss_functions(self):
         self._bce_loss = nn.BCELoss()
         self._ce_loss = nn.CrossEntropyLoss()
@@ -107,7 +104,7 @@ class TrainSGABase(SGABase):
             self._save_model(
                 model=self._model,
                 epoch=epoch,
-                checkpoint_save_file_path=self._conf.save_path,
+                checkpoint_save_file_path=self._checkpoint_save_file_path,
                 checkpoint_name=self._checkpoint_name,
                 method_name=self._conf.method_name
             )
@@ -469,10 +466,10 @@ class TrainSGABase(SGABase):
         return losses
 
     def compute_baseline_gen_ant_loss(self, pred):
-        context = self._conf.baseline_context
-        future = self._conf.baseline_future
         count = 0
         start = 0
+        context = self._conf.baseline_context
+        future = self._conf.baseline_future
         total_frames = len(pred["im_idx"].unique())
 
         losses = {}
@@ -507,3 +504,23 @@ class TrainSGABase(SGABase):
     @abstractmethod
     def process_evaluation_score(self, pred, gt_annotation):
         pass
+
+    def init_method_training(self):
+        # 0. Initialize the config
+        self._init_config()
+
+        # 1. Initialize the dataset
+        self.init_dataset()
+
+        # 2. Initialize evaluators
+        self._init_evaluators()
+
+        # 3. Initialize and load pre-trained models
+        self.init_model()
+        self._load_checkpoint()
+        self._init_object_detector()
+
+        # 4. Initialize model training
+        self._train_model()
+
+

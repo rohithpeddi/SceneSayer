@@ -1,3 +1,4 @@
+from lib.supervised.config import Config
 from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
 from train_sga_base import TrainSGABase
 
@@ -6,7 +7,7 @@ from train_sga_base import TrainSGABase
 # ------------------------------- BASELINE METHODS ---------------------------------
 # -------------------------------------------------------------------------------------
 
-class TrainSttranAnt(TrainSGABase):
+class TrainSTTranAnt(TrainSGABase):
 
     def __init__(self, conf):
         super().__init__(conf)
@@ -43,7 +44,7 @@ class TrainSttranAnt(TrainSGABase):
         self.compute_baseline_evaluation_score(pred, gt)
 
 
-class TrainSttranGenAnt(TrainSGABase):
+class TrainSTTranGenAnt(TrainSGABase):
 
     def __init__(self, conf):
         super().__init__(conf)
@@ -234,3 +235,29 @@ class TrainSDE(TrainSGABase):
 
     def process_evaluation_score(self, pred, gt):
         self.compute_scene_sayer_evaluation_score(pred, gt)
+
+
+# -------------------------------------------------------------------------------------
+
+def main():
+    conf = Config()
+    if conf.method_name == "ode":
+        evaluate_class = TrainODE(conf)
+    elif conf.method_name == "sde":
+        evaluate_class = TrainSDE(conf)
+    elif conf.method_name == "sttran_ant":
+        evaluate_class = TrainSTTranAnt(conf)
+    elif conf.method_name == "sttran_gen_ant":
+        evaluate_class = TrainSTTranGenAnt(conf)
+    elif conf.method_name == "dsgdetr_ant":
+        evaluate_class = TrainDsgDetrAnt(conf)
+    elif conf.method_name == "dsgdetr_gen_ant":
+        evaluate_class = TrainDsgDetrGenAnt(conf)
+    else:
+        raise NotImplementedError
+
+    evaluate_class.init_method_training()
+
+
+if __name__ == "__main__":
+    main()

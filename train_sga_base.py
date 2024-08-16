@@ -8,12 +8,9 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
-from constants import Constants as const
 from dataloader.action_genome.ag_dataset import AG
-
 from dataloader.action_genome.ag_dataset import cuda_collate_fn
 from lib.object_detector import Detector
-from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
 from sga_base import SGABase
 
 
@@ -36,10 +33,18 @@ class TrainSGABase(SGABase):
         # Load checkpoint name
         self._checkpoint_name = None
 
-    def _init_loss_functions(self):
+    def _init_diffeq_loss_functions(self):
         self._bce_loss = nn.BCELoss()
         self._ce_loss = nn.CrossEntropyLoss()
         self._mlm_loss = nn.MultiLabelMarginLoss()
+        self._bbox_loss = nn.SmoothL1Loss()
+        self._abs_loss = nn.L1Loss()
+        self._mse_loss = nn.MSELoss()
+
+    def _init_transformer_loss_functions(self):
+        self._bce_loss = nn.BCELoss(reduction='none')
+        self._ce_loss = nn.CrossEntropyLoss(reduction='none')
+        self._mlm_loss = nn.MultiLabelMarginLoss(reduction='none')
         self._bbox_loss = nn.SmoothL1Loss()
         self._abs_loss = nn.L1Loss()
         self._mse_loss = nn.MSELoss()
@@ -71,7 +76,7 @@ class TrainSGABase(SGABase):
                     entry = self._object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
 
                 # ----------------- Process the video (Method Specific)-----------------
-                pred = self.process_train_video(entry, frame_size)
+                pred = self.process_train_video(entry, gt_annotation, frame_size)
                 # ----------------------------------------------------------------------
 
                 # ----------------- Compute the loss (Method Specific)-----------------
@@ -164,22 +169,6 @@ class TrainSGABase(SGABase):
             collate_fn=cuda_collate_fn,
             pin_memory=False
         )
-
-    @abstractmethod
-    def process_train_video(self, video, frame_size) -> dict:
-        pass
-
-    @abstractmethod
-    def process_test_video(self, entry, gt_annotation, frame_size) -> dict:
-        pass
-
-    @abstractmethod
-    def compute_loss(self, pred, gt) -> dict:
-        pass
-
-    @abstractmethod
-    def process_evaluation_score(self, pred, gt_annotation):
-        pass
 
     def compute_scene_sayer_evaluation_score(self, pred, gt_annotation):
         w = self._conf.max_window
@@ -502,3 +491,19 @@ class TrainSGABase(SGABase):
         losses = self.compute_gen_loss(pred, losses)
 
         return losses
+
+    @abstractmethod
+    def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
+        pass
+
+    @abstractmethod
+    def process_test_video(self, entry, gt_annotation, frame_size) -> dict:
+        pass
+
+    @abstractmethod
+    def compute_loss(self, pred, gt) -> dict:
+        pass
+
+    @abstractmethod
+    def process_evaluation_score(self, pred, gt_annotation):
+        pass

@@ -1,4 +1,3 @@
-from constants import Constants as const
 from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
 from train_sga_base import TrainSGABase
 
@@ -22,7 +21,9 @@ class TrainSttranAnt(TrainSGABase):
                                 enc_layer_num=self._conf.enc_layer,
                                 dec_layer_num=self._conf.dec_layer).to(device=self._device)
 
-    def process_train_video(self, entry, frame_size) -> dict:
+        self._init_transformer_loss_functions()
+
+    def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
         self.get_sequence_no_tracking(entry, self._conf.mode)
         pred = self._model(entry, self._conf.baseline_context, self._conf.baseline_future)
         return pred
@@ -58,7 +59,9 @@ class TrainSttranGenAnt(TrainSGABase):
                                    enc_layer_num=self._conf.enc_layer,
                                    dec_layer_num=self._conf.dec_layer).to(device=self._device)
 
-    def process_train_video(self, entry, frame_size) -> dict:
+        self._init_transformer_loss_functions()
+
+    def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
         self.get_sequence_no_tracking(entry, self._conf.mode)
         pred = self._model(entry, self._conf.baseline_context, self._conf.baseline_future)
         return pred
@@ -95,9 +98,10 @@ class TrainDsgDetrAnt(TrainSGABase):
                                  enc_layer_num=self._conf.enc_layer,
                                  dec_layer_num=self._conf.dec_layer).to(device=self._device)
         self._init_matcher()
+        self._init_transformer_loss_functions()
 
-    def process_train_video(self, entry, frame_size) -> dict:
-        self.get_sequence_no_tracking(entry, self._conf.mode)
+    def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
+        get_sequence_with_tracking(self._conf, entry, gt_annotation, self._matcher, frame_size)
         pred = self._model(entry, self._conf.baseline_context, self._conf.baseline_future)
         return pred
 
@@ -133,9 +137,10 @@ class TrainDsgDetrGenAnt(TrainSGABase):
                                     enc_layer_num=self._conf.enc_layer,
                                     dec_layer_num=self._conf.dec_layer).to(device=self._device)
         self._init_matcher()
+        self._init_transformer_loss_functions()
 
-    def process_train_video(self, entry, frame_size) -> dict:
-        self.get_sequence_no_tracking(entry, self._conf.mode)
+    def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
+        get_sequence_with_tracking(self._conf, entry, gt_annotation, self._matcher, frame_size)
         pred = self._model(entry, self._conf.baseline_context, self._conf.baseline_future)
         return pred
 
@@ -162,11 +167,21 @@ class TrainODE(TrainSGABase):
 
     def __init__(self, conf):
         super().__init__(conf)
-        self._init_matcher()
 
-    def process_train_video(self, entry, frame_size) -> dict:
-        gt_annotation = entry[const.GT_ANNOTATION]
-        frame_size = entry[const.FRAME_SIZE]
+    def init_model(self):
+        from lib.supervised.sga.scene_sayer_ode import SceneSayerODE
+
+        self._model = SceneSayerODE(mode=self._conf.mode,
+                                    attention_class_num=len(self._test_dataset.attention_relationships),
+                                    spatial_class_num=len(self._test_dataset.spatial_relationships),
+                                    contact_class_num=len(self._test_dataset.contacting_relationships),
+                                    obj_classes=self._test_dataset.object_classes,
+                                    max_window=self._conf.max_window).to(device=self._device)
+
+        self._init_matcher()
+        self._init_diffeq_loss_functions()
+
+    def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
         get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
         pred = self._model(entry)
         return pred
@@ -188,11 +203,22 @@ class TrainSDE(TrainSGABase):
 
     def __init__(self, conf):
         super().__init__(conf)
-        self._init_matcher()
 
-    def process_train_video(self, entry, frame_size) -> dict:
-        gt_annotation = entry[const.GT_ANNOTATION]
-        frame_size = entry[const.FRAME_SIZE]
+    def init_model(self):
+        from lib.supervised.sga.scene_sayer_sde import SceneSayerSDE
+
+        self._model = SceneSayerSDE(mode=self._conf.mode,
+                                    attention_class_num=len(self._test_dataset.attention_relationships),
+                                    spatial_class_num=len(self._test_dataset.spatial_relationships),
+                                    contact_class_num=len(self._test_dataset.contacting_relationships),
+                                    obj_classes=self._test_dataset.object_classes,
+                                    max_window=self._conf.max_window,
+                                    brownian_size=self._conf.brownian_size).to(device=self._device)
+
+        self._init_matcher()
+        self._init_diffeq_loss_functions()
+
+    def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
         get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
         pred = self._model(entry)
         return pred

@@ -95,13 +95,14 @@ class TrainODE(TrainSGABase):
         raise NotImplementedError
 
     def compute_loss(self, pred, gt) -> dict:
-        raise NotImplementedError
+        losses = self.compute_scene_sayer_loss(pred, self._conf.ode_ratio)
+        return losses
 
     def process_evaluation_score(self, pred, gt):
         raise NotImplementedError
 
 
-class TestSDE(TrainSGABase):
+class TrainSDE(TrainSGABase):
 
     def __init__(self, conf):
         super().__init__(conf)
@@ -113,7 +114,8 @@ class TestSDE(TrainSGABase):
         raise NotImplementedError
 
     def compute_loss(self, pred, gt) -> dict:
-        raise NotImplementedError
+        losses = self.compute_scene_sayer_loss(pred, self._conf.sde_ratio)
+        return losses
 
     def process_evaluation_score(self, pred, gt):
         raise NotImplementedError

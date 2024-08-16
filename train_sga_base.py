@@ -180,9 +180,98 @@ class TrainSGABase(SGABase):
     def process_evaluation_score(self, pred, gt):
         pass
 
-    # TODO: Fill the following methods describing various loss functions
-    def compute_scene_sayer_loss(self, pred, gt):
-        pass
+    def compute_scene_sayer_loss(self, pred, model_ratio):
+        """
+        Use this method to compute the loss for the scene sayer models
+        """
+        global_output = pred["global_output"]
+        spatial_distribution = pred["spatial_distribution"]
+        contact_distribution = pred["contacting_distribution"]
+        attention_distribution = pred["attention_distribution"]
+        subject_boxes_rcnn = pred["subject_boxes_rcnn"]
+        # object_boxes_rcnn = pred["object_boxes_rcnn"]
+        subject_boxes_dsg = pred["subject_boxes_dsg"]
+        # object_boxes_dsg = pred["object_boxes_dsg"]
+
+        anticipated_global_output = pred["anticipated_vals"]
+        anticipated_subject_boxes = pred["anticipated_subject_boxes"]
+        # targets = pred["detached_outputs"]
+        anticipated_spatial_distribution = pred["anticipated_spatial_distribution"]
+        anticipated_contact_distribution = pred["anticipated_contacting_distribution"]
+        anticipated_attention_distribution = pred["anticipated_attention_distribution"]
+        # anticipated_object_boxes = pred["anticipated_object_boxes"]
+
+        attention_label = torch.tensor(pred["attention_gt"], dtype=torch.long).to \
+            (device=attention_distribution.device).squeeze()
+        if not self._conf.bce_loss:
+            # multi-label margin loss or adaptive loss
+            spatial_label = -torch.ones([len(pred["spatial_gt"]), 6], dtype=torch.long).to \
+                (device=attention_distribution.device)
+            contact_label = -torch.ones([len(pred["contacting_gt"]), 17], dtype=torch.long).to \
+                (device=attention_distribution.device)
+            for i in range(len(pred["spatial_gt"])):
+                spatial_label[i, : len(pred["spatial_gt"][i])] = torch.tensor(pred["spatial_gt"][i])
+                contact_label[i, : len(pred["contacting_gt"][i])] = torch.tensor(pred["contacting_gt"][i])
+
+        else:
+            # bce loss
+            spatial_label = torch.zeros([len(pred["spatial_gt"]), 6], dtype=torch.float32).to \
+                (device=attention_distribution.device)
+            contact_label = torch.zeros([len(pred["contacting_gt"]), 17], dtype=torch.float32).to \
+                (device=attention_distribution.device)
+            for i in range(len(pred["spatial_gt"])):
+                spatial_label[i, pred["spatial_gt"][i]] = 1
+                contact_label[i, pred["contacting_gt"][i]] = 1
+        losses = {}
+        if self._conf.mode == 'sgcls' or self._conf.mode == 'sgdet':
+            losses['object_loss'] = self._ce_loss(pred['distribution'], pred['labels'])
+
+        losses["attention_relation_loss"] = self._ce_loss(attention_distribution, attention_label)
+        losses["subject_boxes_loss"] = self._conf.bbox_ratio * self._bbox_loss(subject_boxes_dsg, subject_boxes_rcnn)
+        # losses["object_boxes_loss"] = bbox_ratio * bbox_loss(object_boxes_dsg, object_boxes_rcnn)
+        losses["anticipated_latent_loss"] = 0
+        losses["anticipated_subject_boxes_loss"] = 0
+        losses["anticipated_spatial_relation_loss"] = 0
+        losses["anticipated_contact_relation_loss"] = 0
+        losses["anticipated_attention_relation_loss"] = 0
+        # losses["anticipated_object_boxes_loss"] = 0
+        if not self._conf.bce_loss:
+            losses["spatial_relation_loss"] = self._mlm_loss(spatial_distribution, spatial_label)
+            losses["contact_relation_loss"] = self._mlm_loss(contact_distribution, contact_label)
+            for i in range(1, self._conf.max_window + 1):
+                mask_curr = pred["mask_curr_" + str(i)]
+                mask_gt = pred["mask_gt_" + str(i)]
+                losses["anticipated_latent_loss"] += model_ratio * self._abs_loss(
+                    anticipated_global_output[i - 1][mask_curr],
+                    global_output[mask_gt])
+                losses["anticipated_subject_boxes_loss"] += self._conf.bbox_ratio * self._bbox_loss \
+                    (anticipated_subject_boxes[i - 1][mask_curr], subject_boxes_rcnn[mask_gt])
+                losses["anticipated_spatial_relation_loss"] += self._mlm_loss \
+                    (anticipated_spatial_distribution[i - 1][mask_curr], spatial_label[mask_gt])
+                losses["anticipated_contact_relation_loss"] += self._mlm_loss \
+                    (anticipated_contact_distribution[i - 1][mask_curr], contact_label[mask_gt])
+                losses["anticipated_attention_relation_loss"] += self._ce_loss \
+                    (anticipated_attention_distribution[i - 1][mask_curr], attention_label[mask_gt])
+        # losses["anticipated_object_boxes_loss"] += bbox_ratio * bbox_loss(anticipated_object_boxes[i - 1][mask_curr], object_boxes_rcnn[mask_gt])
+        else:
+            losses["spatial_relation_loss"] = self._bce_loss(spatial_distribution, spatial_label)
+            losses["contact_relation_loss"] = self._bce_loss(contact_distribution, contact_label)
+            for i in range(1, self._conf.max_window + 1):
+                mask_curr = pred["mask_curr_" + str(i)]
+                mask_gt = pred["mask_gt_" + str(i)]
+                losses["anticipated_latent_loss"] += model_ratio * self._abs_loss(
+                    anticipated_global_output[i - 1][mask_curr],
+                    global_output[mask_gt])
+                losses["anticipated_subject_boxes_loss"] += self._conf.bbox_ratio * self._bbox_loss \
+                    (anticipated_subject_boxes[i - 1][mask_curr], subject_boxes_rcnn[mask_gt])
+                losses["anticipated_spatial_relation_loss"] += self._bce_loss \
+                    (anticipated_spatial_distribution[i - 1][mask_curr], spatial_label[mask_gt])
+                losses["anticipated_contact_relation_loss"] += self._bce_loss \
+                    (anticipated_contact_distribution[i - 1][mask_curr], contact_label[mask_gt])
+                losses["anticipated_attention_relation_loss"] += self._ce_loss \
+                    (anticipated_attention_distribution[i - 1][mask_curr], attention_label[mask_gt])
+
+        return losses
 
     def compute_baseline_ant_loss(self, pred, gt):
         pass

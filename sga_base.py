@@ -8,6 +8,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from constants import Constants as const
 from lib.AdamW import AdamW
 from lib.supervised.evaluation_recall import BasicSceneGraphEvaluator
+from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
 
 
 class SGABase:
@@ -46,6 +47,10 @@ class SGABase:
     def _init_scheduler(self):
         self._scheduler = ReduceLROnPlateau(self._optimizer, "max", patience=1, factor=0.5, verbose=True,
                                             threshold=1e-4, threshold_mode="abs", min_lr=1e-7)
+
+    def _init_matcher(self):
+        self._matcher = HungarianMatcher(0.5, 1, 1, 0.5)
+        self._matcher.eval()
 
     def _load_checkpoint(self):
         if self._model is None:
@@ -87,6 +92,10 @@ class SGABase:
 
     @abstractmethod
     def _init_object_detector(self):
+        pass
+
+    @abstractmethod
+    def init_model(self):
         pass
 
     @staticmethod

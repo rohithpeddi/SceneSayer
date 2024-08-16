@@ -53,10 +53,6 @@ class TrainSGABase(SGABase):
         ).to(device=self._device)
         self._object_detector.eval()
 
-    def _init_matcher(self):
-        self._matcher = HungarianMatcher(0.5, 1, 1, 0.5)
-        self._matcher.eval()
-
     def _train_model(self):
         tr = []
         for epoch in range(self._conf.nepoch):
@@ -124,7 +120,7 @@ class TrainSGABase(SGABase):
                     entry = self._object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
 
                     # ----------------- Process the video (Method Specific)-----------------
-                    pred = self.process_test_video(entry, frame_size)
+                    pred = self.process_test_video(entry, gt_annotation, frame_size)
                     # ----------------------------------------------------------------------
 
                     # ----------------- Process evaluation score (Method Specific)-----------------
@@ -174,7 +170,7 @@ class TrainSGABase(SGABase):
         pass
 
     @abstractmethod
-    def process_test_video(self, video, frame_size) -> dict:
+    def process_test_video(self, entry, gt_annotation, frame_size) -> dict:
         pass
 
     @abstractmethod
@@ -182,8 +178,46 @@ class TrainSGABase(SGABase):
         pass
 
     @abstractmethod
-    def process_evaluation_score(self, pred, gt):
+    def process_evaluation_score(self, pred, gt_annotation):
         pass
+
+    def compute_scene_sayer_evaluation_score(self, pred, gt_annotation):
+        w = self._conf.max_window
+        n = len(gt_annotation)
+        w = min(w, n - 1)
+        for i in range(1, w + 1):
+            pred_anticipated = pred.copy()
+            mask_curr = pred["mask_curr_" + str(i)]
+            pred_anticipated["spatial_distribution"] = pred["anticipated_spatial_distribution"][i - 1][
+                mask_curr]
+            pred_anticipated["contacting_distribution"] = pred["anticipated_contacting_distribution"][i - 1][
+                mask_curr]
+            pred_anticipated["attention_distribution"] = pred["anticipated_attention_distribution"][i - 1][
+                mask_curr]
+            pred_anticipated["im_idx"] = pred["im_idx_test_" + str(i)]
+            pred_anticipated["pair_idx"] = pred["pair_idx_test_" + str(i)]
+            if self._conf.mode == "predcls":
+                pred_anticipated["scores"] = pred["scores_test_" + str(i)]
+                pred_anticipated["labels"] = pred["labels_test_" + str(i)]
+            else:
+                pred_anticipated["pred_scores"] = pred["pred_scores_test_" + str(i)]
+                pred_anticipated["pred_labels"] = pred["pred_labels_test_" + str(i)]
+            pred_anticipated["boxes"] = pred["boxes_test_" + str(i)]
+            self._evaluator.evaluate_scene_graph(gt_annotation[i:], pred_anticipated)
+
+    def compute_baseline_evaluation_score(self, pred, gt_annotation):
+        count = 0
+        num_ff = self._conf.baseline_future
+        num_cf = self._conf.baseline_context
+        num_tf = len(pred["im_idx"].unique())
+        num_cf = min(num_cf, num_tf - 1)
+        while num_cf + 1 <= num_tf:
+            num_ff = min(num_ff, num_tf - num_cf)
+            gt_future = gt_annotation[num_cf: num_cf + num_ff]
+            pred_dict = pred["output"][count]
+            self._evaluator.evaluate_scene_graph(gt_future, pred_dict)
+            count += 1
+            num_cf += 1
 
     def compute_scene_sayer_loss(self, pred, model_ratio):
         """

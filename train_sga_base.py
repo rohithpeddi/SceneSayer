@@ -13,6 +13,7 @@ from dataloader.action_genome.ag_dataset import AG
 
 from dataloader.action_genome.ag_dataset import cuda_collate_fn
 from lib.object_detector import Detector
+from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
 from sga_base import SGABase
 
 
@@ -51,6 +52,10 @@ class TrainSGABase(SGABase):
             mode=self._conf.mode
         ).to(device=self._device)
         self._object_detector.eval()
+
+    def _init_matcher(self):
+        self._matcher = HungarianMatcher(0.5, 1, 1, 0.5)
+        self._matcher.eval()
 
     def _train_model(self):
         tr = []
@@ -274,7 +279,277 @@ class TrainSGABase(SGABase):
         return losses
 
     def compute_baseline_ant_loss(self, pred, gt):
-        pass
+        context = self._conf.baseline_context
+        future = self._conf.baseline_future
+        count = 0
+        start = 0
+        total_frames = len(pred["im_idx"].unique())
+
+        losses = {}
+        if self._conf.mode == 'sgcls' or self._conf.mode == 'sgdet':
+            losses['object_loss'] = self._ce_loss(pred['distribution'], pred['labels']).mean()
+
+        losses["attention_relation_loss"] = 0
+        losses["spatial_relation_loss"] = 0
+        losses["contact_relation_loss"] = 0
+        losses["anticipated_latent_loss"] = 0
+
+        context = min(context, total_frames - 1)
+        future = min(future, total_frames - context)
+
+        while start + context + 1 <= total_frames:
+            future_frame_start_id = pred["im_idx"].unique()[context]
+
+            if start + context + future > total_frames > start + context:
+                future = total_frames - (start + context)
+
+            future_frame_end_id = pred["im_idx"].unique()[context + future - 1]
+
+            context_end_idx = int(torch.where(pred["im_idx"] == future_frame_start_id)[0][0])
+            future_end_idx = int(torch.where(pred["im_idx"] == future_frame_end_id)[0][-1]) + 1
+            if pred["output"][count]["scatter_flag"] == 0:
+                attention_distribution = pred["output"][count]["attention_distribution"]
+                spatial_distribution = pred["output"][count]["spatial_distribution"]
+                contact_distribution = pred["output"][count]["contacting_distribution"]
+
+                attention_label = torch.tensor(pred["attention_gt"][context_end_idx:future_end_idx],
+                                               dtype=torch.long).to(
+                    device=attention_distribution.device).squeeze()
+
+                if not self._conf.bce_loss:
+                    spatial_label = -torch.ones([len(pred["spatial_gt"][context_end_idx:future_end_idx]), 6],
+                                                dtype=torch.long).to(device=attention_distribution.device)
+                    contact_label = -torch.ones([len(pred["contacting_gt"][context_end_idx:future_end_idx]), 17],
+                                                dtype=torch.long).to(device=attention_distribution.device)
+                    for i in range(len(pred["spatial_gt"][context_end_idx:future_end_idx])):
+                        spatial_label[i, : len(pred["spatial_gt"][context_end_idx:future_end_idx][i])] = torch.tensor(
+                            pred["spatial_gt"][context_end_idx:future_end_idx][i])
+                        contact_label[i,
+                        : len(pred["contacting_gt"][context_end_idx:future_end_idx][i])] = torch.tensor(
+                            pred["contacting_gt"][context_end_idx:future_end_idx][i])
+                else:
+                    spatial_label = torch.zeros([len(pred["spatial_gt"][context_end_idx:future_end_idx]), 6],
+                                                dtype=torch.float32).to(device=attention_distribution.device)
+                    contact_label = torch.zeros([len(pred["contacting_gt"][context_end_idx:future_end_idx]), 17],
+                                                dtype=torch.float32).to(device=attention_distribution.device)
+                    for i in range(len(pred["spatial_gt"][context_end_idx:future_end_idx])):
+                        spatial_label[i, pred["spatial_gt"][context_end_idx:future_end_idx][i]] = 1
+                        contact_label[i, pred["contacting_gt"][context_end_idx:future_end_idx][i]] = 1
+
+                context_boxes_idx = torch.where(pred["boxes"][:, 0] == context)[0][0]
+                context_excluding_last_frame_boxes_idx = torch.where(pred["boxes"][:, 0] == context - 1)[0][0]
+                future_boxes_idx = torch.where(pred["boxes"][:, 0] == context + future - 1)[0][-1]
+
+                if self._conf.mode == 'predcls':
+                    context_last_frame_labels = set(
+                        pred["labels"][context_excluding_last_frame_boxes_idx:context_boxes_idx].tolist())
+                    future_labels = set(pred["labels"][context_boxes_idx:future_boxes_idx + 1].tolist())
+                    context_labels = set(pred["labels"][:context_boxes_idx].tolist())
+                else:
+                    context_last_frame_labels = set(
+                        pred["pred_labels"][context_excluding_last_frame_boxes_idx:context_boxes_idx].tolist())
+                    future_labels = set(pred["pred_labels"][context_boxes_idx:future_boxes_idx + 1].tolist())
+                    context_labels = set(pred["pred_labels"][:context_boxes_idx].tolist())
+
+                appearing_object_labels = future_labels - context_last_frame_labels
+                disappearing_object_labels = context_labels - context_last_frame_labels
+                ignored_object_labels = appearing_object_labels.union(disappearing_object_labels)
+                ignored_object_labels = list(ignored_object_labels)
+
+                # Weighting loss based on appearance or disappearance of objects
+                # We only consider loss on objects that are present in the last frame of the context
+                weight = torch.ones(pred["output"][count]["global_output"].shape[0]).cuda()
+                for object_label in ignored_object_labels:
+                    for idx, pair in enumerate(pred["pair_idx"][context_end_idx:future_end_idx]):
+                        if self._conf.mode == 'predcls':
+                            if pred["labels"][pair[1]] == object_label:
+                                weight[idx] = 0
+                        else:
+                            if pred["pred_labels"][pair[1]] == object_label:
+                                weight[idx] = 0
+                try:
+                    at_loss = self._ce_loss(attention_distribution, attention_label)
+                    losses["attention_relation_loss"] += (at_loss * weight).mean()
+                except ValueError:
+                    # If there is only one object in the last frame of the context, we need to unsqueeze the label
+                    attention_label = attention_label.unsqueeze(0)
+                    at_loss = self._ce_loss(attention_distribution, attention_label)
+                    losses["attention_relation_loss"] += (at_loss * weight).mean()
+
+                if not self._conf.bce_loss:
+                    sp_loss = self._mlm_loss(spatial_distribution, spatial_label)
+                    losses["spatial_relation_loss"] += (sp_loss * weight).mean()
+                    con_loss = self._mlm_loss(contact_distribution, contact_label)
+                    losses["contact_relation_loss"] += (con_loss * weight).mean()
+                else:
+                    sp_loss = self._bce_loss(spatial_distribution, spatial_label)
+                    losses["spatial_relation_loss"] += (sp_loss * weight).mean()
+                    con_loss = self._bce_loss(contact_distribution, contact_label)
+                    losses["contact_relation_loss"] += (con_loss * weight).mean()
+
+                latent_loss = self._abs_loss(pred["output"][count]["global_output"], pred["output"][count]["spatial_latents"])
+                losses["anticipated_latent_loss"] += (latent_loss * weight).mean()
+
+                context += 1
+                count += 1
+            else:
+                context += 1
+                count += 1
+
+        losses["attention_relation_loss"] = losses["attention_relation_loss"] / count
+        losses["spatial_relation_loss"] = losses["spatial_relation_loss"] / count
+        losses["contact_relation_loss"] = losses["contact_relation_loss"] / count
+        losses["anticipated_latent_loss"] = losses["anticipated_latent_loss"] / count
+
+        return losses
 
     def compute_baseline_gen_ant_loss(self, pred, gt):
-        pass
+        context = self._conf.baseline_context
+        future = self._conf.baseline_future
+        count = 0
+        start = 0
+        total_frames = len(pred["im_idx"].unique())
+
+        losses = {}
+        if self._conf.mode == 'sgcls' or self._conf.mode == 'sgdet':
+            losses['object_loss'] = self._ce_loss(pred['distribution'], pred['labels']).mean()
+
+        losses["attention_relation_loss"] = 0
+        losses["spatial_relation_loss"] = 0
+        losses["contact_relation_loss"] = 0
+
+        context = min(context, total_frames - 1)
+        future = min(future, total_frames - context)
+
+        while start + context + 1 <= total_frames:
+            future_frame_start_id = pred["im_idx"].unique()[context]
+
+            if start + context + future > total_frames > start + context:
+                future = total_frames - (start + context)
+
+            future_frame_end_id = pred["im_idx"].unique()[context + future - 1]
+
+            context_end_idx = int(torch.where(pred["im_idx"] == future_frame_start_id)[0][0])
+            future_end_idx = int(torch.where(pred["im_idx"] == future_frame_end_id)[0][-1]) + 1
+            if pred["output"][count]["scatter_flag"] == 0:
+                attention_distribution = pred["output"][count]["attention_distribution"]
+                spatial_distribution = pred["output"][count]["spatial_distribution"]
+                contact_distribution = pred["output"][count]["contacting_distribution"]
+
+                attention_label = torch.tensor(pred["attention_gt"][context_end_idx:future_end_idx],
+                                               dtype=torch.long).to(
+                    device=attention_distribution.device).squeeze()
+
+                if not self._conf.bce_loss:
+                    spatial_label = -torch.ones([len(pred["spatial_gt"][context_end_idx:future_end_idx]), 6],
+                                                dtype=torch.long).to(device=attention_distribution.device)
+                    contact_label = -torch.ones([len(pred["contacting_gt"][context_end_idx:future_end_idx]), 17],
+                                                dtype=torch.long).to(device=attention_distribution.device)
+                    for i in range(len(pred["spatial_gt"][context_end_idx:future_end_idx])):
+                        spatial_label[i, : len(pred["spatial_gt"][context_end_idx:future_end_idx][i])] = torch.tensor(
+                            pred["spatial_gt"][context_end_idx:future_end_idx][i])
+                        contact_label[i,
+                        : len(pred["contacting_gt"][context_end_idx:future_end_idx][i])] = torch.tensor(
+                            pred["contacting_gt"][context_end_idx:future_end_idx][i])
+                else:
+                    spatial_label = torch.zeros([len(pred["spatial_gt"][context_end_idx:future_end_idx]), 6],
+                                                dtype=torch.float32).to(device=attention_distribution.device)
+                    contact_label = torch.zeros([len(pred["contacting_gt"][context_end_idx:future_end_idx]), 17],
+                                                dtype=torch.float32).to(device=attention_distribution.device)
+                    for i in range(len(pred["spatial_gt"][context_end_idx:future_end_idx])):
+                        spatial_label[i, pred["spatial_gt"][context_end_idx:future_end_idx][i]] = 1
+                        contact_label[i, pred["contacting_gt"][context_end_idx:future_end_idx][i]] = 1
+
+                context_boxes_idx = torch.where(pred["boxes"][:, 0] == context)[0][0]
+                context_excluding_last_frame_boxes_idx = torch.where(pred["boxes"][:, 0] == context - 1)[0][0]
+                future_boxes_idx = torch.where(pred["boxes"][:, 0] == context + future - 1)[0][-1]
+
+                if self._conf.mode == 'predcls':
+                    context_last_frame_labels = set(
+                        pred["labels"][context_excluding_last_frame_boxes_idx:context_boxes_idx].tolist())
+                    future_labels = set(pred["labels"][context_boxes_idx:future_boxes_idx + 1].tolist())
+                    context_labels = set(pred["labels"][:context_boxes_idx].tolist())
+                else:
+                    context_last_frame_labels = set(
+                        pred["pred_labels"][context_excluding_last_frame_boxes_idx:context_boxes_idx].tolist())
+                    future_labels = set(pred["pred_labels"][context_boxes_idx:future_boxes_idx + 1].tolist())
+                    context_labels = set(pred["pred_labels"][:context_boxes_idx].tolist())
+
+                appearing_object_labels = future_labels - context_last_frame_labels
+                disappearing_object_labels = context_labels - context_last_frame_labels
+                ignored_object_labels = appearing_object_labels.union(disappearing_object_labels)
+                ignored_object_labels = list(ignored_object_labels)
+
+                # Weighting loss based on appearance or disappearance of objects
+                # We only consider loss on objects that are present in the last frame of the context
+                weight = torch.ones(pred["output"][count]["global_output"].shape[0]).cuda()
+                for object_label in ignored_object_labels:
+                    for idx, pair in enumerate(pred["pair_idx"][context_end_idx:future_end_idx]):
+                        if self._conf.mode == 'predcls':
+                            if pred["labels"][pair[1]] == object_label:
+                                weight[idx] = 0
+                        else:
+                            if pred["pred_labels"][pair[1]] == object_label:
+                                weight[idx] = 0
+                try:
+                    at_loss = self._ce_loss(attention_distribution, attention_label)
+                    losses["attention_relation_loss"] += (at_loss * weight).mean()
+                except ValueError:
+                    # If there is only one object in the last frame of the context, we need to unsqueeze the label
+                    attention_label = attention_label.unsqueeze(0)
+                    at_loss = self._ce_loss(attention_distribution, attention_label)
+                    losses["attention_relation_loss"] += (at_loss * weight).mean()
+
+                if not self._conf.bce_loss:
+                    sp_loss = self._mlm_loss(spatial_distribution, spatial_label)
+                    losses["spatial_relation_loss"] += (sp_loss * weight).mean()
+                    con_loss = self._mlm_loss(contact_distribution, contact_label)
+                    losses["contact_relation_loss"] += (con_loss * weight).mean()
+                else:
+                    sp_loss = self._bce_loss(spatial_distribution, spatial_label)
+                    losses["spatial_relation_loss"] += (sp_loss * weight).mean()
+                    con_loss = self._bce_loss(contact_distribution, contact_label)
+                    losses["contact_relation_loss"] += (con_loss * weight).mean()
+                context += 1
+                count += 1
+            else:
+                context += 1
+                count += 1
+
+        gen_attention_out = pred["gen_attention_distribution"]
+        gen_spatial_out = pred["gen_spatial_distribution"]
+        gen_contacting_out = pred["gen_contacting_distribution"]
+
+        gen_attention_label = torch.tensor(pred["attention_gt"], dtype=torch.long).to(device=self._device).squeeze()
+        if not self._conf.bce_loss:
+            # multi-label margin loss or adaptive loss
+            gen_spatial_label = -torch.ones([len(pred["spatial_gt"]), 6], dtype=torch.long).to(device=self._device)
+            gen_contact_label = -torch.ones([len(pred["contacting_gt"]), 17], dtype=torch.long).to(device=self._device)
+            for i in range(len(pred["spatial_gt"])):
+                gen_spatial_label[i, : len(pred["spatial_gt"][i])] = torch.tensor(pred["spatial_gt"][i])
+                gen_contact_label[i, : len(pred["contacting_gt"][i])] = torch.tensor(pred["contacting_gt"][i])
+        else:
+            gen_spatial_label = torch.zeros([len(pred["spatial_gt"]), 6], dtype=torch.float32).to(device=self._device)
+            gen_contact_label = torch.zeros([len(pred["contacting_gt"]), 17], dtype=torch.float32).to(device=self._device)
+            for i in range(len(pred["spatial_gt"])):
+                gen_spatial_label[i, pred["spatial_gt"][i]] = 1
+                gen_contact_label[i, pred["contacting_gt"][i]] = 1
+
+        try:
+            losses["gen_attention_relation_loss"] = self._ce_loss(gen_attention_out, gen_attention_label).mean()
+        except ValueError:
+            gen_attention_label = gen_attention_label.unsqueeze(0)
+            losses["gen_attention_relation_loss"] = self._ce_loss(gen_attention_out, gen_attention_label).mean()
+
+        if not self._conf.bce_loss:
+            losses["gen_spatial_relation_loss"] = self._mlm_loss(gen_spatial_out, gen_spatial_label).mean()
+            losses["gen_contact_relation_loss"] = self._mlm_loss(gen_contacting_out, gen_contact_label).mean()
+        else:
+            losses["gen_spatial_relation_loss"] = self._bce_loss(gen_spatial_out, gen_spatial_label).mean()
+            losses["gen_contact_relation_loss"] = self._bce_loss(gen_contacting_out, gen_contact_label).mean()
+
+        losses["attention_relation_loss"] = losses["attention_relation_loss"] / count
+        losses["spatial_relation_loss"] = losses["spatial_relation_loss"] / count
+        losses["contact_relation_loss"] = losses["contact_relation_loss"] / count
+
+        return losses

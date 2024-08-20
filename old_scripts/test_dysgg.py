@@ -97,7 +97,7 @@ def main():
 	matcher.eval()
 	method_name = conf.method_name
 	
-	evaluator_save_file_path = os.path.join(os.path.abspath('.'), conf.results_path, method_name,
+	evaluator_save_file_path = os.path.join(os.path.abspath('..'), conf.results_path, method_name,
 	                                        f"train_{method_name}_{conf.mode}.txt")
 	os.makedirs(os.path.dirname(evaluator_save_file_path), exist_ok=True)
 	for gen_evaluator in gen_evaluators:

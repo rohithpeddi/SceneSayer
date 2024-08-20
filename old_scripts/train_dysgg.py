@@ -188,7 +188,7 @@ def main():
 	checkpoint_name = f"{method_name}_{conf.mode}"
 	checkpoint_save_file_path = os.path.join(conf.save_path, method_name)
 	os.makedirs(checkpoint_save_file_path, exist_ok=True)
-	evaluator_save_file_path = os.path.join(os.path.abspath('.'), conf.results_path, method_name,
+	evaluator_save_file_path = os.path.join(os.path.abspath('..'), conf.results_path, method_name,
 	                                        f"train_{method_name}_{conf.mode}.txt")
 	os.makedirs(os.path.dirname(evaluator_save_file_path), exist_ok=True)
 	evaluator.save_file = evaluator_save_file_path

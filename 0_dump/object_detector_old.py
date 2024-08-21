@@ -30,7 +30,7 @@ class DetectorOld(nn.Module):
 		self.fasterRCNN.load_state_dict(checkpoint['model'])
 		
 		self.ROI_Align = copy.deepcopy(self.fasterRCNN.RCNN_roi_align)
-		self.RCNN_Head = copy.deepcopy(self.fasterRCNN.head_to_tail)
+		self.RCNN_Head = copy.deepcopy(self.fasterRCNN._head_to_tail)
 	
 	def forward(self, im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all):
 		
@@ -167,7 +167,7 @@ class DetectorOld(nn.Module):
 							# compute the features of unfound gt_boxes
 							pooled_feat = self.fasterRCNN.RCNN_roi_align(FINAL_BASE_FEATURES[i].unsqueeze(0),
 							                                             unfound_gt_bboxes.cuda(0))
-							pooled_feat = self.fasterRCNN.head_to_tail(pooled_feat)
+							pooled_feat = self.fasterRCNN._head_to_tail(pooled_feat)
 							cls_prob = F.softmax(self.fasterRCNN.RCNN_cls_score(pooled_feat), 1)
 							
 							unfound_gt_bboxes[:, 0] = i
@@ -314,7 +314,7 @@ class DetectorOld(nn.Module):
 			
 			FINAL_BBOXES[:, 1:] = FINAL_BBOXES[:, 1:] * im_info[0, 2]
 			FINAL_FEATURES = self.fasterRCNN.RCNN_roi_align(FINAL_BASE_FEATURES, FINAL_BBOXES)
-			FINAL_FEATURES = self.fasterRCNN.head_to_tail(FINAL_FEATURES)
+			FINAL_FEATURES = self.fasterRCNN._head_to_tail(FINAL_FEATURES)
 			
 			if self.mode == 'predcls':
 				

@@ -31,7 +31,7 @@ class Detector(nn.Module):
         self.fasterRCNN.load_state_dict(checkpoint['model'])
 
         self.ROI_Align = copy.deepcopy(self.fasterRCNN.RCNN_roi_align)
-        self.RCNN_Head = copy.deepcopy(self.fasterRCNN.head_to_tail)
+        self.RCNN_Head = copy.deepcopy(self.fasterRCNN._head_to_tail)
 
         self.NMS_THRESHOLD = 0.4
         self.SCORE_THRESHOLD = 0.1
@@ -137,7 +137,7 @@ class Detector(nn.Module):
     def _compute_pooled_feat(self, FINAL_BASE_FEATURES, unfound_gt_bboxes):
         pooled_feat = self.fasterRCNN.RCNN_roi_align(FINAL_BASE_FEATURES.unsqueeze(0),
                                                      unfound_gt_bboxes.to(self.device))
-        return self.fasterRCNN.head_to_tail(pooled_feat)
+        return self.fasterRCNN._head_to_tail(pooled_feat)
 
     def _construct_relations(self, DETECTOR_FOUND_IDX, GT_RELATIONS, FINAL_BBOXES_X, global_idx):
         im_idx = []
@@ -407,7 +407,7 @@ class Detector(nn.Module):
         return FINAL_BASE_FEATURES
 
     def _compute_final_features(self, FINAL_BASE_FEATURES, FINAL_BBOXES):
-        return self.fasterRCNN.head_to_tail(
+        return self.fasterRCNN._head_to_tail(
             self.fasterRCNN.RCNN_roi_align(FINAL_BASE_FEATURES, FINAL_BBOXES)
         )
 

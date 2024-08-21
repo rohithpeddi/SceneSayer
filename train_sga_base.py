@@ -98,7 +98,7 @@ class TrainSGABase(SGABase):
                 tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
                 counter += 1
 
-                if counter % 1000 == 0 and counter >= 1000:
+                if counter % 100 == 0 and counter >= 100:
                     time_per_batch = (time.time() - start_time) / 1000
                     print(
                         "\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, counter,
@@ -176,6 +176,8 @@ class TrainSGABase(SGABase):
             collate_fn=cuda_collate_fn,
             pin_memory=False
         )
+
+        self._object_classes = self._train_dataset.object_classes
 
     def compute_scene_sayer_evaluation_score(self, pred, gt_annotation):
         w = self._conf.max_window
@@ -487,6 +489,7 @@ class TrainSGABase(SGABase):
         self.init_model()
         self._load_checkpoint()
         self._init_object_detector()
+        self._init_optimizer()
 
         # 4. Initialize model training
         self._train_model()

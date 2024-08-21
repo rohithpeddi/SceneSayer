@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from test_base import fetch_diffeq_test_basic_config
+from old_code.test_base import fetch_diffeq_test_basic_config
 from time import time
 from lib.supervised.sga import scene_sayer_sde as SDE
 

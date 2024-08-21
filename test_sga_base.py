@@ -3,6 +3,7 @@ import csv
 import os
 from abc import abstractmethod
 
+import numpy as np
 import torch
 
 from torch.utils.data import DataLoader
@@ -206,11 +207,10 @@ class TestSGABase(SGABase):
         mode_results_dir = os.path.join(results_dir, self._conf.mode)
         os.makedirs(mode_results_dir, exist_ok=True)
 
-        # TODO: Have train and test future frame windows for the filenames
         # Create the results file
         for i, future_frame_window in enumerate(self._future_frame_windows):
-            results_file_path = os.path.join(mode_results_dir,
-                                             f'{self._conf.method_name}_{self._conf.mode}_{future_frame_window}.csv')
+            file_name = f'{self._conf.method_name}_{self._conf.mode}_train_{self._conf.max_window}_test_{future_frame_window}.csv'
+            results_file_path = os.path.join(mode_results_dir, file_name)
 
             with open(results_file_path, "a", newline='') as activity_idx_step_idx_annotation_csv_file:
                 writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
@@ -230,8 +230,8 @@ class TestSGABase(SGABase):
                 writer.writerow(collated_stats)
 
         for i, context_fraction in enumerate(self._context_fractions):
-            results_file_path = os.path.join(mode_results_dir,
-                                             f'{self._conf.method_name}_{self._conf.mode}_{context_fraction}.csv')
+            file_name = f'{self._conf.method_name}_{self._conf.mode}_train_{self._conf.max_window}_test_{context_fraction}.csv'
+            results_file_path = os.path.join(mode_results_dir, file_name)
 
             with open(results_file_path, "a", newline='') as activity_idx_step_idx_annotation_csv_file:
                 writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
@@ -269,32 +269,62 @@ class TestSGABase(SGABase):
 
         return metrics
 
-    # TODO: Use this function inside a loop to evaluate all the future frame windows
     def _publish_results_to_firebase(self, evaluators):
         db_service = FirebaseService()
 
-        result = Result(
-            task_name=self._conf.task_name,
-            method_name=self._conf.method_name,
-            mode=self._conf.mode,
-        )
+        for i, future_frame_window in enumerate(self._future_frame_windows):
+            result = Result(
+                task_name=self._conf.task_name,
+                method_name=self._conf.method_name,
+                mode=self._conf.mode,
+                train_future_frames=self._conf.max_window,
+                test_future_frames=future_frame_window
+            )
 
-        result_details = ResultDetails()
-        with_constraint_metrics = self._prepare_metrics_from_stats(evaluators[0].fetch_stats_json())
-        no_constraint_metrics = self._prepare_metrics_from_stats(evaluators[1].fetch_stats_json())
-        semi_constraint_metrics = self._prepare_metrics_from_stats(evaluators[2].fetch_stats_json())
+            result_details = ResultDetails()
+            with_constraint_metrics = self._prepare_metrics_from_stats(evaluators[0].fetch_stats_json())
+            no_constraint_metrics = self._prepare_metrics_from_stats(evaluators[1].fetch_stats_json())
+            semi_constraint_metrics = self._prepare_metrics_from_stats(evaluators[2].fetch_stats_json())
 
-        result_details.add_with_constraint_metrics(with_constraint_metrics)
-        result_details.add_no_constraint_metrics(no_constraint_metrics)
-        result_details.add_semi_constraint_metrics(semi_constraint_metrics)
+            result_details.add_with_constraint_metrics(with_constraint_metrics)
+            result_details.add_no_constraint_metrics(no_constraint_metrics)
+            result_details.add_semi_constraint_metrics(semi_constraint_metrics)
 
-        result.add_result_details(result_details)
+            result.add_result_details(result_details)
 
-        print("Saving result: ", result.result_id)
-        db_service.update_result(result.result_id, result.to_dict())
-        print("Saved result: ", result.result_id)
+            print(
+                f"Saving result for train {self._conf.max_window} and test {future_frame_window} with result id {result.result_id}")
+            db_service.update_result(result.result_id, result.to_dict())
+            print(
+                f"Saved result for train {self._conf.max_window} and test {future_frame_window} with result id {result.result_id}")
 
-        return result
+        for i, context_fraction in enumerate(self._context_fractions):
+            result = Result(
+                task_name=self._conf.task_name,
+                method_name=self._conf.method_name,
+                mode=self._conf.mode,
+                train_future_frames=self._conf.max_window,
+                test_future_frames=context_fraction
+            )
+
+            result_details = ResultDetails()
+            with_constraint_metrics = self._prepare_metrics_from_stats(evaluators[0].fetch_stats_json())
+            no_constraint_metrics = self._prepare_metrics_from_stats(evaluators[1].fetch_stats_json())
+            semi_constraint_metrics = self._prepare_metrics_from_stats(evaluators[2].fetch_stats_json())
+
+            result_details.add_with_constraint_metrics(with_constraint_metrics)
+            result_details.add_no_constraint_metrics(no_constraint_metrics)
+            result_details.add_semi_constraint_metrics(semi_constraint_metrics)
+
+            result.add_result_details(result_details)
+
+            print(
+                f"Saving result for train {self._conf.max_window} and test {context_fraction} with result id {result.result_id}")
+            db_service.update_result(result.result_id, result.to_dict())
+            print(
+                f"Saved result for test {self._conf.max_window} and test {context_fraction} with result id {result.result_id}")
+
+        return
 
     def _test_model_diffeq(self):
         test_iter = iter(self._dataloader_test)
@@ -414,16 +444,85 @@ class TestSGABase(SGABase):
         )
 
     @abstractmethod
-    def init_model(self):
-        pass
-
-    @abstractmethod
     def process_test_video_future_frame(self, video_entry, frame_size, gt_annotation):
         pass
 
     @abstractmethod
     def process_test_video_context(self, video_entry, frame_size, gt_annotation, context_fraction):
         pass
+
+    @abstractmethod
+    def init_model(self):
+        pass
+
+    def _test_model(self):
+        test_iter = iter(self._dataloader_test)
+        self._model.eval()
+        self._object_detector.is_train = False
+        with torch.no_grad():
+            for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress", ascii=True):
+                data = next(test_iter)
+                im_data, im_info, gt_boxes, num_boxes = [copy.deepcopy(d.cuda(0)) for d in data[:4]]
+                gt_annotation = self._test_dataset.gt_annotations[data[4]]
+                frame_size = (im_info[0][:2] / im_info[0, 2]).cpu().data
+
+                entry = self._object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+                entry["gt_annotation"] = gt_annotation
+
+                # ----------------- Process the video (Method Specific) -----------------
+                # TODO: Implement the method specific processing
+                pred = self.process_test_video_future_frame(entry, frame_size, gt_annotation)
+
+                w = self._conf.max_window
+                n = len(gt_annotation)
+                w = min(w, n - 1)
+                for i in range(1, w + 1):
+                    pred_anticipated = pred.copy()
+                    last = pred["last_" + str(i)]
+                    pred_anticipated["spatial_distribution"] = pred["anticipated_spatial_distribution"][i - 1, : last]
+                    pred_anticipated["contacting_distribution"] = pred["anticipated_contacting_distribution"][i - 1,
+                                                                  : last]
+                    pred_anticipated["attention_distribution"] = pred["anticipated_attention_distribution"][i - 1,
+                                                                 : last]
+                    pred_anticipated["im_idx"] = pred["im_idx_test_" + str(i)]
+                    pred_anticipated["pair_idx"] = pred["pair_idx_test_" + str(i)]
+                    if self._conf.mode == "predcls":
+                        pred_anticipated["scores"] = pred["scores_test_" + str(i)]
+                        pred_anticipated["labels"] = pred["labels_test_" + str(i)]
+                    else:
+                        pred_anticipated["pred_scores"] = pred["pred_scores_test_" + str(i)]
+                        pred_anticipated["pred_labels"] = pred["pred_labels_test_" + str(i)]
+                    pred_anticipated["boxes"] = pred["boxes_test_" + str(i)]
+                    self._evaluate_anticipated_future_frame_scene_graph(
+                        entry["gt_annotation"][i:],
+                        pred_anticipated,
+                        future_frame_count=i,
+                        future_evaluators=self._combined_future_frames_evaluators
+                    )
+                # ----------------------------------------------------------------------
+            print('-----------------------------------------------------------------------------------', flush=True)
+            for i, context_fraction in enumerate(self._context_fractions):
+                test_iter = iter(self._dataloader_test)
+                for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress", ascii=True):
+                    data = next(test_iter)
+                    im_data, im_info, gt_boxes, num_boxes = [copy.deepcopy(d.cuda(0)) for d in data[:4]]
+                    gt_annotation = self._test_dataset.gt_annotations[data[4]]
+                    frame_size = (im_info[0][:2] / im_info[0, 2]).cpu().data
+                    entry = self._object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+                    entry["gt_annotation"] = gt_annotation
+                    frame_idx_list = []
+                    for frame_gt_annotation in gt_annotation:
+                        frame_id = int(frame_gt_annotation[0][const.FRAME].split('/')[1][:-4])
+                        frame_idx_list.append(frame_id)
+                    entry[const.FRAME_IDX] = frame_idx_list
+                    # ----------------- Process the video (Method Specific) -----------------
+                    skip, ind, pred = self.process_test_video_context(entry, frame_size, gt_annotation,
+                                                                      context_fraction)
+                    if skip:
+                        continue
+                    self._evaluate_predictions(i, gt_annotation[ind:], pred)
+                    # ----------------------------------------------------------------------
+                print('-----------------------------------------------------------------------------------', flush=True)
 
     def init_method_evaluation(self):
         diffeq = ["ode", "sde"]
@@ -442,10 +541,7 @@ class TestSGABase(SGABase):
         self._init_object_detector()
 
         # 4. Test the model
-        if self._conf.method_name in diffeq:
-            self._test_model_diffeq()
-        else:
-            self._test_model_transformer()
+        self._test_model()
 
         # 5. Publish the evaluation results
         self._publish_evaluation_results()

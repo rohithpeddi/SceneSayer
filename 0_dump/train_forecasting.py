@@ -7,11 +7,10 @@ import os
 import pandas as pd
 import copy
 from lib.object_detector import detector
-from lib.supervised.evaluation_recall import BasicSceneGraphEvaluator
 from lib.supervised.biased.sga.forecasting import STTran
 from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
-from train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions
+from old_code.train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions
 
 CONTEXT = 4
 FUTURE = 5

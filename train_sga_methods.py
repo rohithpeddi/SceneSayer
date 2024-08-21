@@ -226,6 +226,17 @@ class TrainODE(TrainSGABase):
         self._init_matcher()
         self._init_diffeq_loss_function_heads()
 
+    def init_method_loss_type_params(self):
+        # Observed Representations Loss
+        self._enable_obj_class_loss = True
+        self._enable_gen_pred_class_loss = True
+
+        # Anticipated Representations Loss
+        self._enable_ant_pred_loss = True
+        self._enable_ant_bb_subject_loss = True
+        self._enable_ant_bb_object_loss = False
+        self._enable_ant_recon_loss = True
+
     def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
         get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
         pred = self._model(entry)
@@ -262,6 +273,17 @@ class TrainSDE(TrainSGABase):
 
         self._init_matcher()
         self._init_diffeq_loss_function_heads()
+
+    def init_method_loss_type_params(self):
+        # Observed Representations Loss
+        self._enable_obj_class_loss = True
+        self._enable_gen_pred_class_loss = True
+
+        # Anticipated Representations Loss
+        self._enable_ant_pred_loss = True
+        self._enable_ant_bb_subject_loss = True
+        self._enable_ant_bb_object_loss = False
+        self._enable_ant_recon_loss = True
 
     def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
         get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)

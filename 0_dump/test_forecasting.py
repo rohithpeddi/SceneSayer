@@ -2,7 +2,7 @@ import numpy as np
 
 from lib.supervised.biased.dsgdetr.matcher import HungarianMatcher
 from lib.supervised.biased.dsgdetr.track import get_sequence_with_tracking
-from test_base import fetch_test_basic_config
+from old_code.test_base import fetch_test_basic_config
 
 import copy
 import torch

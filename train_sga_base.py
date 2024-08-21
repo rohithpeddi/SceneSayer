@@ -232,6 +232,10 @@ class TrainSGABase(SGABase):
 
         return attention_label, spatial_label, contact_label
 
+    # ------------------------------------------------------------------------------------------------------
+    # ----------------------------------- SCENE SAYER LOSS FUNCTIONS ---------------------------------------
+    # ------------------------------------------------------------------------------------------------------
+
     def compute_scene_sayer_loss(self, pred, model_ratio):
         """
         Use this method to compute the loss for the scene sayer models
@@ -325,7 +329,7 @@ class TrainSGABase(SGABase):
         return losses
 
     # ------------------------------------------------------------------------------------------------------
-    # ----------------------------------- BASELINE LOSS FUNCTIONS -----------------------------------------
+    # ----------------------------------- BASELINE LOSS FUNCTIONS ------------------------------------------
     # ------------------------------------------------------------------------------------------------------
 
     def compute_ff_ant_loss(self, pred, losses, attention_label, spatial_label, contact_label):
@@ -443,24 +447,23 @@ class TrainSGABase(SGABase):
 
         return losses
 
-    @abstractmethod
-    def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
-        pass
+    # ------------------------ Abstract Train Methods ------------------------ #
 
     @abstractmethod
-    def process_test_video(self, entry, gt_annotation, frame_size) -> dict:
+    def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
         pass
 
     @abstractmethod
     def compute_loss(self, pred, gt) -> dict:
         pass
 
+    # ------------------------ Abstract Test Methods ------------------------ #
     @abstractmethod
-    def process_evaluation_score(self, pred, gt_annotation):
+    def process_test_video(self, entry, gt_annotation, frame_size) -> dict:
         pass
 
     @abstractmethod
-    def init_method_loss_type_params(self):
+    def process_evaluation_score(self, pred, gt_annotation):
         pass
 
     def init_method_training(self):

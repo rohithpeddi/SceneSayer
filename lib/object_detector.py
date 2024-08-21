@@ -538,4 +538,12 @@ class Detector(nn.Module):
             )
 
         entry = self._construct_entry(attribute_dictionary)
+
+        # Adding frame information to train the Neural Differential Equation Models.
+        frame_idx_list = []
+        for frame_gt_annotation in gt_annotation:
+            frame_id = int(frame_gt_annotation[0][const.FRAME].split('/')[1][:-4])
+            frame_idx_list.append(frame_id)
+        entry[const.FRAME_IDX] = frame_idx_list
+
         return entry

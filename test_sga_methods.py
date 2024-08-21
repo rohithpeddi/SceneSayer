@@ -1,7 +1,14 @@
-import torch
+import math
 from lib.supervised.config import Config
 from test_sga_base import TestSGABase
+from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
+from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
+from lib.supervised.sga.dsgdetr_gen_ant import DsgDetrGenAnt
 
+
+# ---------------------------------------------------------------------------------------------------------------
+# -------------------------------------- TEST SCENESAYER METHODS ------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------
 
 class TestODE(TestSGABase):
 
@@ -81,6 +88,10 @@ class TestSDE(TestSGABase):
         pred = self._model(video_entry, True)
         return pred
 
+# ---------------------------------------------------------------------------------------------------------------
+# -------------------------------------- TEST BASELINE METHODS --------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------
+
 
 class TestSTTranAnt(TestSGABase):
 
@@ -99,8 +110,7 @@ class TestSTTranAnt(TestSGABase):
                                 dec_layer_num=self._conf.dec_layer).to(device=self._device)
 
     def process_test_video_context(self, video_entry, frame_size, gt_annotation, context_fraction) -> dict:
-        import math
-        get_sequence_no_tracking(video_entry, self._conf)
+        self.get_sequence_no_tracking(video_entry, self._conf.mode)
         video_entry["gt_annotation"] = gt_annotation
         pred = self._model.forward_single_entry(context_fraction=context_fraction, entry=video_entry)
         num_tf = len(video_entry["im_idx"].unique())
@@ -127,8 +137,7 @@ class TestSTTranGenAnt(TestSGABase):
                                    dec_layer_num=self._conf.dec_layer).to(device=self._device)
 
     def process_test_video_context(self, video_entry, frame_size, gt_annotation, context_fraction) -> dict:
-        import math
-        get_sequence_no_tracking(video_entry, self._conf)
+        self.get_sequence_no_tracking(video_entry, self._conf.mode)
         video_entry["gt_annotation"] = gt_annotation
         pred = self._model.forward_single_entry(context_fraction=context_fraction, entry=video_entry)
         num_tf = len(video_entry["im_idx"].unique())
@@ -160,8 +169,6 @@ class TestDsgDetrAnt(TestSGABase):
         self._matcher.eval()
 
     def process_test_video_context(self, video_entry, frame_size, gt_annotation, context_fraction) -> dict:
-        import math
-        from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
         get_sequence_with_tracking(video_entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
         video_entry["gt_annotation"] = gt_annotation
         pred = self._model.forward_single_entry(context_fraction=context_fraction, entry=video_entry)
@@ -179,9 +186,6 @@ class TestDsgDetrGenAnt(TestSGABase):
         self._matcher = None
 
     def init_model(self):
-        from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
-        from lib.supervised.sga.dsgdetr_gen_ant import DsgDetrGenAnt
-
         self._model = DsgDetrGenAnt(mode=self._conf.mode,
                                     attention_class_num=len(self._test_dataset.attention_relationships),
                                     spatial_class_num=len(self._test_dataset.spatial_relationships),
@@ -194,8 +198,6 @@ class TestDsgDetrGenAnt(TestSGABase):
         self._matcher.eval()
 
     def process_test_video_context(self, video_entry, frame_size, gt_annotation, context_fraction) -> dict:
-        import math
-        from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
         get_sequence_with_tracking(video_entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
         video_entry["gt_annotation"] = gt_annotation
         pred = self._model.forward_single_entry(context_fraction=context_fraction, entry=video_entry)

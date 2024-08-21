@@ -119,17 +119,19 @@ class Result:
 			task_name,
 			method_name,
 			mode,
-			result_id=None
-			
+			result_id=None,
+			train_future_frames=None,
+			test_future_frames=None,
+			context_fraction=None
 	):
 		self.task_name = task_name
 		self.method_name = method_name
 		self.mode = mode
 		
 		# Specific Attributes
-		self.train_num_future_frames = None
-		self.test_num_future_frames = None
-		self.context_fraction = None
+		self.train_num_future_frames = train_future_frames
+		self.test_num_future_frames = test_future_frames
+		self.context_fraction = context_fraction
 		
 		# Common Attributes
 		self.result_details = None

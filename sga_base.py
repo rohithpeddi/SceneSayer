@@ -112,6 +112,10 @@ class SGABase:
     def init_model(self):
         pass
 
+    @abstractmethod
+    def init_method_loss_type_params(self):
+        pass
+
     @staticmethod
     def get_sequence_no_tracking(entry, task="sgcls"):
         if task == "predcls":

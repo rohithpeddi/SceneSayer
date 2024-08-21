@@ -13,7 +13,7 @@ from constants import Constants as const
 from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
 from lib.supervised.sgg.dsgdetr.matcher import HungarianMatcher
 
-from train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions
+from old_code.train_base import fetch_train_basic_config, prepare_optimizer, fetch_loss_functions
 from lib.supervised.sga import scene_sayer_ode as ODE
 
 

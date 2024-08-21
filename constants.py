@@ -129,7 +129,9 @@ class DetectorConstants:
 	FMAPS = "fmaps"
 	IM_INFO = "im_info"
 	FINAL_PRED_SCORES = "FINAL_PRED_SCORES"
-	
+
+	FRAME = "frame"
+	FRAME_IDX = "frame_idx"
 	PERSON_BBOX = "person_bbox"
 	BBOX = "bbox"
 	CLASS = "class"

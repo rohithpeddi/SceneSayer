@@ -41,7 +41,7 @@ class TrainSTTranAnt(TrainSGABase):
         return pred
 
     def process_test_video(self, entry, gt_annotation, frame_size) -> dict:
-        self.get_sequence_no_tracking(entry)
+        self.get_sequence_no_tracking(entry, self._conf.mode)
         num_ff = self._conf.baseline_future
         num_cf = self._conf.baseline_context
         pred = self._model(entry, num_cf, num_ff)
@@ -90,7 +90,7 @@ class TrainSTTranGenAnt(TrainSGABase):
         return pred
 
     def process_test_video(self, entry, gt_annotation, frame_size) -> dict:
-        self.get_sequence_no_tracking(entry)
+        self.get_sequence_no_tracking(entry, self._conf.mode)
         num_ff = self._conf.baseline_future
         num_cf = self._conf.baseline_context
         pred = self._model(entry, num_cf, num_ff)
@@ -135,12 +135,12 @@ class TrainDsgDetrAnt(TrainSGABase):
         self._enable_ant_recon_loss = True
 
     def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
-        get_sequence_with_tracking(self._conf, entry, gt_annotation, self._matcher, frame_size)
+        get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
         pred = self._model(entry, self._conf.baseline_context, self._conf.baseline_future)
         return pred
 
     def process_test_video(self, entry, gt_annotation, frame_size) -> dict:
-        get_sequence_with_tracking(self._conf, entry, gt_annotation, self._matcher, frame_size)
+        get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
         num_ff = self._conf.baseline_future
         num_cf = self._conf.baseline_context
         pred = self._model(entry, num_cf, num_ff)
@@ -185,12 +185,12 @@ class TrainDsgDetrGenAnt(TrainSGABase):
         self._enable_ant_recon_loss = True
 
     def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
-        get_sequence_with_tracking(self._conf, entry, gt_annotation, self._matcher, frame_size)
+        get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
         pred = self._model(entry, self._conf.baseline_context, self._conf.baseline_future)
         return pred
 
     def process_test_video(self, entry, gt_annotation, frame_size) -> dict:
-        get_sequence_with_tracking(self._conf, entry, gt_annotation, self._matcher, frame_size)
+        get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
         num_ff = self._conf.baseline_future
         num_cf = self._conf.baseline_context
         pred = self._model(entry, num_cf, num_ff)

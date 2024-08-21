@@ -34,12 +34,18 @@ class TestODE(TestSGABase):
         from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
         get_sequence_with_tracking(video_entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
         video_entry["gt_annotation"] = gt_annotation
-        # video_entry = self._model(video_entry, True)
         ind, pred = self._model.forward_single_entry(context_fraction=context_fraction, entry=video_entry)
         skip = False
         if ind >= len(gt_annotation):
             skip = True
-        return skip, ind, pred
+
+        result = {
+            'skip': skip,
+            'ind': ind,
+            'pred': pred
+        }
+
+        return result
 
     def process_test_video_future_frame(self, video_entry, frame_size, gt_annotation) -> dict:
         from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking

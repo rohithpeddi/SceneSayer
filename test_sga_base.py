@@ -444,12 +444,78 @@ class TestSGABase(SGABase):
         )
 
     @abstractmethod
-    def process_test_video_future_frame(self, video_entry, frame_size, gt_annotation):
+    def process_test_video_future_frame(self, entry, frame_size, gt_annotation):
         pass
 
     @abstractmethod
-    def process_test_video_context(self, video_entry, frame_size, gt_annotation, context_fraction):
+    def process_test_video_context(self, entry, frame_size, gt_annotation, context_fraction):
         pass
+
+    @abstractmethod
+    def compute_test_video_future_frame_score(self, entry, frame_size, gt_annotation):
+        pass
+
+    @abstractmethod
+    def compute_test_video_context_score(self, result, gt_annotation, i_cf):
+        pass
+
+    def compute_scene_sayer_ff_score(self, pred_entry, gt_annotation):
+        w = self._conf.max_window
+        n = len(gt_annotation)
+        w = min(w, n - 1)
+        for i in range(1, w + 1):
+            pred_anticipated = pred_entry.copy()
+            last = pred_entry["last_" + str(i)]
+            pred_anticipated["spatial_distribution"] = pred_entry["anticipated_spatial_distribution"][i - 1, : last]
+            pred_anticipated["contacting_distribution"] = pred_entry["anticipated_contacting_distribution"][i - 1,
+                                                          : last]
+            pred_anticipated["attention_distribution"] = pred_entry["anticipated_attention_distribution"][i - 1,
+                                                         : last]
+            pred_anticipated["im_idx"] = pred_entry["im_idx_test_" + str(i)]
+            pred_anticipated["pair_idx"] = pred_entry["pair_idx_test_" + str(i)]
+            if self._conf.mode == "predcls":
+                pred_anticipated["scores"] = pred_entry["scores_test_" + str(i)]
+                pred_anticipated["labels"] = pred_entry["labels_test_" + str(i)]
+            else:
+                pred_anticipated["pred_scores"] = pred_entry["pred_scores_test_" + str(i)]
+                pred_anticipated["pred_labels"] = pred_entry["pred_labels_test_" + str(i)]
+            pred_anticipated["boxes"] = pred_entry["boxes_test_" + str(i)]
+            self._evaluate_anticipated_future_frame_scene_graph(
+                pred_entry["gt_annotation"][i:],
+                pred_anticipated,
+                future_frame_count=i,
+                future_evaluators=self._combined_future_frames_evaluators
+            )
+
+    def compute_scene_sayer_context_score(self, result, gt_annotation, i_cf):
+        pred = result["pred"]
+        ind = result["ind"]
+        self._evaluate_predictions(i_cf, gt_annotation[ind:], pred)
+
+    def compute_transformer_ff_score(self, pred, gt_annotation, num_ff):
+        # ----------------- Evaluate future scene graphs -----------------
+        count = 0
+        num_cf = self._conf.baseline_context
+        num_tf = len(pred["im_idx"].unique())
+        num_cf = min(num_cf, num_tf - 1)
+        while num_cf + 1 <= num_tf:
+            num_ff = min(num_ff, num_tf - num_cf)
+            gt_future = gt_annotation[num_cf: num_cf + num_ff]
+            pred_dict = pred["output"][count]
+
+            evaluators = self._combined_future_frames_evaluators[num_ff]
+            evaluators[0].evaluate_scene_graph(gt_future, pred_dict)
+            evaluators[1].evaluate_scene_graph(gt_future, pred_dict)
+            evaluators[2].evaluate_scene_graph(gt_future, pred_dict)
+            count += 1
+            num_cf += 1
+
+    def compute_transformer_context_score(self, pred, gt_annotation, i_cf):
+        pass
+        # evaluators = percentage_evaluators[context_fraction]
+        # evaluators[0].evaluate_scene_graph(gt_future, pred_dict)
+        # evaluators[1].evaluate_scene_graph(gt_future, pred_dict)
+        # evaluators[2].evaluate_scene_graph(gt_future, pred_dict)
 
     @abstractmethod
     def init_model(self):
@@ -470,36 +536,10 @@ class TestSGABase(SGABase):
                 entry["gt_annotation"] = gt_annotation
 
                 # ----------------- Process the video (Method Specific) -----------------
-                # TODO: Implement the method specific processing
                 pred = self.process_test_video_future_frame(entry, frame_size, gt_annotation)
 
-                w = self._conf.max_window
-                n = len(gt_annotation)
-                w = min(w, n - 1)
-                for i in range(1, w + 1):
-                    pred_anticipated = pred.copy()
-                    last = pred["last_" + str(i)]
-                    pred_anticipated["spatial_distribution"] = pred["anticipated_spatial_distribution"][i - 1, : last]
-                    pred_anticipated["contacting_distribution"] = pred["anticipated_contacting_distribution"][i - 1,
-                                                                  : last]
-                    pred_anticipated["attention_distribution"] = pred["anticipated_attention_distribution"][i - 1,
-                                                                 : last]
-                    pred_anticipated["im_idx"] = pred["im_idx_test_" + str(i)]
-                    pred_anticipated["pair_idx"] = pred["pair_idx_test_" + str(i)]
-                    if self._conf.mode == "predcls":
-                        pred_anticipated["scores"] = pred["scores_test_" + str(i)]
-                        pred_anticipated["labels"] = pred["labels_test_" + str(i)]
-                    else:
-                        pred_anticipated["pred_scores"] = pred["pred_scores_test_" + str(i)]
-                        pred_anticipated["pred_labels"] = pred["pred_labels_test_" + str(i)]
-                    pred_anticipated["boxes"] = pred["boxes_test_" + str(i)]
-                    self._evaluate_anticipated_future_frame_scene_graph(
-                        entry["gt_annotation"][i:],
-                        pred_anticipated,
-                        future_frame_count=i,
-                        future_evaluators=self._combined_future_frames_evaluators
-                    )
-                # ----------------------------------------------------------------------
+                self.compute_test_video_future_frame_score(pred, frame_size, gt_annotation)
+
             print('-----------------------------------------------------------------------------------', flush=True)
             for i, context_fraction in enumerate(self._context_fractions):
                 test_iter = iter(self._dataloader_test)
@@ -510,18 +550,14 @@ class TestSGABase(SGABase):
                     frame_size = (im_info[0][:2] / im_info[0, 2]).cpu().data
                     entry = self._object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
                     entry["gt_annotation"] = gt_annotation
-                    frame_idx_list = []
-                    for frame_gt_annotation in gt_annotation:
-                        frame_id = int(frame_gt_annotation[0][const.FRAME].split('/')[1][:-4])
-                        frame_idx_list.append(frame_id)
-                    entry[const.FRAME_IDX] = frame_idx_list
+
                     # ----------------- Process the video (Method Specific) -----------------
-                    skip, ind, pred = self.process_test_video_context(entry, frame_size, gt_annotation,
-                                                                      context_fraction)
-                    if skip:
+                    result = self.process_test_video_context(entry, frame_size, gt_annotation, context_fraction)
+                    if result["skip"]:
                         continue
-                    self._evaluate_predictions(i, gt_annotation[ind:], pred)
-                    # ----------------------------------------------------------------------
+
+                    self.compute_test_video_context_score(result, gt_annotation, i)
+
                 print('-----------------------------------------------------------------------------------', flush=True)
 
     def init_method_evaluation(self):

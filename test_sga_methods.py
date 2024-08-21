@@ -54,6 +54,12 @@ class TestODE(TestSGABase):
         pred = self._model(video_entry, True)
         return pred
 
+    def compute_test_video_future_frame_score(self, entry, frame_size, gt_annotation):
+        return self.compute_scene_sayer_ff_score(entry, gt_annotation)
+
+    def compute_test_video_context_score(self, result, gt_annotation, context_fraction):
+        return self.compute_scene_sayer_context_score(result, gt_annotation, context_fraction)
+
 
 class TestSDE(TestSGABase):
 
@@ -85,7 +91,14 @@ class TestSDE(TestSGABase):
         skip = False
         if ind >= len(gt_annotation):
             skip = True
-        return skip, ind, pred
+
+        result = {
+            'skip': skip,
+            'ind': ind,
+            'pred': pred
+        }
+
+        return result
 
     def process_test_video_future_frame(self, video_entry, frame_size, gt_annotation) -> dict:
         from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
@@ -93,6 +106,13 @@ class TestSDE(TestSGABase):
         video_entry["gt_annotation"] = gt_annotation
         pred = self._model(video_entry, True)
         return pred
+
+    def compute_test_video_future_frame_score(self, entry, frame_size, gt_annotation):
+        return self.compute_scene_sayer_ff_score(entry, gt_annotation)
+
+    def compute_test_video_context_score(self, result, gt_annotation, context_fraction):
+        return self.compute_scene_sayer_context_score(result, gt_annotation, context_fraction)
+
 
 # ---------------------------------------------------------------------------------------------------------------
 # -------------------------------------- TEST BASELINE METHODS --------------------------------------------------
@@ -123,7 +143,29 @@ class TestSTTranAnt(TestSGABase):
         num_cf = min(int(math.ceil(context_fraction * num_tf)), num_tf - 1)
         gt_future = gt_annotation[num_cf: num_tf]
         pred_dict = pred["output"][0]
-        return gt_future, pred_dict
+
+        result = {
+            'gt_future': gt_future,
+            'pred_dict': pred_dict
+        }
+
+        return result
+
+    def compute_test_video_context_score(self, result, gt_annotation, context_fraction):
+        return self.compute_transformer_context_score(result, gt_annotation, context_fraction)
+
+    def process_test_video_future_frame(self, entry, frame_size, gt_annotation) -> dict:
+        from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
+
+        num_cf = self._conf.baseline_context
+        num_ff = self._conf.baseline_future
+        get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
+        pred = self._model(entry, num_cf, num_ff)
+
+        return pred
+
+    def compute_test_video_future_frame_score(self, entry, frame_size, gt_annotation):
+        return self.compute_transformer_ff_score(entry, gt_annotation)
 
 
 class TestSTTranGenAnt(TestSGABase):
@@ -150,7 +192,28 @@ class TestSTTranGenAnt(TestSGABase):
         num_cf = min(int(math.ceil(context_fraction * num_tf)), num_tf - 1)
         gt_future = gt_annotation[num_cf: num_tf]
         pred_dict = pred["output"][0]
-        return gt_future, pred_dict
+        result = {
+            'gt_future': gt_future,
+            'pred_dict': pred_dict
+        }
+
+        return result
+
+    def process_test_video_future_frame(self, entry, frame_size, gt_annotation) -> dict:
+        from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
+
+        num_cf = self._conf.baseline_context
+        num_ff = self._conf.baseline_future
+        get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
+        pred = self._model(entry, num_cf, num_ff)
+
+        return pred
+
+    def compute_test_video_future_frame_score(self, entry, frame_size, gt_annotation):
+        return self.compute_transformer_ff_score(entry, gt_annotation)
+
+    def compute_test_video_context_score(self, result, gt_annotation, context_fraction):
+        return self.compute_transformer_context_score(result, gt_annotation, context_fraction)
 
 
 class TestDsgDetrAnt(TestSGABase):
@@ -182,7 +245,28 @@ class TestDsgDetrAnt(TestSGABase):
         num_cf = min(int(math.ceil(context_fraction * num_tf)), num_tf - 1)
         gt_future = gt_annotation[num_cf: num_tf]
         pred_dict = pred["output"][0]
-        return gt_future, pred_dict
+        result = {
+            'gt_future': gt_future,
+            'pred_dict': pred_dict
+        }
+
+        return result
+
+    def process_test_video_future_frame(self, entry, frame_size, gt_annotation) -> dict:
+        from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
+
+        num_cf = self._conf.baseline_context
+        num_ff = self._conf.baseline_future
+        get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
+        pred = self._model(entry, num_cf, num_ff)
+
+        return pred
+
+    def compute_test_video_future_frame_score(self, entry, frame_size, gt_annotation):
+        return self.compute_transformer_ff_score(entry, gt_annotation)
+
+    def compute_test_video_context_score(self, result, gt_annotation, context_fraction):
+        return self.compute_transformer_context_score(result, gt_annotation, context_fraction)
 
 
 class TestDsgDetrGenAnt(TestSGABase):
@@ -211,7 +295,28 @@ class TestDsgDetrGenAnt(TestSGABase):
         num_cf = min(int(math.ceil(context_fraction * num_tf)), num_tf - 1)
         gt_future = gt_annotation[num_cf: num_tf]
         pred_dict = pred["output"][0]
-        return gt_future, pred_dict
+        result = {
+            'gt_future': gt_future,
+            'pred_dict': pred_dict
+        }
+
+        return result
+
+    def process_test_video_future_frame(self, entry, frame_size, gt_annotation) -> dict:
+        from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
+
+        num_cf = self._conf.baseline_context
+        num_ff = self._conf.baseline_future
+        get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
+        pred = self._model(entry, num_cf, num_ff)
+
+        return pred
+
+    def compute_test_video_future_frame_score(self, entry, frame_size, gt_annotation):
+        return self.compute_transformer_ff_score(entry, gt_annotation)
+
+    def compute_test_video_context_score(self, result, gt_annotation, context_fraction):
+        return self.compute_transformer_context_score(result, gt_annotation, context_fraction)
 
 
 def main():

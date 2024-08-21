@@ -457,6 +457,10 @@ class TrainSGABase(SGABase):
     def compute_loss(self, pred, gt) -> dict:
         pass
 
+    @abstractmethod
+    def init_method_loss_type_params(self):
+        pass
+
     # ------------------------ Abstract Test Methods ------------------------ #
     @abstractmethod
     def process_test_video(self, entry, gt_annotation, frame_size) -> dict:

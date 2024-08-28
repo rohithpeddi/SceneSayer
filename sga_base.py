@@ -83,7 +83,7 @@ class SGABase:
     @staticmethod
     def _save_model(model, epoch, checkpoint_save_file_path, checkpoint_name, method_name):
         print("*" * 40)
-        os.makedirs(os.path.dirname(checkpoint_save_file_path), exist_ok=True)
+        os.makedirs(checkpoint_save_file_path, exist_ok=True)
         torch.save({f"{method_name}_state_dict": model.state_dict()},
                    os.path.join(checkpoint_save_file_path, f"{checkpoint_name}_epoch_{epoch}.tar"))
         print(f"Saved {method_name} checkpoint after {epoch} epochs")

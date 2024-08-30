@@ -265,8 +265,16 @@ class BaseLDPUDiffEq(nn.Module):
                 ind2 += frames_ranges[j + i]
                 mask_preds = torch.cat((mask_preds, ind1))
                 mask_gt = torch.cat((mask_gt, ind2))
-            entry["mask_curr_%d" % i] = mask_preds
-            entry["mask_gt_%d" % i] = mask_gt
+
+            if len(mask_preds) == 0:
+                if len(mask_gt) == 0:
+                    continue
+                else:
+                    print("mask_gt not empty but mask_preds empty")
+            else:
+                assert len(mask_gt) == len(mask_preds)
+                entry["mask_curr_%d" % i] = mask_preds
+                entry["mask_gt_%d" % i] = mask_gt
             if testing:
                 """pair_idx_test = pair_idx[mask_preds]
                 _, inverse_indices = torch.unique(pair_idx_test, sorted=True, return_inverse=True)

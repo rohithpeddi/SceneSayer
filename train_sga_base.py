@@ -3,13 +3,12 @@ import time
 from abc import abstractmethod
 
 import numpy as np
-import pandas as pd
 import torch
-import wandb
 from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+import wandb
 from dataloader.action_genome.ag_dataset import AG
 from dataloader.action_genome.ag_dataset import cuda_collate_fn
 from lib.object_detector import Detector
@@ -112,7 +111,7 @@ class TrainSGABase(SGABase):
             self._save_model(
                 model=self._model,
                 epoch=epoch,
-                checkpoint_save_file_path=self._checkpoint_save_file_path,
+                checkpoint_save_file_path=self._checkpoint_save_dir_path,
                 checkpoint_name=self._checkpoint_name,
                 method_name=self._conf.method_name
             )

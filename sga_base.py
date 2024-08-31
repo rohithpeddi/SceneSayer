@@ -25,7 +25,7 @@ class SGABase:
 
         # Load checkpoint name
         self._checkpoint_name = None
-        self._checkpoint_save_file_path = None
+        self._checkpoint_save_dir_path = None
 
         # Init Wandb
         self._enable_wandb = True
@@ -50,7 +50,7 @@ class SGABase:
             # Set the checkpoint name and save path details
             self._checkpoint_name = f"{self._conf.method_name}_{self._conf.mode}_future_{self._conf.max_window}"
 
-        self._checkpoint_save_file_path = os.path.join(self._conf.save_path, self._checkpoint_name)
+        self._checkpoint_save_dir_path = os.path.join(self._conf.save_path, self._checkpoint_name)
 
         # --------------------------- W&B CONFIGURATION ---------------------------
         if self._enable_wandb:
@@ -94,7 +94,7 @@ class SGABase:
     @staticmethod
     def _save_model(model, epoch, checkpoint_save_file_path, checkpoint_name, method_name):
         print("*" * 40)
-        os.makedirs(os.path.dirname(checkpoint_save_file_path), exist_ok=True)
+        os.makedirs(checkpoint_save_file_path, exist_ok=True)
         torch.save({f"{method_name}_state_dict": model.state_dict()},
                    os.path.join(checkpoint_save_file_path, f"{checkpoint_name}_epoch_{epoch}.tar"))
         print(f"Saved {method_name} checkpoint after {epoch} epochs")

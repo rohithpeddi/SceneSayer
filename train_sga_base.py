@@ -494,3 +494,6 @@ class TrainSGABase(SGABase):
 
         # 4. Initialize model training
         self._train_model()
+
+        # 5. Initialize Scheduler
+        self._init_scheduler()

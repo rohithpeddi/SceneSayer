@@ -5,8 +5,10 @@ from abc import abstractmethod
 import numpy as np
 import pandas as pd
 import torch
+import wandb
 from torch import nn
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from dataloader.action_genome.ag_dataset import AG
 from dataloader.action_genome.ag_dataset import cuda_collate_fn
@@ -66,15 +68,13 @@ class TrainSGABase(SGABase):
         self._object_detector.eval()
 
     def _train_model(self):
-        tr = []
         for epoch in range(self._conf.nepoch):
             self._model.train()
             train_iter = iter(self._dataloader_train)
 
-            counter = 0
             start_time = time.time()
             self._object_detector.is_train = True
-            for train_idx in range(len(self._dataloader_train)):
+            for train_id in tqdm(range(len(self._dataloader_train))):
                 data = next(train_iter)
                 im_data, im_info, gt_boxes, num_boxes = [copy.deepcopy(d.cuda(0)) for d in data[:4]]
                 gt_annotation = self._train_dataset.gt_annotations[data[4]]
@@ -95,21 +95,19 @@ class TrainSGABase(SGABase):
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self._model.parameters(), max_norm=5, norm_type=2)
                 self._optimizer.step()
-                tr.append(pd.Series({x: y.item() for x, y in losses.items()}))
-                counter += 1
 
-                if counter % 100 == 0 and counter >= 100:
+                if self._enable_wandb:
+                    wandb.log(losses)
+
+                if train_id % 100 == 0 and train_id >= 100:
                     time_per_batch = (time.time() - start_time) / 1000
                     print(
-                        "\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, counter,
+                        "\ne{:2d}  b{:5d}/{:5d}  {:.3f}s/batch, {:.1f}m/epoch".format(epoch, train_id,
                                                                                       len(self._dataloader_train),
                                                                                       time_per_batch,
                                                                                       len(self._dataloader_train) * time_per_batch / 60))
 
-                    mn = pd.concat(tr[-1000:], axis=1).mean(1)
-                    print(mn)
                     start_time = time.time()
-                counter += 1
 
             self._save_model(
                 model=self._model,
@@ -278,7 +276,6 @@ class TrainSGABase(SGABase):
         if not self._conf.bce_loss:
             losses["spatial_relation_loss"] = self._mlm_loss(spatial_distribution, spatial_label)
             losses["contact_relation_loss"] = self._mlm_loss(contact_distribution, contact_label)
-            # TODO: Change the maximum window
             for i in range(1, self._conf.max_window + 1):
                 if "mask_gt_" + str(i) not in pred:
                     print("mask_gt_" + str(i) + " not in pred")

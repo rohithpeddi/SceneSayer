@@ -135,7 +135,6 @@ class TrainSGABase(SGABase):
                     # ----------------- Process evaluation score (Method Specific)-----------------
                     self.process_evaluation_score(pred, gt_annotation)
                     # ----------------------------------------------------------------------
-
                 print('-----------------------------------------------------------------------------------', flush=True)
             score = np.mean(self._evaluator.result_dict[self._conf.mode + "_recall"][20])
             self._evaluator.print_stats()
@@ -491,9 +490,7 @@ class TrainSGABase(SGABase):
         self._load_checkpoint()
         self._init_object_detector()
         self._init_optimizer()
+        self._init_scheduler()
 
         # 4. Initialize model training
         self._train_model()
-
-        # 5. Initialize Scheduler
-        self._init_scheduler()

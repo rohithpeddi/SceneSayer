@@ -103,6 +103,8 @@ class SGABase:
     def _init_evaluators(self):
         # For VidSGG set iou_threshold=0.5
         # For SGA set iou_threshold=0
+        iou_threshold = 0.5 if self._conf.task_name == 'sgg' else 0.0
+
         self._evaluator = BasicSceneGraphEvaluator(
             mode=self._conf.mode,
             AG_object_classes=self._train_dataset.object_classes,
@@ -110,7 +112,7 @@ class SGABase:
             AG_attention_predicates=self._train_dataset.attention_relationships,
             AG_spatial_predicates=self._train_dataset.spatial_relationships,
             AG_contacting_predicates=self._train_dataset.contacting_relationships,
-            iou_threshold=0.5,
+            iou_threshold=iou_threshold,
             save_file=os.path.join(self._conf.save_path, const.PROGRESS_TEXT_FILE),
             constraint='with'
         )

@@ -399,8 +399,8 @@ class TestSGABase(SGABase):
     def compute_transformer_ff_score(self, pred, gt_annotation):
         # ----------------- Evaluate future scene graphs -----------------
         count = 0
-        num_ff = self._conf.max_window
-        num_cf = self._conf.baseline_context
+        num_ff = int(self._conf.max_future)
+        num_cf = int(self._conf.baseline_context)
         num_tf = len(pred["im_idx"].unique())
         num_cf = min(num_cf, num_tf - 1)
         while num_cf + 1 <= num_tf:
@@ -433,7 +433,7 @@ class TestSGABase(SGABase):
         self._model.eval()
         self._object_detector.is_train = False
         with torch.no_grad():
-            for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress", ascii=True):
+            for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress (Future Frames)", ascii=True):
                 data = next(test_iter)
                 im_data, im_info, gt_boxes, num_boxes = [copy.deepcopy(d.cuda(0)) for d in data[:4]]
                 gt_annotation = self._test_dataset.gt_annotations[data[4]]
@@ -453,7 +453,7 @@ class TestSGABase(SGABase):
             print('-----------------------------------------------------------------------------------', flush=True)
             for i, context_fraction in enumerate(self._context_fractions):
                 test_iter = iter(self._dataloader_test)
-                for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress", ascii=True):
+                for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress (Context Fraction)", ascii=True):
                     data = next(test_iter)
                     im_data, im_info, gt_boxes, num_boxes = [copy.deepcopy(d.cuda(0)) for d in data[:4]]
                     gt_annotation = self._test_dataset.gt_annotations[data[4]]

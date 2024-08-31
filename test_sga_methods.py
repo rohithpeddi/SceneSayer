@@ -158,7 +158,7 @@ class TestSTTranAnt(TestSGABase):
         from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
 
         num_cf = self._conf.baseline_context
-        num_ff = self._conf.baseline_future
+        num_ff = self._conf.max_future
         get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
         pred = self._model(entry, num_cf, num_ff)
 
@@ -203,7 +203,7 @@ class TestSTTranGenAnt(TestSGABase):
         from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
 
         num_cf = self._conf.baseline_context
-        num_ff = self._conf.baseline_future
+        num_ff = self._conf.max_future
         get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
         pred = self._model(entry, num_cf, num_ff)
 
@@ -256,7 +256,7 @@ class TestDsgDetrAnt(TestSGABase):
         from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
 
         num_cf = self._conf.baseline_context
-        num_ff = self._conf.baseline_future
+        num_ff = self._conf.max_future
         get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
         pred = self._model(entry, num_cf, num_ff)
 
@@ -306,7 +306,7 @@ class TestDsgDetrGenAnt(TestSGABase):
         from lib.supervised.sgg.dsgdetr.track import get_sequence_with_tracking
 
         num_cf = self._conf.baseline_context
-        num_ff = self._conf.baseline_future
+        num_ff = self._conf.max_future
         get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
         pred = self._model(entry, num_cf, num_ff)
 

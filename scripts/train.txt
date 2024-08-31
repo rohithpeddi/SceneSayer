@@ -4,33 +4,33 @@
 
 ########### Train future frames - 1 future frame
 
-python train_sga_methods.py --method_name=sttran_ant --mode=sgdet --max_window=1
-python train_sga_methods.py --method_name=sttran_gen_ant --mode=sgdet --max_window=1
-python train_sga_methods.py --method_name=dsgdetr_ant --mode=sgdet --max_window=1
-python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgdet --max_window=1
-python train_sga_methods.py --method_name=ode --mode=sgdet --max_window=1
-python train_sga_methods.py --method_name=sde --mode=sgdet --max_window=1
+python train_sga_methods.py --method_name=sttran_ant --mode=sgdet --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=sttran_gen_ant --mode=sgdet --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_ant --mode=sgdet --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgdet --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=ode --mode=sgdet --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=sde --mode=sgdet --max_window=1 --bce_loss
 
 
 ########### Train future frames - 3 future frame
 
-python train_sga_methods.py --method_name=sttran_ant --mode=sgdet --max_window=3
-python train_sga_methods.py --method_name=sttran_gen_ant --mode=sgdet --max_window=3
-python train_sga_methods.py --method_name=dsgdetr_ant --mode=sgdet --max_window=3
-python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgdet --max_window=3
-python train_sga_methods.py --method_name=ode --mode=sgdet --max_window=3
-python train_sga_methods.py --method_name=sde --mode=sgdet --max_window=3
+python train_sga_methods.py --method_name=sttran_ant --mode=sgdet --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=sttran_gen_ant --mode=sgdet --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_ant --mode=sgdet --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgdet --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=ode --mode=sgdet --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=sde --mode=sgdet --max_window=3 --bce_loss
 
 
 
 ########### Train future frames - 5 future frame
 
-python train_sga_methods.py --method_name=sttran_ant --mode=sgdet --max_window=5
-python train_sga_methods.py --method_name=sttran_gen_ant --mode=sgdet --max_window=5
-python train_sga_methods.py --method_name=dsgdetr_ant --mode=sgdet --max_window=5
-python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgdet --max_window=5
-python train_sga_methods.py --method_name=ode --mode=sgdet --max_window=5
-python train_sga_methods.py --method_name=sde --mode=sgdet --max_window=5
+python train_sga_methods.py --method_name=sttran_ant --mode=sgdet --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=sttran_gen_ant --mode=sgdet --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_ant --mode=sgdet --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgdet --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=ode --mode=sgdet --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=sde --mode=sgdet --max_window=5 --bce_loss
 
 
 
@@ -40,32 +40,32 @@ python train_sga_methods.py --method_name=sde --mode=sgdet --max_window=5
 
 ########### Train future frames - 1 future frame
 
-python train_sga_methods.py --method_name=sttran_ant --mode=sgcls --max_window=1
-python train_sga_methods.py --method_name=sttran_gen_ant --mode=sgcls --max_window=1
-python train_sga_methods.py --method_name=dsgdetr_ant --mode=sgcls --max_window=1
-python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgcls --max_window=1
-python train_sga_methods.py --method_name=ode --mode=sgcls --max_window=1
-python train_sga_methods.py --method_name=sde --mode=sgcls --max_window=1
+python train_sga_methods.py --method_name=sttran_ant --mode=sgcls --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=sttran_gen_ant --mode=sgcls --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_ant --mode=sgcls --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgcls --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=ode --mode=sgcls --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=sde --mode=sgcls --max_window=1 --bce_loss
 
 
 ########### Train future frames - 3 future frame
 
-python train_sga_methods.py --method_name=sttran_ant --mode=sgcls --max_window=3
-python train_sga_methods.py --method_name=sttran_gen_ant --mode=sgcls --max_window=3
-python train_sga_methods.py --method_name=dsgdetr_ant --mode=sgcls --max_window=3
-python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgcls --max_window=3
-python train_sga_methods.py --method_name=ode --mode=sgcls --max_window=3
-python train_sga_methods.py --method_name=sde --mode=sgcls --max_window=3
+python train_sga_methods.py --method_name=sttran_ant --mode=sgcls --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=sttran_gen_ant --mode=sgcls --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_ant --mode=sgcls --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgcls --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=ode --mode=sgcls --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=sde --mode=sgcls --max_window=3 --bce_loss
 
 
 ########### Train future frames - 5 future frame
 
-python train_sga_methods.py --method_name=sttran_ant --mode=sgcls --max_window=5
-python train_sga_methods.py --method_name=sttran_gen_ant --mode=sgcls --max_window=5
-python train_sga_methods.py --method_name=dsgdetr_ant --mode=sgcls --max_window=5
-python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgcls --max_window=5
-python train_sga_methods.py --method_name=ode --mode=sgcls --max_window=5
-python train_sga_methods.py --method_name=sde --mode=sgcls --max_window=5
+python train_sga_methods.py --method_name=sttran_ant --mode=sgcls --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=sttran_gen_ant --mode=sgcls --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_ant --mode=sgcls --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgcls --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=ode --mode=sgcls --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=sde --mode=sgcls --max_window=5 --bce_loss
 
 
 
@@ -75,30 +75,30 @@ python train_sga_methods.py --method_name=sde --mode=sgcls --max_window=5
 
 ########### Train future frames - 1 future frame
 
-python train_sga_methods.py --method_name=sttran_ant --mode=predcls --max_window=1
-python train_sga_methods.py --method_name=sttran_gen_ant --mode=predcls --max_window=1
-python train_sga_methods.py --method_name=dsgdetr_ant --mode=predcls --max_window=1
-python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=predcls --max_window=1
-python train_sga_methods.py --method_name=ode --mode=predcls --max_window=1
-python train_sga_methods.py --method_name=sde --mode=predcls --max_window=1
+python train_sga_methods.py --method_name=sttran_ant --mode=predcls --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=sttran_gen_ant --mode=predcls --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_ant --mode=predcls --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=predcls --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=ode --mode=predcls --max_window=1 --bce_loss
+python train_sga_methods.py --method_name=sde --mode=predcls --max_window=1 --bce_loss
 
 
 ########### Train future frames - 3 future frame
 
-python train_sga_methods.py --method_name=sttran_ant --mode=predcls --max_window=3
-python train_sga_methods.py --method_name=sttran_gen_ant --mode=predcls --max_window=3
-python train_sga_methods.py --method_name=dsgdetr_ant --mode=predcls --max_window=3
-python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=predcls --max_window=3
-python train_sga_methods.py --method_name=ode --mode=predcls --max_window=3
-python train_sga_methods.py --method_name=sde --mode=predcls --max_window=3
+python train_sga_methods.py --method_name=sttran_ant --mode=predcls --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=sttran_gen_ant --mode=predcls --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_ant --mode=predcls --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=predcls --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=ode --mode=predcls --max_window=3 --bce_loss
+python train_sga_methods.py --method_name=sde --mode=predcls --max_window=3 --bce_loss
 
 
 ########### Train future frames - 5 future frame
 
-python train_sga_methods.py --method_name=sttran_ant --mode=predcls --max_window=5
-python train_sga_methods.py --method_name=sttran_gen_ant --mode=predcls --max_window=5
-python train_sga_methods.py --method_name=dsgdetr_ant --mode=predcls --max_window=5
-python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=predcls --max_window=5
-python train_sga_methods.py --method_name=ode --mode=predcls --max_window=5
-python train_sga_methods.py --method_name=sde --mode=predcls --max_window=5
+python train_sga_methods.py --method_name=sttran_ant --mode=predcls --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=sttran_gen_ant --mode=predcls --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_ant --mode=predcls --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=dsgdetr_gen_ant --mode=predcls --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=ode --mode=predcls --max_window=5 --bce_loss
+python train_sga_methods.py --method_name=sde --mode=predcls --max_window=5 --bce_loss
 

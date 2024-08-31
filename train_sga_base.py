@@ -202,7 +202,7 @@ class TrainSGABase(SGABase):
 
     def compute_baseline_evaluation_score(self, pred, gt_annotation):
         count = 0
-        num_ff = self._conf.baseline_future
+        num_ff = self._conf.max_window
         num_cf = self._conf.baseline_context
         num_tf = len(pred["im_idx"].unique())
         num_cf = min(num_cf, num_tf - 1)

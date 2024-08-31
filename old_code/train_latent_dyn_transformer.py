@@ -54,7 +54,7 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
 
     count = 0
     num_cf = conf.baseline_context
-    num_ff = conf.baseline_future
+    num_ff = conf.max_future
     fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size)
     pred = model(entry, num_cf, num_ff)
 
@@ -168,13 +168,13 @@ def process_train_video(conf, entry, optimizer, model, epoch, num_video, tr, gpu
 def process_test_video(conf, entry, model, gt_annotation, evaluator, matcher, frame_size):
     # ----------------- Make predictions -----------------
     fetch_sequences_after_tracking(conf, entry, gt_annotation, matcher, frame_size)
-    num_ff = conf.baseline_future
+    num_ff = conf.max_future
     num_cf = conf.baseline_context
     pred = model(entry, num_cf, num_ff)
 
     # ----------------- Evaluate the anticipated scene graphs -----------------
     count = 0
-    num_ff = conf.baseline_future
+    num_ff = conf.max_future
     num_cf = conf.baseline_context
     num_tf = len(entry["im_idx"].unique())
     num_cf = min(num_cf, num_tf - 1)
@@ -247,7 +247,7 @@ def load_common_config(conf, ag_train_data, gpu_device):
         mode = checkpoint_name.split('_')[-5]
         print(f"Checkpoint name: {checkpoint_name}")
     else:
-        future_frame_loss_num = conf.baseline_future
+        future_frame_loss_num = conf.max_future
         mode = conf.mode
     print(f"Future frame loss num: {future_frame_loss_num}")
     print(f"Mode: {mode}")
@@ -286,11 +286,11 @@ def train_model():
      evaluator, ag_train_data, ag_test_data) = fetch_train_basic_config()
 
     method_name = conf.method_name
-    checkpoint_name = f"{method_name}_{conf.mode}_future_{conf.baseline_future}"
+    checkpoint_name = f"{method_name}_{conf.mode}_future_{conf.max_future}"
     checkpoint_save_file_path = os.path.join(conf.save_path, method_name)
     os.makedirs(checkpoint_save_file_path, exist_ok=True)
     evaluator_save_file_path = os.path.join(os.path.abspath('..'), conf.results_path, method_name,
-                                            f"train_{method_name}_{conf.mode}_{conf.baseline_future}.txt")
+                                            f"train_{method_name}_{conf.mode}_{conf.max_future}.txt")
     os.makedirs(os.path.dirname(evaluator_save_file_path), exist_ok=True)
     evaluator.save_file = evaluator_save_file_path
 

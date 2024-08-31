@@ -28,7 +28,7 @@ class SGABase:
         self._checkpoint_save_dir_path = None
 
         # Init Wandb
-        self._enable_wandb = True
+        self._enable_wandb = False
 
     def _init_config(self):
         print('The CKPT saved here:', self._conf.save_path)
@@ -44,7 +44,7 @@ class SGABase:
 
         if self._conf.ckpt is not None:
             self._checkpoint_name = os.path.basename(self._conf.ckpt).split('.')[0]
-            self._conf.max_window = self._checkpoint_name.split('_')[-3]
+            self._conf.max_window = int(self._checkpoint_name.split('_')[-3])
             self._conf.mode = self._checkpoint_name.split('_')[-5]
         else:
             # Set the checkpoint name and save path details

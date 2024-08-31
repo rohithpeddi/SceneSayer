@@ -188,7 +188,7 @@ class TestSGABase(SGABase):
     def _evaluate_anticipated_future_frame_scene_graph(self, gt, pred, future_frame_count, future_evaluators):
         for index, reference_frame_count in enumerate(self._future_frame_windows):
             if reference_frame_count >= future_frame_count:
-                evaluators = future_evaluators[index]
+                evaluators = future_evaluators[reference_frame_count]
                 evaluators[0].evaluate_scene_graph(gt, pred)
                 evaluators[1].evaluate_scene_graph(gt, pred)
                 evaluators[2].evaluate_scene_graph(gt, pred)
@@ -433,24 +433,24 @@ class TestSGABase(SGABase):
         self._model.eval()
         self._object_detector.is_train = False
         with torch.no_grad():
-            # for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress (Future Frames)", ascii=True):
-            #     data = next(test_iter)
-            #     im_data, im_info, gt_boxes, num_boxes = [copy.deepcopy(d.cuda(0)) for d in data[:4]]
-            #     gt_annotation = self._test_dataset.gt_annotations[data[4]]
-            #     frame_size = (im_info[0][:2] / im_info[0, 2]).cpu().data
-            #
-            #     entry = self._object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-            #     entry["gt_annotation"] = gt_annotation
-            #
-            #     # ----------------- Process the video (Method Specific) ---------------------
-            #     pred = self.process_test_video_future_frame(entry, frame_size, gt_annotation)
-            #     # ---------------------------------------------------------------------------
-            #
-            #     # ----------------- Process evaluation score (Method Specific)-----------------
-            #     self.compute_test_video_future_frame_score(pred, frame_size, gt_annotation)
-            #     # ----------------------------------------------------------------------------
-            #
-            # print('-----------------------------------------------------------------------------------', flush=True)
+            for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress (Future Frames)", ascii=True):
+                data = next(test_iter)
+                im_data, im_info, gt_boxes, num_boxes = [copy.deepcopy(d.cuda(0)) for d in data[:4]]
+                gt_annotation = self._test_dataset.gt_annotations[data[4]]
+                frame_size = (im_info[0][:2] / im_info[0, 2]).cpu().data
+
+                entry = self._object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+                entry["gt_annotation"] = gt_annotation
+
+                # ----------------- Process the video (Method Specific) ---------------------
+                pred = self.process_test_video_future_frame(entry, frame_size, gt_annotation)
+                # ---------------------------------------------------------------------------
+
+                # ----------------- Process evaluation score (Method Specific)-----------------
+                self.compute_test_video_future_frame_score(pred, frame_size, gt_annotation)
+                # ----------------------------------------------------------------------------
+
+            print('-----------------------------------------------------------------------------------', flush=True)
             for i, context_fraction in enumerate(self._context_fractions):
                 test_iter = iter(self._dataloader_test)
                 for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress (Context Fraction)", ascii=True):

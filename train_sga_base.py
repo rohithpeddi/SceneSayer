@@ -120,7 +120,7 @@ class TrainSGABase(SGABase):
             self._model.eval()
             self._object_detector.is_train = False
             with torch.no_grad():
-                for b in range(len(self._dataloader_test)):
+                for b in tqdm(range(len(self._dataloader_test))):
                     data = next(test_iter)
                     im_data, im_info, gt_boxes, num_boxes = [copy.deepcopy(d.cuda(0)) for d in data[:4]]
                     gt_annotation = self._test_dataset.gt_annotations[data[4]]
@@ -182,15 +182,15 @@ class TrainSGABase(SGABase):
         w = min(w, n - 1)
         for i in range(1, w + 1):
             pred_anticipated = pred.copy()
-            mask_curr = pred["mask_curr_" + str(i)]
-            pred_anticipated["spatial_distribution"] = pred["anticipated_spatial_distribution"][i - 1][
-                mask_curr]
-            pred_anticipated["contacting_distribution"] = pred["anticipated_contacting_distribution"][i - 1][
-                mask_curr]
-            pred_anticipated["attention_distribution"] = pred["anticipated_attention_distribution"][i - 1][
-                mask_curr]
+            last = pred["last_" + str(i)]
+            pred_anticipated["spatial_distribution"] = pred["anticipated_spatial_distribution"][i - 1, : last]
+            pred_anticipated["contacting_distribution"] = pred["anticipated_contacting_distribution"][i - 1,
+                                                          : last]
+            pred_anticipated["attention_distribution"] = pred["anticipated_attention_distribution"][i - 1,
+                                                         : last]
             pred_anticipated["im_idx"] = pred["im_idx_test_" + str(i)]
             pred_anticipated["pair_idx"] = pred["pair_idx_test_" + str(i)]
+
             if self._conf.mode == "predcls":
                 pred_anticipated["scores"] = pred["scores_test_" + str(i)]
                 pred_anticipated["labels"] = pred["labels_test_" + str(i)]

@@ -195,7 +195,6 @@ class BaseLDPUDiffEq(nn.Module):
         num_preds = im_idx.size(0)
         times = torch.tensor(entry["frame_idx"], dtype=torch.float32)
         indices = torch.reshape((im_idx[: -1] != im_idx[1:]).nonzero(), (-1,)) + 1
-
         times_unique = torch.unique(times).float()
         num_frames = len(gt_annotation)
         window = self.max_window
@@ -242,8 +241,7 @@ class BaseLDPUDiffEq(nn.Module):
                 # persistent object labels
                 intersection = np.intersect1d(a, b, return_indices=False)
                 ind1 = np.array([])  # indices of object labels from last context frame in the intersection
-                ind2 = np.array(
-                    [])  # indices of object labels that persist in the ith frame after the last context frame
+                ind2 = np.array([])  # indices of object labels that persist in the ith frame after the last context frame
                 for element in intersection:
                     tmp1, tmp2 = np.where(a == element)[0], np.where(b == element)[0]
                     mn = min(tmp1.shape[0], tmp2.shape[0])
@@ -266,35 +264,7 @@ class BaseLDPUDiffEq(nn.Module):
                 mask_preds = torch.cat((mask_preds, ind1))
                 mask_gt = torch.cat((mask_gt, ind2))
 
-            if len(mask_preds) == 0:
-                if len(mask_gt) == 0:
-                    continue
-                else:
-                    print("mask_gt not empty but mask_preds empty")
-            else:
-                assert len(mask_gt) == len(mask_preds)
-                entry["mask_curr_%d" % i] = mask_preds
-                entry["mask_gt_%d" % i] = mask_gt
             if testing:
-                """pair_idx_test = pair_idx[mask_preds]
-                _, inverse_indices = torch.unique(pair_idx_test, sorted=True, return_inverse=True)
-                entry["im_idx_test_%d" %i] = im_idx[mask_preds]
-                entry["pair_idx_test_%d" %i] = inverse_indices
-                if self.mode == "predcls":
-                    entry["scores_test_%d" %i] = entry["scores"][_.long()]
-                    entry["labels_test_%d" %i] = entry["labels"][_.long()]
-                else:
-                    entry["pred_scores_test_%d" %i] = entry["pred_scores"][_.long()]
-                    entry["pred_labels_test_%d" %i] = entry["pred_labels"][_.long()]
-                if inverse_indices.size(0) != 0:
-                    mx = torch.max(inverse_indices)
-                else:
-                    mx = -1
-                boxes_test = torch.zeros(mx + 1, 5, device=entry["boxes"].device)
-                boxes_test[torch.unique_consecutive(inverse_indices[: , 0])] = entry["boxes"][torch.unique_consecutive(pair_idx[mask_gt][: , 0])]
-                boxes_test[inverse_indices[: , 1]] = entry["boxes"][pair_idx[mask_gt][: , 1]]
-                entry["boxes_test_%d" %i] = boxes_test"""
-                # entry["boxes_test_%d" %i] = entry["boxes"][_.long()]
                 entry["last_%d" % i] = frames_ranges[-(i + 1)]
                 mx = torch.max(pair_idx[: frames_ranges[-(i + 1)]]) + 1
                 entry["im_idx_test_%d" % i] = entry["im_idx"][: frames_ranges[-(i + 1)]]
@@ -307,9 +277,17 @@ class BaseLDPUDiffEq(nn.Module):
                     entry["pred_labels_test_%d" % i] = entry["pred_labels"][: mx]
                 entry["boxes_test_%d" % i] = torch.ones(mx, 5).to(device=im_idx.device) / 2
                 entry["gt_annotation_%d" % i] = gt
-        # self.ctr += 1
-        # anticipated_latent_loss = 0
-        # targets = entry["detached_outputs"]
+
+            if len(mask_preds) == 0:
+                if len(mask_gt) == 0:
+                    continue
+                else:
+                    print("mask_gt not empty but mask_preds empty")
+            else:
+                assert len(mask_gt) == len(mask_preds)
+                entry["mask_curr_%d" % i] = mask_preds
+                entry["mask_gt_%d" % i] = mask_gt
+
         return entry, num_frames, frames_ranges, times_unique, window, global_output, anticipated_vals
 
     def process_ff_rels_output_entry(self, entry, anticipated_vals):

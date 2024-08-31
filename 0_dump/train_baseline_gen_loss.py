@@ -17,12 +17,12 @@ def process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_devic
 	start_time = time.time()
 	start = 0
 	context = conf.baseline_context
-	future = conf.baseline_future
+	future = conf.max_future
 	count = 0
 	total_frames = len(entry["im_idx"].unique())
 	
 	get_sequence_no_tracking(entry, conf.mode)
-	pred = model(entry, conf.baseline_context, conf.baseline_future)
+	pred = model(entry, conf.baseline_context, conf.max_future)
 	losses = {}
 	if conf.mode == 'sgcls' or conf.mode == 'sgdet':
 		losses['object_loss'] = ce_loss(pred['distribution'], pred['labels']).mean()
@@ -188,11 +188,11 @@ def process_train_video(conf, entry, optimizer, model, epoch, num, tr, gpu_devic
 
 def process_test_video(conf, entry, model, gt_annotation, evaluator):
 	get_sequence_no_tracking(entry, conf.mode)
-	pred = model(entry, conf.baseline_context, conf.baseline_future)
+	pred = model(entry, conf.baseline_context, conf.max_future)
 	start = 0
 	count = 0
 	context = conf.baseline_context
-	future = conf.baseline_future
+	future = conf.max_future
 	total_frames = len(entry["im_idx"].unique())
 	
 	context = min(context, total_frames - 1)
@@ -344,11 +344,11 @@ def load_object_detector(conf, gpu_device, ag_train_data):
 def main():
 	conf, dataloader_train, dataloader_test, gpu_device, evaluator, ag_train_data, ag_test_data = fetch_train_basic_config()
 	model_name = "baseline_so_gen_loss"
-	checkpoint_name = f"{model_name}_{conf.mode}_future_{conf.baseline_future}"
+	checkpoint_name = f"{model_name}_{conf.mode}_future_{conf.max_future}"
 	checkpoint_save_file_path = os.path.join(conf.save_path, model_name)
 	os.makedirs(checkpoint_save_file_path, exist_ok=True)
 	evaluator_save_file_path = os.path.join(os.path.abspath('..'), conf.results_path, model_name,
-	                                        f"train_{model_name}_{conf.mode}_{conf.baseline_future}.txt")
+	                                        f"train_{model_name}_{conf.mode}_{conf.max_future}.txt")
 	os.makedirs(os.path.dirname(evaluator_save_file_path), exist_ok=True)
 	evaluator.save_file = evaluator_save_file_path
 	

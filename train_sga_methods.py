@@ -37,12 +37,12 @@ class TrainSTTranAnt(TrainSGABase):
 
     def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
         self.get_sequence_no_tracking(entry, self._conf.mode)
-        pred = self._model(entry, self._conf.baseline_context, self._conf.baseline_future)
+        pred = self._model(entry, self._conf.baseline_context, self._conf.max_future)
         return pred
 
     def process_test_video(self, entry, gt_annotation, frame_size) -> dict:
         self.get_sequence_no_tracking(entry, self._conf.mode)
-        num_ff = self._conf.baseline_future
+        num_ff = self._conf.max_window
         num_cf = self._conf.baseline_context
         pred = self._model(entry, num_cf, num_ff)
         return pred
@@ -86,12 +86,12 @@ class TrainSTTranGenAnt(TrainSGABase):
 
     def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
         self.get_sequence_no_tracking(entry, self._conf.mode)
-        pred = self._model(entry, self._conf.baseline_context, self._conf.baseline_future)
+        pred = self._model(entry, self._conf.baseline_context, self._conf.max_future)
         return pred
 
     def process_test_video(self, entry, gt_annotation, frame_size) -> dict:
         self.get_sequence_no_tracking(entry, self._conf.mode)
-        num_ff = self._conf.baseline_future
+        num_ff = self._conf.max_window
         num_cf = self._conf.baseline_context
         pred = self._model(entry, num_cf, num_ff)
         return pred
@@ -136,12 +136,12 @@ class TrainDsgDetrAnt(TrainSGABase):
 
     def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
         get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
-        pred = self._model(entry, self._conf.baseline_context, self._conf.baseline_future)
+        pred = self._model(entry, self._conf.baseline_context, self._conf.max_future)
         return pred
 
     def process_test_video(self, entry, gt_annotation, frame_size) -> dict:
         get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
-        num_ff = self._conf.baseline_future
+        num_ff = self._conf.max_window
         num_cf = self._conf.baseline_context
         pred = self._model(entry, num_cf, num_ff)
         return pred
@@ -186,12 +186,12 @@ class TrainDsgDetrGenAnt(TrainSGABase):
 
     def process_train_video(self, entry, gt_annotation, frame_size) -> dict:
         get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
-        pred = self._model(entry, self._conf.baseline_context, self._conf.baseline_future)
+        pred = self._model(entry, self._conf.baseline_context, self._conf.max_future)
         return pred
 
     def process_test_video(self, entry, gt_annotation, frame_size) -> dict:
         get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size, self._conf.mode)
-        num_ff = self._conf.baseline_future
+        num_ff = self._conf.max_window
         num_cf = self._conf.baseline_context
         pred = self._model(entry, num_cf, num_ff)
         return pred

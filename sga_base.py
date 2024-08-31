@@ -2,6 +2,7 @@ import os
 from abc import abstractmethod
 
 import torch
+import wandb
 from torch import optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
@@ -24,7 +25,10 @@ class SGABase:
 
         # Load checkpoint name
         self._checkpoint_name = None
-        self._checkpoint_save_file_path = None
+        self._checkpoint_save_dir_path = None
+
+        # Init Wandb
+        self._enable_wandb = False
 
     def _init_config(self):
         print('The CKPT saved here:', self._conf.save_path)
@@ -40,13 +44,20 @@ class SGABase:
 
         if self._conf.ckpt is not None:
             self._checkpoint_name = os.path.basename(self._conf.ckpt).split('.')[0]
-            self._conf.max_window = self._checkpoint_name.split('_')[-3]
+            self._conf.max_window = int(self._checkpoint_name.split('_')[-3])
             self._conf.mode = self._checkpoint_name.split('_')[-5]
         else:
             # Set the checkpoint name and save path details
             self._checkpoint_name = f"{self._conf.method_name}_{self._conf.mode}_future_{self._conf.max_window}"
 
-        self._checkpoint_save_file_path = os.path.join(self._conf.save_path, self._checkpoint_name)
+        self._checkpoint_save_dir_path = os.path.join(self._conf.save_path, self._checkpoint_name)
+
+        # --------------------------- W&B CONFIGURATION ---------------------------
+        if self._enable_wandb:
+            wandb.init(
+                project=self._checkpoint_name,
+                config=self._conf,
+            )
 
     def _init_optimizer(self):
         if self._conf.optimizer == const.ADAMW:
@@ -111,8 +122,6 @@ class SGABase:
     @abstractmethod
     def init_model(self):
         pass
-
-
 
     @staticmethod
     def get_sequence_no_tracking(entry, task="sgcls"):

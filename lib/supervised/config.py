@@ -17,13 +17,14 @@ class Config(object):
         self.datasize = None
         self.ckpt = None
         self.optimizer = None
-        self.bce_loss = None
+        self.bce_loss = True
         self.lr = 1e-5
         self.enc_layer = 1
         self.dec_layer = 3
         self.nepoch = 10
         self.results_path = None
         self.method_name = None
+        self.task_name = "sga"
         
         self.max_window = 5
         self.brownian_size = 1
@@ -34,7 +35,7 @@ class Config(object):
         self.additional_data_path = None
         
         self.baseline_context = 3
-        self.baseline_future = 3
+        self.max_future = 5
         
         self.hp_recon_loss = 1.0
         
@@ -65,7 +66,7 @@ class Config(object):
         parser.add_argument('--features_path', default=None, type=str)
         parser.add_argument('--additional_data_path', default=None, type=str)
         parser.add_argument('--baseline_context', default=3, type=int)
-        parser.add_argument('--baseline_future', default=3, type=int)
+        parser.add_argument('--max_future', default=5, type=int)
         parser.add_argument('--use_raw_data', action='store_true')
         parser.add_argument('--data_path', default='/data/rohith/ag', type=str)
         parser.add_argument('--datasize', dest='datasize', help='mini dataset or whole', default='large', type=str)
@@ -77,4 +78,5 @@ class Config(object):
         parser.add_argument('--dec_layer', dest='dec_layer', help='temporal decoder layer', default=3, type=int)
         parser.add_argument('--bce_loss', action='store_true')
         parser.add_argument('--modified_gt', action='store_true')
+        parser.add_argument("--task_name", default="sga", type=str)
         return parser

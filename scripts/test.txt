@@ -1,104 +1,13 @@
 # ------------------------------------------------------------------------------
-# ---------------------------- SGDET (Action Genome Scenes) --------------------
+# Takes the following information from the ckpt name
+# 1. Method Name -- To match with user intent
+# 2. Mode
+# 3. Train Future Frames
 # ------------------------------------------------------------------------------
 
-########### Train future frames - 1 future frame
-
-python test_sga_methods.py --method_name=sttran_ant --mode=sgdet --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=sttran_gen_ant --mode=sgdet --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_ant --mode=sgdet --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgdet --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=ode --mode=sgdet --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=sde --mode=sgdet --max_window=1 --ckpt=
-
-
-########### Train future frames - 3 future frame
-
-python test_sga_methods.py --method_name=sttran_ant --mode=sgdet --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=sttran_gen_ant --mode=sgdet --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_ant --mode=sgdet --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgdet --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=ode --mode=sgdet --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=sde --mode=sgdet --max_window=3 --ckpt=
-
-
-
-########### Train future frames - 5 future frame
-
-python test_sga_methods.py --method_name=sttran_ant --mode=sgdet --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=sttran_gen_ant --mode=sgdet --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_ant --mode=sgdet --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgdet --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=ode --mode=sgdet --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=sde --mode=sgdet --max_window=5 --ckpt=
-
-
-
-# ------------------------------------------------------------------------------
-# ---------------- SGCLS (Partially Grounded Action Genome Scenes) ----------
-# ------------------------------------------------------------------------------
-
-########### Train future frames - 1 future frame
-
-python test_sga_methods.py --method_name=sttran_ant --mode=sgcls --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=sttran_gen_ant --mode=sgcls --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_ant --mode=sgcls --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgcls --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=ode --mode=sgcls --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=sde --mode=sgcls --max_window=1 --ckpt=
-
-
-########### Train future frames - 3 future frame
-
-python test_sga_methods.py --method_name=sttran_ant --mode=sgcls --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=sttran_gen_ant --mode=sgcls --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_ant --mode=sgcls --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgcls --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=ode --mode=sgcls --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=sde --mode=sgcls --max_window=3 --ckpt=
-
-
-########### Train future frames - 5 future frame
-
-python test_sga_methods.py --method_name=sttran_ant --mode=sgcls --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=sttran_gen_ant --mode=sgcls --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_ant --mode=sgcls --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_gen_ant --mode=sgcls --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=ode --mode=sgcls --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=sde --mode=sgcls --max_window=5 --ckpt=
-
-
-
-# ------------------------------------------------------------------------------
-# ---------------- PREDCLS (Grounded Action Genome Scenes) ----------
-# ------------------------------------------------------------------------------
-
-########### Train future frames - 1 future frame
-
-python test_sga_methods.py --method_name=sttran_ant --mode=predcls --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=sttran_gen_ant --mode=predcls --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_ant --mode=predcls --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_gen_ant --mode=predcls --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=ode --mode=predcls --max_window=1 --ckpt=
-python test_sga_methods.py --method_name=sde --mode=predcls --max_window=1 --ckpt=
-
-
-########### Train future frames - 3 future frame
-
-python test_sga_methods.py --method_name=sttran_ant --mode=predcls --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=sttran_gen_ant --mode=predcls --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_ant --mode=predcls --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_gen_ant --mode=predcls --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=ode --mode=predcls --max_window=3 --ckpt=
-python test_sga_methods.py --method_name=sde --mode=predcls --max_window=3 --ckpt=
-
-
-########### Train future frames - 5 future frame
-
-python test_sga_methods.py --method_name=sttran_ant --mode=predcls --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=sttran_gen_ant --mode=predcls --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_ant --mode=predcls --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=dsgdetr_gen_ant --mode=predcls --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=ode --mode=predcls --max_window=5 --ckpt=
-python test_sga_methods.py --method_name=sde --mode=predcls --max_window=5 --ckpt=
-
+python test_sga_methods.py --method_name=sttran_ant --ckpt=
+python test_sga_methods.py --method_name=sttran_gen_ant --ckpt=
+python test_sga_methods.py --method_name=dsgdetr_ant --ckpt=
+python test_sga_methods.py --method_name=dsgdetr_gen_ant --ckpt=
+python test_sga_methods.py --method_name=ode --ckpt=
+python test_sga_methods.py --method_name=sde --ckpt=

@@ -231,7 +231,7 @@ class SceneSayerODE(nn.Module):
             if diff > 1:
                 frames_ranges = torch.cat((frames_ranges[ : i], torch.tensor([frames_ranges[i] for j in range(diff - 1)]).to(device=im_idx.device), frames_ranges[i : ]))
         if im_idx[0] > 0:
-            frames_ranges = torch.cat((torch.tensor([0 for j in range(im_idx[0])]).to(device=im_idx.device), frames_ranges))
+            frames_ranges = torch.cat((torch.tensor([0 for j in range(int(im_idx[0]))]).to(device=im_idx.device), frames_ranges))
         if frames_ranges.size(0) != num_frames + 1:
             frames_ranges = torch.cat((frames_ranges, torch.tensor([num_preds for j in range(num_frames + 1 - frames_ranges.size(0))]).to(device=im_idx.device)))
         entry["times"] = torch.repeat_interleave(times_unique.to(device=global_output.device), frames_ranges[1 : ] - frames_ranges[ : -1])

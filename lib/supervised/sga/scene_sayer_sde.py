@@ -246,7 +246,7 @@ class SceneSayerSDE(nn.Module):
                      frame_ranges[i:]))
         if im_idx[0] > 0:
             frame_ranges = torch.cat(
-                (torch.tensor([0 for j in range(im_idx[0])]).to(device=im_idx.device), frame_ranges))
+                (torch.tensor([0 for j in range(int(im_idx[0]))]).to(device=im_idx.device), frame_ranges))
         if frame_ranges.size(0) != num_frames + 1:
             frame_ranges = torch.cat((frame_ranges, torch.tensor(
                 [num_preds for j in range(num_frames + 1 - frame_ranges.size(0))]).to(device=im_idx.device)))

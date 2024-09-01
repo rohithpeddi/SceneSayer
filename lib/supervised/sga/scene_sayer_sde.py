@@ -233,39 +233,39 @@ class SceneSayerSDE(nn.Module):
         global_output = entry["global_output"]
         anticipated_vals = torch.zeros(window, 0, self.d_model, device=global_output.device)
         # obj_bounding_boxes = torch.zeros(self.max_window, indices[-1], 4, device=global_output.device)
-        frame_ranges = torch.cat(
+        frames_ranges = torch.cat(
             (torch.tensor([0]).to(device=indices.device), indices, torch.tensor([num_preds]).to(device=indices.device)))
-        frame_ranges = frame_ranges.long()
-        k = frame_ranges.size(0) - 1
+        frames_ranges = frames_ranges.long()
+        k = frames_ranges.size(0) - 1
         for i in range(k - 1, 0, -1):
-            diff = int(im_idx[frame_ranges[i]] - im_idx[frame_ranges[i - 1]])
+            diff = int(im_idx[frames_ranges[i]] - im_idx[frames_ranges[i - 1]])
             if diff > 1:
-                frame_ranges = torch.cat(
-                    (frame_ranges[: i],
-                     torch.tensor([frame_ranges[i] for j in range(diff - 1)]).to(device=im_idx.device),
-                     frame_ranges[i:]))
+                frames_ranges = torch.cat(
+                    (frames_ranges[: i],
+                     torch.tensor([frames_ranges[i] for j in range(diff - 1)]).to(device=im_idx.device),
+                     frames_ranges[i:]))
         if im_idx[0] > 0:
-            frame_ranges = torch.cat(
-                (torch.tensor([0 for j in range(int(im_idx[0]))]).to(device=im_idx.device), frame_ranges))
-        if frame_ranges.size(0) != num_frames + 1:
-            frame_ranges = torch.cat((frame_ranges, torch.tensor(
-                [num_preds for j in range(num_frames + 1 - frame_ranges.size(0))]).to(device=im_idx.device)))
+            frames_ranges = torch.cat(
+                (torch.tensor([0 for j in range(int(im_idx[0]))]).to(device=im_idx.device), frames_ranges))
+        if frames_ranges.size(0) != num_frames + 1:
+            frames_ranges = torch.cat((frames_ranges, torch.tensor(
+                [num_preds for j in range(num_frames + 1 - frames_ranges.size(0))]).to(device=im_idx.device)))
         entry["times"] = torch.repeat_interleave(times_unique.to(device=global_output.device),
-                                                 frame_ranges[1:] - frame_ranges[: -1])
-        entry["rng"] = frame_ranges
+                                                 frames_ranges[1:] - frames_ranges[: -1])
+        entry["rng"] = frames_ranges
         times_unique = torch.cat((times_unique, times_extend)).to(device=global_output.device)
         for i in range(1, window + 1):
             # masks for final output latents used during loss evaluation
-            mask_preds = torch.tensor([], dtype=torch.long, device=frame_ranges.device)
-            mask_gt = torch.tensor([], dtype=torch.long, device=frame_ranges.device)
+            mask_preds = torch.tensor([], dtype=torch.long, device=frames_ranges.device)
+            mask_gt = torch.tensor([], dtype=torch.long, device=frames_ranges.device)
             gt = gt_annotation.copy()
             for j in range(num_frames - i):
                 if testing:
-                    a, b = np.array(pred_labels_obj[frame_ranges[j]: frame_ranges[j + 1]].cpu()), np.array(
-                        labels_obj[frame_ranges[j + i]: frame_ranges[j + i + 1]].cpu())
+                    a, b = np.array(pred_labels_obj[frames_ranges[j]: frames_ranges[j + 1]].cpu()), np.array(
+                        labels_obj[frames_ranges[j + i]: frames_ranges[j + i + 1]].cpu())
                 else:
-                    a, b = np.array(labels_obj[frame_ranges[j]: frame_ranges[j + 1]].cpu()), np.array(
-                        labels_obj[frame_ranges[j + i]: frame_ranges[j + i + 1]].cpu())
+                    a, b = np.array(labels_obj[frames_ranges[j]: frames_ranges[j + 1]].cpu()), np.array(
+                        labels_obj[frames_ranges[j + i]: frames_ranges[j + i + 1]].cpu())
                 # persistent object labels
                 intersection = np.intersect1d(a, b, return_indices=False)
                 ind1 = np.array([])  # indices of object labels from last context frame in the intersection
@@ -285,11 +285,11 @@ class SceneSayerSDE(nn.Module):
                         ctr += 1
                     # stores modified ground truth
                     gt[i + j] = [gt[i + j][ind] for ind in L]
-                ind1 = torch.tensor(ind1, dtype=torch.long, device=frame_ranges.device)
-                ind2 = torch.tensor(ind2, dtype=torch.long, device=frame_ranges.device)
+                ind1 = torch.tensor(ind1, dtype=torch.long, device=frames_ranges.device)
+                ind2 = torch.tensor(ind2, dtype=torch.long, device=frames_ranges.device)
                 # offset by subject-object pair position
-                ind1 += frame_ranges[j]
-                ind2 += frame_ranges[j + i]
+                ind1 += frames_ranges[j]
+                ind2 += frames_ranges[j + i]
                 mask_preds = torch.cat((mask_preds, ind1))
                 mask_gt = torch.cat((mask_gt, ind2))
             entry["mask_curr_%d" % i] = mask_preds
@@ -314,10 +314,10 @@ class SceneSayerSDE(nn.Module):
                 boxes_test[inverse_indices[: , 1]] = entry["boxes"][pair_idx[mask_gt][: , 1]]
                 entry["boxes_test_%d" %i] = boxes_test"""
                 # entry["boxes_test_%d" %i] = entry["boxes"][_.long()]
-                entry["last_%d" % i] = frame_ranges[-(i + 1)]
-                mx = torch.max(pair_idx[: frame_ranges[-(i + 1)]]) + 1
-                entry["im_idx_test_%d" % i] = entry["im_idx"][: frame_ranges[-(i + 1)]]
-                entry["pair_idx_test_%d" % i] = entry["pair_idx"][: frame_ranges[-(i + 1)]]
+                entry["last_%d" % i] = frames_ranges[-(i + 1)]
+                mx = torch.max(pair_idx[: frames_ranges[-(i + 1)]]) + 1
+                entry["im_idx_test_%d" % i] = entry["im_idx"][: frames_ranges[-(i + 1)]]
+                entry["pair_idx_test_%d" % i] = entry["pair_idx"][: frames_ranges[-(i + 1)]]
                 if self.mode == "predcls":
                     entry["scores_test_%d" % i] = entry["scores"][: mx]
                     entry["labels_test_%d" % i] = entry["labels"][: mx]
@@ -330,7 +330,7 @@ class SceneSayerSDE(nn.Module):
         # anticipated_latent_loss = 0
         # targets = entry["detached_outputs"]
         for i in range(num_frames - 1):
-            end = frame_ranges[i + 1]
+            end = frames_ranges[i + 1]
             if curr_id == end:
                 continue
             batch_y0 = global_output[curr_id: end]
@@ -362,18 +362,47 @@ class SceneSayerSDE(nn.Module):
         # evaluation_recall.evaluate_scene_graph_forecasting(self, gt, pred, end, future_end, future_frame_idx, count=0)
         # entry["output"][0] = {pred_scores, pred_labels, attention_distribution, spatial_distribution, contact_distribution}
         assert context_fraction > 0
+        entry = self.dsgdetr(entry)
         im_idx = entry["im_idx"]
         pair_idx = entry["pair_idx"]
-        frame_ranges = entry["rng"]
-        times = torch.unique(torch.tensor(entry["frame_idx"], dtype=torch.float32)).to(device=im_idx.device)
-        num_frames = len(entry["gt_annotation"])
+        gt_annotation = entry["gt_annotation"]
+        num_preds = im_idx.size(0)
+        times = torch.tensor(entry["frame_idx"], dtype=torch.float32)
+        indices = torch.reshape((im_idx[: -1] != im_idx[1:]).nonzero(), (-1,)) + 1
+        times_unique = torch.unique(times).float()
+        num_frames = len(gt_annotation)
+        window = self.max_window
+        if self.max_window == -1:
+            window = num_frames - 1
+        window = min(window, num_frames - 1)
+        times_extend = torch.Tensor([times_unique[-1] + i + 1 for i in range(window)])
+        global_output = entry["global_output"]
+        frames_ranges = torch.cat(
+            (torch.tensor([0]).to(device=indices.device), indices, torch.tensor([num_preds]).to(device=indices.device)))
+        frames_ranges = frames_ranges.long()
+        k = frames_ranges.size(0) - 1
+        for i in range(k - 1, 0, -1):
+            diff = int(im_idx[frames_ranges[i]] - im_idx[frames_ranges[i - 1]])
+            if diff > 1:
+                frames_ranges = torch.cat((frames_ranges[: i],
+                                           torch.tensor([frames_ranges[i] for j in range(diff - 1)]).to(
+                                               device=im_idx.device), frames_ranges[i:]))
+        if int(im_idx[0]) > 0:
+            frames_ranges = torch.cat(
+                (torch.tensor([0 for j in range(int(im_idx[0]))]).to(device=im_idx.device), frames_ranges))
+        if frames_ranges.size(0) != num_frames + 1:
+            frames_ranges = torch.cat((frames_ranges, torch.tensor(
+                [num_preds for j in range(num_frames + 1 - frames_ranges.size(0))]).to(device=im_idx.device)))
+        entry["times"] = torch.repeat_interleave(times_unique.to(device=global_output.device),
+                                                 frames_ranges[1:] - frames_ranges[: -1])
+        entry["rng"] = frames_ranges
         pred = {}
         end = int(np.ceil(num_frames * context_fraction) - 1)
-        while end > 0 and frame_ranges[end] == frame_ranges[end + 1]:
+        while end > 0 and frames_ranges[end] == frames_ranges[end + 1]:
             end -= 1
-        if end == num_frames - 1 or frame_ranges[end] == frame_ranges[end + 1]:
+        if end == num_frames - 1 or frames_ranges[end] == frames_ranges[end + 1]:
             return num_frames, pred
-        ret = sdeint(self.diff_func, entry["global_output"][frame_ranges[end]: frame_ranges[end + 1]], times[end:],
+        ret = sdeint(self.diff_func, entry["global_output"][frames_ranges[end]: frames_ranges[end + 1]], times[end:],
                      method='reversible_heun', adjoint_method='adjoint_reversible_heun', dt=1)[1:]
         pred["attention_distribution"] = torch.flatten(self.dsgdetr.a_rel_compress(ret), start_dim=0, end_dim=1)
         pred["spatial_distribution"] = torch.flatten(torch.sigmoid(self.dsgdetr.s_rel_compress(ret)), start_dim=0,
@@ -381,26 +410,26 @@ class SceneSayerSDE(nn.Module):
         pred["contacting_distribution"] = torch.flatten(torch.sigmoid(self.dsgdetr.c_rel_compress(ret)), start_dim=0,
                                                         end_dim=1)
         if self.mode == "predcls":
-            pred["scores"] = entry["scores"][torch.min(pair_idx[frame_ranges[end]: frame_ranges[end + 1]]): torch.max(
-                pair_idx[frame_ranges[end]: frame_ranges[end + 1]]) + 1].repeat(num_frames - end - 1)
-            pred["labels"] = entry["labels"][torch.min(pair_idx[frame_ranges[end]: frame_ranges[end + 1]]): torch.max(
-                pair_idx[frame_ranges[end]: frame_ranges[end + 1]]) + 1].repeat(num_frames - end - 1)
+            pred["scores"] = entry["scores"][torch.min(pair_idx[frames_ranges[end]: frames_ranges[end + 1]]): torch.max(
+                pair_idx[frames_ranges[end]: frames_ranges[end + 1]]) + 1].repeat(num_frames - end - 1)
+            pred["labels"] = entry["labels"][torch.min(pair_idx[frames_ranges[end]: frames_ranges[end + 1]]): torch.max(
+                pair_idx[frames_ranges[end]: frames_ranges[end + 1]]) + 1].repeat(num_frames - end - 1)
         else:
             pred["pred_scores"] = entry["pred_scores"][
-                                  torch.min(pair_idx[frame_ranges[end]: frame_ranges[end + 1]]): torch.max(
-                                      pair_idx[frame_ranges[end]: frame_ranges[end + 1]]) + 1].repeat(
+                                  torch.min(pair_idx[frames_ranges[end]: frames_ranges[end + 1]]): torch.max(
+                                      pair_idx[frames_ranges[end]: frames_ranges[end + 1]]) + 1].repeat(
                 num_frames - end - 1)
             pred["pred_labels"] = entry["pred_labels"][
-                                  torch.min(pair_idx[frame_ranges[end]: frame_ranges[end + 1]]): torch.max(
-                                      pair_idx[frame_ranges[end]: frame_ranges[end + 1]]) + 1].repeat(
+                                  torch.min(pair_idx[frames_ranges[end]: frames_ranges[end + 1]]): torch.max(
+                                      pair_idx[frames_ranges[end]: frames_ranges[end + 1]]) + 1].repeat(
                 num_frames - end - 1)
         pred["im_idx"] = torch.tensor(
-            [i for i in range(num_frames - end - 1) for j in range(frame_ranges[end + 1] - frame_ranges[end])],
-            dtype=torch.int32).to(device=frame_ranges.device)
-        mx = torch.max(pair_idx[frame_ranges[end]: frame_ranges[end + 1]]) - torch.min(
-            pair_idx[frame_ranges[end]: frame_ranges[end + 1]]) + 1
-        pred["pair_idx"] = (pair_idx[frame_ranges[end]: frame_ranges[end + 1]] - torch.min(
-            pair_idx[frame_ranges[end]: frame_ranges[end + 1]])).repeat(
+            [i for i in range(num_frames - end - 1) for j in range(frames_ranges[end + 1] - frames_ranges[end])],
+            dtype=torch.int32).to(device=frames_ranges.device)
+        mx = torch.max(pair_idx[frames_ranges[end]: frames_ranges[end + 1]]) - torch.min(
+            pair_idx[frames_ranges[end]: frames_ranges[end + 1]]) + 1
+        pred["pair_idx"] = (pair_idx[frames_ranges[end]: frames_ranges[end + 1]] - torch.min(
+            pair_idx[frames_ranges[end]: frames_ranges[end + 1]])).repeat(
             num_frames - end - 1, 1) + mx * torch.reshape(pred["im_idx"], (-1, 1))
         pred["boxes"] = torch.ones(mx * (num_frames - end - 1), 5).to(device=im_idx.device) / 2
         return end + 1, pred

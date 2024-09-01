@@ -239,8 +239,8 @@ class SceneSayerODE(nn.Module):
         times_unique = torch.cat((times_unique, times_extend)).to(device=global_output.device)
         for i in range(1, window + 1):
             # masks for final output latents used during loss evaluation
-            mask_preds = torch.tensor([], dtype=torch.long, device=frames_ranges.device)   
-            mask_gt = torch.tensor([], dtype=torch.long, device=frames_ranges.device)    
+            mask_preds = torch.tensor([], dtype=torch.long, device=frames_ranges.device)
+            mask_gt = torch.tensor([], dtype=torch.long, device=frames_ranges.device)
             gt = gt_annotation.copy()
             for j in range(num_frames - i):
                 if testing:
@@ -308,7 +308,7 @@ class SceneSayerODE(nn.Module):
                 entry["gt_annotation_%d" %i] = gt
         #self.ctr += 1
         #anticipated_latent_loss = 0
-        #targets = entry["detached_outputs"] 
+        #targets = entry["detached_outputs"]
         for i in range(num_frames - 1):
             end = frames_ranges[i + 1]
             if curr_id == end:
@@ -340,11 +340,42 @@ class SceneSayerODE(nn.Module):
         # Take each entry and extrapolate it to the future
         # evaluation_recall.evaluate_scene_graph_forecasting(self, gt, pred, end, future_end, future_frame_idx, count=0)
         # entry["output"][0] = {pred_scores, pred_labels, attention_distribution, spatial_distribution, contact_distribution}
+
         assert context_fraction > 0
+        entry = self.dsgdetr(entry)
         im_idx = entry["im_idx"]
         pair_idx = entry["pair_idx"]
-        frames_ranges = entry["rng"]
-        times = torch.unique(torch.tensor(entry["frame_idx"], dtype = torch.float32)).to(device=im_idx.device)
+        gt_annotation = entry["gt_annotation"]
+        num_preds = im_idx.size(0)
+        times = torch.tensor(entry["frame_idx"], dtype=torch.float32)
+        indices = torch.reshape((im_idx[: -1] != im_idx[1:]).nonzero(), (-1,)) + 1
+        times_unique = torch.unique(times).float()
+        num_frames = len(gt_annotation)
+        window = self.max_window
+        if self.max_window == -1:
+            window = num_frames - 1
+        window = min(window, num_frames - 1)
+        times_extend = torch.Tensor([times_unique[-1] + i + 1 for i in range(window)])
+        global_output = entry["global_output"]
+        frames_ranges = torch.cat(
+            (torch.tensor([0]).to(device=indices.device), indices, torch.tensor([num_preds]).to(device=indices.device)))
+        frames_ranges = frames_ranges.long()
+        k = frames_ranges.size(0) - 1
+        for i in range(k - 1, 0, -1):
+            diff = int(im_idx[frames_ranges[i]] - im_idx[frames_ranges[i - 1]])
+            if diff > 1:
+                frames_ranges = torch.cat((frames_ranges[: i],
+                                           torch.tensor([frames_ranges[i] for j in range(diff - 1)]).to(
+                                               device=im_idx.device), frames_ranges[i:]))
+        if int(im_idx[0]) > 0:
+            frames_ranges = torch.cat(
+                (torch.tensor([0 for j in range(int(im_idx[0]))]).to(device=im_idx.device), frames_ranges))
+        if frames_ranges.size(0) != num_frames + 1:
+            frames_ranges = torch.cat((frames_ranges, torch.tensor(
+                [num_preds for j in range(num_frames + 1 - frames_ranges.size(0))]).to(device=im_idx.device)))
+        entry["times"] = torch.repeat_interleave(times_unique.to(device=global_output.device),
+                                                 frames_ranges[1:] - frames_ranges[: -1])
+        entry["rng"] = frames_ranges
         num_frames = len(entry["gt_annotation"])
         pred = {}
         end = int(np.ceil(num_frames * context_fraction) - 1)

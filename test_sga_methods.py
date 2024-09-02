@@ -37,6 +37,7 @@ class TestODE(TestSGABase):
         ind, pred = self._model.forward_single_entry(context_fraction=context_fraction, entry=video_entry)
         skip = False
         if ind >= len(gt_annotation):
+            print("Skipping")
             skip = True
 
         result = {

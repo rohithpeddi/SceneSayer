@@ -143,6 +143,7 @@ class TestSGABase(SGABase):
             semi_constraint_evaluator_stats = self._combined_cf_evaluators_dict[index][2].fetch_stats_json()
 
         collated_stats = [
+            self._conf.method_name,
             with_constraint_evaluator_stats["recall"][10],
             with_constraint_evaluator_stats["recall"][20],
             with_constraint_evaluator_stats["recall"][50],

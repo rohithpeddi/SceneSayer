@@ -195,6 +195,7 @@ class BaseLDPUDiffEq(nn.Module):
         num_preds = im_idx.size(0)
         times = torch.tensor(entry["frame_idx"], dtype=torch.float32)
         indices = torch.reshape((im_idx[: -1] != im_idx[1:]).nonzero(), (-1,)) + 1
+        curr_id = 0
         times_unique = torch.unique(times).float()
         num_frames = len(gt_annotation)
         window = self.max_window
@@ -212,10 +213,9 @@ class BaseLDPUDiffEq(nn.Module):
         for i in range(k - 1, 0, -1):
             diff = int(im_idx[frames_ranges[i]] - im_idx[frames_ranges[i - 1]])
             if diff > 1:
-                frames_ranges = torch.cat(
-                    (frames_ranges[: i],
-                     torch.tensor([frames_ranges[i] for j in range(diff - 1)]).to(device=im_idx.device),
-                     frames_ranges[i:]))
+                frames_ranges = torch.cat((frames_ranges[: i],
+                                           torch.tensor([frames_ranges[i] for j in range(diff - 1)]).to(
+                                               device=im_idx.device), frames_ranges[i:]))
         if im_idx[0] > 0:
             frames_ranges = torch.cat(
                 (torch.tensor([0 for j in range(int(im_idx[0]))]).to(device=im_idx.device), frames_ranges))
@@ -241,7 +241,8 @@ class BaseLDPUDiffEq(nn.Module):
                 # persistent object labels
                 intersection = np.intersect1d(a, b, return_indices=False)
                 ind1 = np.array([])  # indices of object labels from last context frame in the intersection
-                ind2 = np.array([])  # indices of object labels that persist in the ith frame after the last context frame
+                ind2 = np.array(
+                    [])  # indices of object labels that persist in the ith frame after the last context frame
                 for element in intersection:
                     tmp1, tmp2 = np.where(a == element)[0], np.where(b == element)[0]
                     mn = min(tmp1.shape[0], tmp2.shape[0])
@@ -263,8 +264,28 @@ class BaseLDPUDiffEq(nn.Module):
                 ind2 += frames_ranges[j + i]
                 mask_preds = torch.cat((mask_preds, ind1))
                 mask_gt = torch.cat((mask_gt, ind2))
-
+            entry["mask_curr_%d" % i] = mask_preds
+            entry["mask_gt_%d" % i] = mask_gt
             if testing:
+                """pair_idx_test = pair_idx[mask_preds]
+                _, inverse_indices = torch.unique(pair_idx_test, sorted=True, return_inverse=True)
+                entry["im_idx_test_%d" %i] = im_idx[mask_preds]
+                entry["pair_idx_test_%d" %i] = inverse_indices
+                if self.mode == "predcls":
+                    entry["scores_test_%d" %i] = entry["scores"][_.long()]
+                    entry["labels_test_%d" %i] = entry["labels"][_.long()]
+                else:
+                    entry["pred_scores_test_%d" %i] = entry["pred_scores"][_.long()]
+                    entry["pred_labels_test_%d" %i] = entry["pred_labels"][_.long()]
+                if inverse_indices.size(0) != 0:
+                    mx = torch.max(inverse_indices)
+                else:
+                    mx = -1
+                boxes_test = torch.zeros(mx + 1, 5, device=entry["boxes"].device)
+                boxes_test[torch.unique_consecutive(inverse_indices[: , 0])] = entry["boxes"][torch.unique_consecutive(pair_idx[mask_gt][: , 0])]
+                boxes_test[inverse_indices[: , 1]] = entry["boxes"][pair_idx[mask_gt][: , 1]]
+                entry["boxes_test_%d" %i] = boxes_test"""
+                # entry["boxes_test_%d" %i] = entry["boxes"][_.long()]
                 entry["last_%d" % i] = frames_ranges[-(i + 1)]
                 mx = torch.max(pair_idx[: frames_ranges[-(i + 1)]]) + 1
                 entry["im_idx_test_%d" % i] = entry["im_idx"][: frames_ranges[-(i + 1)]]
@@ -277,29 +298,22 @@ class BaseLDPUDiffEq(nn.Module):
                     entry["pred_labels_test_%d" % i] = entry["pred_labels"][: mx]
                 entry["boxes_test_%d" % i] = torch.ones(mx, 5).to(device=im_idx.device) / 2
                 entry["gt_annotation_%d" % i] = gt
-
-            if len(mask_preds) == 0:
-                if len(mask_gt) == 0:
-                    continue
-                else:
-                    print("mask_gt not empty but mask_preds empty")
-            else:
-                assert len(mask_gt) == len(mask_preds)
-                entry["mask_curr_%d" % i] = mask_preds
-                entry["mask_gt_%d" % i] = mask_gt
+        # self.ctr += 1
+        # anticipated_latent_loss = 0
+        # targets = entry["detached_outputs"]
 
         return entry, num_frames, frames_ranges, times_unique, window, global_output, anticipated_vals
 
     def process_ff_rels_output_entry(self, entry, anticipated_vals):
-        # for p in self.dsgdetr.get_subj_boxes.parameters():
+        # for p in self.base_ldpu.get_subj_boxes.parameters():
         #    p.requires_grad_(False)
-        entry["anticipated_subject_boxes"] = self.base_ldpu.get_subj_boxes(anticipated_vals)
-        # for p in self.dsgdetr.get_subj_boxes.parameters():
+        entry["anticipated_subject_boxes"] = self.dsgdetr.get_subj_boxes(anticipated_vals)
+        # for p in self.base_ldpu.get_subj_boxes.parameters():
         #    p.requires_grad_(True)
         entry["anticipated_vals"] = anticipated_vals
-        entry["anticipated_attention_distribution"] = self.base_ldpu.a_rel_compress(anticipated_vals)
-        entry["anticipated_spatial_distribution"] = torch.sigmoid(self.base_ldpu.s_rel_compress(anticipated_vals))
-        entry["anticipated_contacting_distribution"] = torch.sigmoid(self.base_ldpu.c_rel_compress(anticipated_vals))
+        entry["anticipated_attention_distribution"] = self.dsgdetr.a_rel_compress(anticipated_vals)
+        entry["anticipated_spatial_distribution"] = torch.sigmoid(self.dsgdetr.s_rel_compress(anticipated_vals))
+        entry["anticipated_contacting_distribution"] = torch.sigmoid(self.dsgdetr.c_rel_compress(anticipated_vals))
         # entry["anticipated_object_boxes"] = obj_bounding_boxes
         return entry
 
@@ -309,12 +323,16 @@ class BaseLDPUDiffEq(nn.Module):
         im_idx = entry["im_idx"]
         pair_idx = entry["pair_idx"]
         gt_annotation = entry["gt_annotation"]
-        times = torch.unique(torch.tensor(entry["frame_idx"], dtype=torch.float32).to(device=im_idx.device))
-        num_frames = len(gt_annotation)
         num_preds = im_idx.size(0)
+        times = torch.tensor(entry["frame_idx"], dtype=torch.float32)
         indices = torch.reshape((im_idx[: -1] != im_idx[1:]).nonzero(), (-1,)) + 1
+        times_unique = torch.unique(times).float()
+        num_frames = len(gt_annotation)
         window = self.max_window
+        if self.max_window == -1:
+            window = num_frames - 1
         window = min(window, num_frames - 1)
+        times_extend = torch.Tensor([times_unique[-1] + i + 1 for i in range(window)])
         global_output = entry["global_output"]
         frames_ranges = torch.cat(
             (torch.tensor([0]).to(device=indices.device), indices, torch.tensor([num_preds]).to(device=indices.device)))
@@ -332,8 +350,10 @@ class BaseLDPUDiffEq(nn.Module):
         if frames_ranges.size(0) != num_frames + 1:
             frames_ranges = torch.cat((frames_ranges, torch.tensor(
                 [num_preds for j in range(num_frames + 1 - frames_ranges.size(0))]).to(device=im_idx.device)))
+        entry["times"] = torch.repeat_interleave(times_unique.to(device=global_output.device),
+                                                 frames_ranges[1:] - frames_ranges[: -1])
         entry["rng"] = frames_ranges
-        frames_ranges = entry["rng"]
+        num_frames = len(entry["gt_annotation"])
         end = int(np.ceil(num_frames * context_fraction) - 1)
         while end > 0 and frames_ranges[end] == frames_ranges[end + 1]:
             end -= 1
@@ -366,7 +386,7 @@ class BaseLDPUDiffEq(nn.Module):
         mx = torch.max(pair_idx[frames_ranges[end]: frames_ranges[end + 1]]) - torch.min(
             pair_idx[frames_ranges[end]: frames_ranges[end + 1]]) + 1
         pred["pair_idx"] = (pair_idx[frames_ranges[end]: frames_ranges[end + 1]] - torch.min(
-            pair_idx[frames_ranges[end]: frames_ranges[end + 1]])).repeat(
-            num_frames - end - 1, 1) + mx * torch.reshape(pred["im_idx"], (-1, 1))
+            pair_idx[frames_ranges[end]: frames_ranges[end + 1]])).repeat(num_frames - end - 1, 1) + mx * torch.reshape(
+            pred["im_idx"], (-1, 1))
         pred["boxes"] = torch.ones(mx * (num_frames - end - 1), 5).to(device=im_idx.device) / 2
         return pred

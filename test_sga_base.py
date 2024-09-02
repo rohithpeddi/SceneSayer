@@ -1,6 +1,7 @@
 import copy
 import csv
 import os
+import pickle
 from abc import abstractmethod
 
 import numpy as np
@@ -142,6 +143,7 @@ class TestSGABase(SGABase):
             semi_constraint_evaluator_stats = self._combined_cf_evaluators_dict[index][2].fetch_stats_json()
 
         collated_stats = [
+            self._conf.method_name,
             with_constraint_evaluator_stats["recall"][10],
             with_constraint_evaluator_stats["recall"][20],
             with_constraint_evaluator_stats["recall"][50],
@@ -193,62 +195,64 @@ class TestSGABase(SGABase):
                 evaluators[1].evaluate_scene_graph(gt, pred)
                 evaluators[2].evaluate_scene_graph(gt, pred)
 
-    def _publish_evaluation_results(self):
+    def _publish_evaluation_results(self, is_future_frame=True):
         # 1. Collate the evaluation statistics
         # self._collated_stats = self._collate_evaluation_stats()
         # 2. Write to the CSV File
-        self._write_evaluation_statistics()
+        self._write_evaluation_statistics(is_future_frame=is_future_frame)
         # 3. Publish the results to Firebase
         # self._publish_results_to_firebase()
 
-    def _write_evaluation_statistics(self):
+    def _write_evaluation_statistics(self, is_future_frame=True):
         # Create the results directory
         results_dir = os.path.join(os.getcwd(), 'results')
         mode_results_dir = os.path.join(results_dir, self._conf.mode)
         os.makedirs(mode_results_dir, exist_ok=True)
 
-        # Create the results file
-        for i, future_frame_window in enumerate(self._future_frame_windows):
-            file_name = f'{self._conf.method_name}_{self._conf.mode}_train_{self._conf.max_window}_test_{future_frame_window}.csv'
-            results_file_path = os.path.join(mode_results_dir, file_name)
+        if is_future_frame:
+            # Create the results file
+            for i, future_frame_window in enumerate(self._future_frame_windows):
+                file_name = f'{self._conf.method_name}_{self._conf.mode}_train_{self._conf.max_window}_test_{future_frame_window}.csv'
+                results_file_path = os.path.join(mode_results_dir, file_name)
 
-            with open(results_file_path, "a", newline='') as activity_idx_step_idx_annotation_csv_file:
-                writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
-                collated_stats = self._collate_evaluation_stats(future_frame_window, True)
-                # Write the header if the file is empty
-                if not os.path.isfile(results_file_path):
-                    writer.writerow([
-                        "Method Name",
-                        "R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
-                        "hR@100"
-                        "R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
-                        "hR@100",
-                        "R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
-                        "hR@100"
-                    ])
-                    # Write the results row
-                writer.writerow(collated_stats)
+                with open(results_file_path, "a", newline='') as activity_idx_step_idx_annotation_csv_file:
+                    writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
+                    collated_stats = self._collate_evaluation_stats(future_frame_window, True)
+                    # Write the header if the file is empty
+                    if not os.path.isfile(results_file_path):
+                        writer.writerow([
+                            "Method Name",
+                            "R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+                            "hR@100"
+                            "R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+                            "hR@100",
+                            "R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+                            "hR@100"
+                        ])
+                        # Write the results row
+                    writer.writerow(collated_stats)
 
-        for i, context_fraction in enumerate(self._context_fractions):
-            file_name = f'{self._conf.method_name}_{self._conf.mode}_train_{self._conf.max_window}_test_{context_fraction}.csv'
-            results_file_path = os.path.join(mode_results_dir, file_name)
+        if not is_future_frame:
+            for i, context_fraction in enumerate(self._context_fractions):
+                file_name = f'{self._conf.method_name}_{self._conf.mode}_train_{self._conf.max_window}_test_{context_fraction}.csv'
+                results_file_path = os.path.join(mode_results_dir, file_name)
 
-            with open(results_file_path, "a", newline='') as activity_idx_step_idx_annotation_csv_file:
-                writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
-                collated_stats = self._collate_evaluation_stats(context_fraction, False)
-                # Write the header if the file is empty
-                if not os.path.isfile(results_file_path):
-                    writer.writerow([
-                        "Method Name",
-                        "R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
-                        "hR@100"
-                        "R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
-                        "hR@100",
-                        "R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
-                        "hR@100"
-                    ])
-                    # Write the results row
-                writer.writerow(collated_stats)
+                with open(results_file_path, "a", newline='') as activity_idx_step_idx_annotation_csv_file:
+                    writer = csv.writer(activity_idx_step_idx_annotation_csv_file, quoting=csv.QUOTE_NONNUMERIC)
+                    collated_stats = self._collate_evaluation_stats(context_fraction, False)
+                    # Write the header if the file is empty
+                    if not os.path.isfile(results_file_path):
+                        writer.writerow([
+                            "Method Name",
+                            "R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+                            "hR@100"
+                            "R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+                            "hR@100",
+                            "R@10", "R@20", "R@50", "R@100", "mR@10", "mR@20", "mR@50", "mR@100", "hR@10", "hR@20", "hR@50",
+                            "hR@100"
+                        ])
+                        # Write the results row
+                    writer.writerow(collated_stats)
 
     @staticmethod
     def _prepare_metrics_from_stats(evaluator_stats):
@@ -433,27 +437,42 @@ class TestSGABase(SGABase):
         self._model.eval()
         self._object_detector.is_train = False
         with torch.no_grad():
-            for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress (Future Frames)", ascii=True):
-                data = next(test_iter)
-                im_data, im_info, gt_boxes, num_boxes = [copy.deepcopy(d.cuda(0)) for d in data[:4]]
-                gt_annotation = self._test_dataset.gt_annotations[data[4]]
-                frame_size = (im_info[0][:2] / im_info[0, 2]).cpu().data
+            # for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress (Future Frames)",
+            #                          ascii=True):
+            #     data = next(test_iter)
+            #     im_data, im_info, gt_boxes, num_boxes = [copy.deepcopy(d.cuda(0)) for d in data[:4]]
+            #     gt_annotation = self._test_dataset.gt_annotations[data[4]]
+            #     frame_size = (im_info[0][:2] / im_info[0, 2]).cpu().data
+            #
+            #     entry = self._object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
+            #     entry["gt_annotation"] = gt_annotation
+            #
+            #     # Load corresponding extracted feature file for comparison
+            #     # video_id = gt_annotation[0][0]["frame"].split("/")[0]
+            #     # video_feature_file_path = os.path.join("/data/rohith/ag/features/supervised/test",
+            #     #                                        f"{video_id}_{self._conf.mode}.pkl")
+            #     # with open(os.path.join(video_feature_file_path), 'rb') as pkl_file:
+            #     #     data_dictionary = pickle.load(pkl_file)
+            #     #
+            #     # assert torch.equal(entry["features"], data_dictionary["FINAL_FEATURES"])
+            #
+            #     # ----------------- Process the video (Method Specific) ---------------------
+            #     pred = self.process_test_video_future_frame(entry, frame_size, gt_annotation)
+            #     # ---------------------------------------------------------------------------
+            #
+            #     # ----------------- Process evaluation score (Method Specific)-----------------
+            #     self.compute_test_video_future_frame_score(pred, frame_size, gt_annotation)
+            #     # ----------------------------------------------------------------------------
+            #
+            # print('-----------------------------------------------------------------------------------', flush=True)
+            #
+            # # 5. Publish the evaluation results
+            # self._publish_evaluation_results(is_future_frame=True)
 
-                entry = self._object_detector(im_data, im_info, gt_boxes, num_boxes, gt_annotation, im_all=None)
-                entry["gt_annotation"] = gt_annotation
-
-                # ----------------- Process the video (Method Specific) ---------------------
-                pred = self.process_test_video_future_frame(entry, frame_size, gt_annotation)
-                # ---------------------------------------------------------------------------
-
-                # ----------------- Process evaluation score (Method Specific)-----------------
-                self.compute_test_video_future_frame_score(pred, frame_size, gt_annotation)
-                # ----------------------------------------------------------------------------
-
-            print('-----------------------------------------------------------------------------------', flush=True)
             for i, context_fraction in enumerate(self._context_fractions):
                 test_iter = iter(self._dataloader_test)
-                for num_video_id in tqdm(range(len(self._dataloader_test)), desc="Testing Progress (Context Fraction)", ascii=True):
+                for num_video_id in tqdm(range(len(self._dataloader_test)), desc=f"Testing Progress (Context Fraction: {context_fraction})",
+                                         ascii=True):
                     data = next(test_iter)
                     im_data, im_info, gt_boxes, num_boxes = [copy.deepcopy(d.cuda(0)) for d in data[:4]]
                     gt_annotation = self._test_dataset.gt_annotations[data[4]]
@@ -473,7 +492,11 @@ class TestSGABase(SGABase):
                     self.compute_test_video_context_score(result, gt_annotation, context_fraction)
                     # ---------------------------------------------------------------------------
 
+
                 print('-----------------------------------------------------------------------------------', flush=True)
+
+            # 5. Publish the evaluation results
+            self._publish_evaluation_results(is_future_frame=False)
 
     def init_method_evaluation(self):
         # 0. Init config
@@ -492,6 +515,3 @@ class TestSGABase(SGABase):
 
         # 4. Test the model
         self._test_model()
-
-        # 5. Publish the evaluation results
-        self._publish_evaluation_results()

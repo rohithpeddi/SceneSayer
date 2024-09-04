@@ -244,7 +244,7 @@ class TrainODE(TrainSGABase):
         return pred
 
     def process_test_video(self, entry, gt_annotation, frame_size) -> dict:
-        get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size,self._conf)
+        get_sequence_with_tracking(entry, gt_annotation, self._matcher, frame_size,self._conf.mode)
         entry["gt_annotation"] = gt_annotation
         pred = self._model(entry, True)
         return pred

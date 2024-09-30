@@ -168,6 +168,55 @@ Follow [this](https://www.youtube.com/watch?v=aai42Qp6L28) for changing gcc vers
 Download pretrained fasterRCNN model [here](https://utdallas.box.com/s/gj7n57na15cel6y682pdfn7bmnbbwq8g) and place in fasterRCNN/models/
 
 
+------
+
+## CHECKPOINTS
+
+| Method Name     | Checkpoint method Name |
+|-----------------|------------------------|
+| STTran+         | sttran_ant  |
+| DSGDetr+        | dsgdetr_ant  | 
+| STTran++        | sttran_gen_ant | 
+| DSGDetr++       | dsgdetr_gen_ant | 
+| SceneSayerODE   | ode | 
+| SceneSayerSDE   | sde | 
+
+
+Please find the checkpoints with the following name structure.
+
+```
+<CKPT_METHOD_NAME>_<MODE>_future_<#TRAIN_FUTURE_FRAMES>_epoch_<#STORED_EPOCH>.tar
+```
+Eg:
+
+**dsgdetr_ant**\_**sgdet**\_future\_**3**\_epoch\_**0**
+
+**ode**\_**sgdet**\_future\_**1**\_epoch\_**0**
+
+## Settings
+
+### Action Genome Scenes [AGS] (~sgdet)
+
+Download the required checkpoints from [here](https://utdallas.box.com/s/g94v2zfgxkxfgcs68q31lkf3olg6p7wy)
+
+### Partially Grounded Action Genome Scenes [PGAGS] (~sgcls)
+
+Download the required checkpoints from [here](https://utdallas.box.com/s/mvdwz8fe1ct9q8l1pv6ndi0wi7bkbl8r)
+
+### Grounded Action Genome Scenes [GAGS] (~predcls)
+
+Download the required checkpoints from [here](https://utdallas.box.com/s/9xncf5498o4nvqkjzpjp268gajmhiygo)
+
+------
+
+# Instructions to run
+
+Please see the scripts/training for Python modules.
+
+Please see the scripts/tests for testing Python modules.
+
+------
+
 
 # Citation
 

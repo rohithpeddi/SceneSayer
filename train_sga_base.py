@@ -308,6 +308,9 @@ class TrainSGABase(SGABase):
             losses["spatial_relation_loss"] = self._bce_loss(spatial_distribution, spatial_label)
             losses["contact_relation_loss"] = self._bce_loss(contact_distribution, contact_label)
             for i in range(1, self._conf.max_window + 1):
+                if "mask_gt_" + str(i) not in pred:
+                    print("mask_gt_" + str(i) + " not in pred")
+                    continue
                 mask_curr = pred["mask_curr_" + str(i)]
                 mask_gt = pred["mask_gt_" + str(i)]
 

@@ -165,7 +165,7 @@ If there are any errors, check gcc version ``` Works for 9.x.x```
 Follow [this](https://www.youtube.com/watch?v=aai42Qp6L28) for changing gcc version
 
 
-Download pretrained fasterRCNN model [here](https://utdallas.box.com/s/gj7n57na15cel6y682pdfn7bmnbbwq8g) and place in fasterRCNN/models/
+Download pretrained fasterRCNN model [here](https://utdallas.box.com/s/1pspm5x8etlczoklyw4bclotsmlejagj) and place in fasterRCNN/models/
 
 
 ------

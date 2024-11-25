@@ -221,13 +221,25 @@ Please see the scripts/tests for testing Python modules.
 # Citation
 
 ```
-@misc{peddi2024scene,
-      title={Towards Scene Graph Anticipation}, 
-      author={Rohith Peddi and Saksham Singh and Saurabh and Parag Singla and Vibhav Gogate},
-      year={2024},
-      eprint={2403.04899},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
+@InProceedings{peddi_et_al_scene_sayer_2024,
+    author="Peddi, Rohith
+    and Singh, Saksham
+    and Saurabh
+    and Singla, Parag
+    and Gogate, Vibhav",
+    editor="Leonardis, Ale{\v{s}}
+    and Ricci, Elisa
+    and Roth, Stefan
+    and Russakovsky, Olga
+    and Sattler, Torsten
+    and Varol, G{\"u}l",
+    title="Towards Scene Graph Anticipation",
+    booktitle="Computer Vision -- ECCV 2024",
+    year="2025",
+    publisher="Springer Nature Switzerland",
+    address="Cham",
+    pages="159--175",
+    isbn="978-3-031-73223-2"
 }
 ```
 

@@ -197,15 +197,15 @@ Eg:
 
 ### Action Genome Scenes [AGS] (~sgdet)
 
-Download the required checkpoints from [here](https://utdallas.box.com/s/g94v2zfgxkxfgcs68q31lkf3olg6p7wy)
+Download the required checkpoints from [here](https://utdallas.box.com/s/xaf2ifdla5y1qm7prh175d6e3t3yoz79)
 
 ### Partially Grounded Action Genome Scenes [PGAGS] (~sgcls)
 
-Download the required checkpoints from [here](https://utdallas.box.com/s/mvdwz8fe1ct9q8l1pv6ndi0wi7bkbl8r)
+Download the required checkpoints from [here](https://utdallas.box.com/s/qomw52816xiylln15j64nfj5lhg7d56t)
 
 ### Grounded Action Genome Scenes [GAGS] (~predcls)
 
-Download the required checkpoints from [here](https://utdallas.box.com/s/9xncf5498o4nvqkjzpjp268gajmhiygo)
+Download the required checkpoints from [here](https://utdallas.box.com/s/py5yt40pt3bokqbyx7wc0o2imzn3j5tq)
 
 ------
 
